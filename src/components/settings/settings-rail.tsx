@@ -55,7 +55,7 @@ export function SettingsRail({
         'lg:sticky lg:top-0 lg:flex-col lg:overflow-visible lg:border-b-0 lg:pb-0',
       )}
     >
-      {RAIL_GROUPS.map(({ label, group }) => {
+      {RAIL_GROUPS.map(({ labelKey, group }) => {
         const items = SETTINGS_SECTIONS.filter(
           (s) => SECTION_META[s].group === group,
         );
@@ -64,9 +64,9 @@ export function SettingsRail({
             key={group}
             className="flex shrink-0 gap-1 lg:flex-col lg:gap-0.5"
           >
-            {label ? (
+            {labelKey ? (
               <div className="hidden px-3 pt-3.5 pb-1.5 text-[11px] font-semibold tracking-[0.09em] text-muted-foreground uppercase lg:block">
-                {t(`groups.${group}`)}
+                {t(labelKey)}
               </div>
             ) : null}
             {items.map((s) => {
@@ -89,7 +89,7 @@ export function SettingsRail({
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
-                  <span className="flex-1">{t(`sections.${s}`)}</span>
+                  <span className="flex-1">{t(meta.labelKey)}</span>
                   {hints?.[s] != null ? (
                     <span
                       className={cn(

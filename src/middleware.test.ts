@@ -98,6 +98,18 @@ describe("middleware — refreshed auth cookies survive redirects", () => {
     expect(res.cookies.get(ROTATED.name)?.value).toBe(ROTATED.value);
   });
 
+  it.each(["/agents", "/flows", "/notifications", "/admin"])(
+    "redirects an unauth user off %s (server-side, not just the client shell)",
+    async (path) => {
+      mockUser = null;
+
+      const res = await middleware(new NextRequest(`https://app.test${path}`));
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toContain("/login");
+    },
+  );
+
   it("passes through (no redirect) for a signed-in user on a protected page", async () => {
     mockUser = { id: "user-1" };
     refreshedCookies = [ROTATED];

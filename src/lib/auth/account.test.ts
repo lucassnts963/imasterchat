@@ -66,9 +66,13 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: () => createClient(),
 }));
 
-const { getCurrentAccount, UnauthorizedError, ForbiddenError } = await import(
-  "./account"
-);
+const {
+  getCurrentAccount,
+  requirePlatformAdmin,
+  UnauthorizedError,
+  ForbiddenError,
+  PaymentRequiredError,
+} = await import("./account");
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -172,5 +176,93 @@ describe("getCurrentAccount", () => {
     await expect(getCurrentAccount()).rejects.toThrow(
       "Profile is not linked to an account",
     );
+  });
+});
+
+// ------------------------------------------------------------
+// Manual-billing gate (migration 037). `pending` and `blocked`
+// accounts throw a 402 PaymentRequiredError unless the caller opts
+// into `allowBlocked` (the /blocked page, admin surface, logout).
+// `active` and `past_due` — and rows with no billing_status at all,
+// which degrade to 'active' — resolve normally.
+// ------------------------------------------------------------
+
+function clientWithBilling(billing_status: string | null, extraProfile = {}) {
+  return makeClient({
+    user: { id: "user-1" },
+    byTable: {
+      profiles: {
+        data: { account_id: "acct-1", account_role: "owner", ...extraProfile },
+        error: null,
+      },
+      accounts: {
+        data: { id: "acct-1", name: "Acme", billing_status },
+        error: null,
+      },
+    },
+  });
+}
+
+describe("getCurrentAccount — billing gate", () => {
+  it.each(["pending", "blocked"] as const)(
+    "throws PaymentRequiredError (402) for a %s account",
+    async (status) => {
+      createClient.mockReturnValue(clientWithBilling(status).client);
+      const err = await getCurrentAccount().catch((e) => e);
+      expect(err).toBeInstanceOf(PaymentRequiredError);
+      expect(err.status).toBe(402);
+      expect(err.billingStatus).toBe(status);
+    },
+  );
+
+  it.each(["active", "past_due"] as const)(
+    "resolves normally for an %s account",
+    async (status) => {
+      createClient.mockReturnValue(clientWithBilling(status).client);
+      const ctx = await getCurrentAccount();
+      expect(ctx.account.billingStatus).toBe(status);
+    },
+  );
+
+  it("degrades a missing billing_status to 'active' instead of locking out", async () => {
+    createClient.mockReturnValue(clientWithBilling(null).client);
+    const ctx = await getCurrentAccount();
+    expect(ctx.account.billingStatus).toBe("active");
+  });
+
+  it("resolves a gated account when allowBlocked is passed", async () => {
+    createClient.mockReturnValue(clientWithBilling("blocked").client);
+    const ctx = await getCurrentAccount({ allowBlocked: true });
+    expect(ctx.account.billingStatus).toBe("blocked");
+    expect(ctx.account.name).toBe("Acme");
+  });
+
+  it("surfaces is_platform_admin from the profile row", async () => {
+    createClient.mockReturnValue(
+      clientWithBilling("active", { is_platform_admin: true }).client,
+    );
+    const ctx = await getCurrentAccount();
+    expect(ctx.isPlatformAdmin).toBe(true);
+  });
+
+  it("defaults isPlatformAdmin to false when the column is absent", async () => {
+    createClient.mockReturnValue(clientWithBilling("active").client);
+    const ctx = await getCurrentAccount();
+    expect(ctx.isPlatformAdmin).toBe(false);
+  });
+});
+
+describe("requirePlatformAdmin", () => {
+  it("rejects a non-admin with ForbiddenError", async () => {
+    createClient.mockReturnValue(clientWithBilling("active").client);
+    await expect(requirePlatformAdmin()).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("resolves for a platform admin even on a gated account", async () => {
+    createClient.mockReturnValue(
+      clientWithBilling("blocked", { is_platform_admin: true }).client,
+    );
+    const ctx = await requirePlatformAdmin();
+    expect(ctx.isPlatformAdmin).toBe(true);
   });
 });

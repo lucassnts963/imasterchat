@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getCurrentAccount, PaymentRequiredError } from "@/lib/auth/account";
 import { DashboardShell } from "./dashboard-shell";
 
 // Server layout whose only job is to declare "do not index" metadata
@@ -19,10 +21,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Manual-billing gate (migration 037): a pending/blocked account
+  // must not render the dashboard. API routes already 402 via
+  // toErrorResponse; this is the page-level counterpart. Middleware
+  // stays dumb (no DB round trip per request) — the gate lives here,
+  // where the account row is loaded anyway. Auth errors fall through
+  // to the existing client-side redirect in DashboardShell and the
+  // middleware guard, so only the billing case is handled.
+  try {
+    await getCurrentAccount();
+  } catch (err) {
+    if (err instanceof PaymentRequiredError) {
+      redirect("/blocked");
+    }
+  }
+
   return <DashboardShell>{children}</DashboardShell>;
 }
