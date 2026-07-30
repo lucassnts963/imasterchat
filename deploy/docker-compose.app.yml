@@ -1,0 +1,66 @@
+# ============================================================
+# iMasterChat on a VPS that also runs a self-hosted Supabase.
+#
+# This file adds ONLY the app. The Supabase stack (db, auth, rest,
+# realtime, storage, kong, studio) comes from the official
+# supabase/docker compose — see deploy/README.md. Keeping them in two
+# files means a Supabase version bump is a `git pull` in their repo,
+# not a merge conflict in ours.
+#
+# Run both together from the repo root:
+#   docker compose -f supabase/docker/docker-compose.yml \
+#                  -f deploy/docker-compose.app.yml up -d
+#
+# ⚠ NEXT_PUBLIC_SUPABASE_URL must be the PUBLIC https URL of your Kong
+# gateway (e.g. https://api.seudominio.com.br), never http://kong:8000.
+# It is inlined into the JavaScript bundle at build time and runs in
+# the visitor's browser, which cannot resolve Docker service names.
+# The server-side code in the container uses the same variable, so that
+# public hostname must also resolve from inside the container — see the
+# `extra_hosts` note in deploy/README.md if your DNS doesn't loop back.
+# ============================================================
+
+services:
+  app:
+    build:
+      context: ..
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+        NEXT_PUBLIC_APP_LOCALE: ${NEXT_PUBLIC_APP_LOCALE:-pt-BR}
+    environment:
+      PORT: 3000
+      # ANON_KEY / SERVICE_ROLE_KEY come from the Supabase stack's .env,
+      # so the two composes share one source of truth for the JWTs.
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_APP_ID: ${META_APP_ID:-}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+      NEXT_PUBLIC_BILLING_CONTACT: ${NEXT_PUBLIC_BILLING_CONTACT:-}
+      NEXT_PUBLIC_BILLING_PIX_KEY: ${NEXT_PUBLIC_BILLING_PIX_KEY:-}
+      AUTOMATION_CRON_SECRET: ${AUTOMATION_CRON_SECRET:-}
+    ports:
+      - '${HOST_PORT:-3000}:3000'
+    restart: unless-stopped
+    depends_on:
+      # Not a readiness guarantee — just ordering. The app tolerates a
+      # briefly-unavailable Supabase (requests fail and retry); the
+      # migrations are what genuinely must wait, and
+      # deploy/apply-migrations.sh does its own waiting.
+      - kong
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000').then((r)=>process.exit(r.ok||r.status<500?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

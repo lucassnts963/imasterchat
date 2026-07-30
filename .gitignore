@@ -42,3 +42,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Self-hosted Supabase stack — cloned from supabase/docker at deploy
+# time (see deploy/README.md), not vendored here.
+/supabase-stack/

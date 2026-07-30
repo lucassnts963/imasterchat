@@ -6,6 +6,12 @@ runs as a non-root user) and a `docker-compose.yml` with a single
 (or self-hosted) Supabase project via env vars; no database container
 is included.
 
+> **Rodando Supabase self-hosted na mesma VPS?** Use
+> [`deploy/README.md`](../deploy/README.md) em vez deste guia. Lá o app sobe
+> junto com o stack completo do Supabase num compose só, e as migrações são
+> aplicadas por `deploy/apply-migrations.sh` (que espera os schemas `auth` e
+> `storage` existirem antes de rodar) em vez de coladas à mão no SQL Editor.
+
 ## Quick start
 
 1. Copy the env template and fill it in:
