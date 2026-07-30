@@ -1294,7 +1294,8 @@
       "labelTooLong": "Label must be {max} characters or fewer",
       "copied": "Invite link copied",
       "clipboardBlocked": "Clipboard blocked — copy the link manually",
-      "whatsappMessage": "Join {accountName} on iMasterChat using this link (valid for {expiresInDays} days): {url}"
+      "whatsappMessage": "Join {accountName} on iMasterChat using this link (valid for {expiresInDays} days): {url}",
+      "accountFallback": "our account"
     },
     "tagsAndFields": {
       "title": "Fields & tags",

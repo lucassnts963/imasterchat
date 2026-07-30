@@ -1294,7 +1294,8 @@
       "labelTooLong": "O rótulo deve ter no máximo {max} caracteres",
       "copied": "Link do convite copiado",
       "clipboardBlocked": "Área de transferência bloqueada — copie o link manualmente",
-      "whatsappMessage": "Entre em {accountName} no iMasterChat usando este link (válido por {expiresInDays} dias): {url}"
+      "whatsappMessage": "Entre em {accountName} no iMasterChat usando este link (válido por {expiresInDays} dias): {url}",
+      "accountFallback": "nossa conta"
     },
     "tagsAndFields": {
       "title": "Campos e etiquetas",
