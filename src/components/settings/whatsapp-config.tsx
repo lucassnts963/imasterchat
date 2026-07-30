@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SettingsPanelHead } from './settings-panel-head';
+import { EmbeddedSignupButton } from './embedded-signup-button';
 import {
   Accordion,
   AccordionItem,
@@ -38,6 +39,15 @@ type ResetReason = 'token_corrupted' | 'meta_api_error' | null;
 
 export function WhatsAppConfig() {
   const t = useTranslations('Settings.whatsapp');
+  // Tech Provider credentials. Read from NEXT_PUBLIC_* (inlined at
+  // build time) rather than fetched, because the Embedded Signup popup
+  // is launched entirely client-side — the app id and config id are
+  // public by design; only the app SECRET is server-side, and it never
+  // leaves the exchange route. Both empty ⇒ this deployment isn't a
+  // Tech Provider and only the manual path renders.
+  const techProviderAppId = process.env.NEXT_PUBLIC_META_APP_ID ?? '';
+  const techProviderConfigId =
+    process.env.NEXT_PUBLIC_META_ES_CONFIG_ID ?? '';
   const supabase = createClient();
   // After multi-user, whatsapp_config is one-row-per-account, not
   // one-row-per-user. We pull `accountId` straight off the auth
@@ -554,10 +564,45 @@ export function WhatsAppConfig() {
           </Alert>
         )}
 
+        {/* Embedded Signup — only when this deployment is set up as a
+            Tech Provider (app id + Embedded Signup config id present).
+            Without both, the popup can't launch, so we render nothing
+            and the manual form below stays the only path. */}
+        {techProviderAppId && techProviderConfigId ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-foreground">
+                {t('embeddedSignup.title')}
+              </CardTitle>
+              <CardDescription className="text-muted-foreground">
+                {t('embeddedSignup.hint')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmbeddedSignupButton
+                appId={techProviderAppId}
+                configId={techProviderConfigId}
+                onConnected={() => {
+                  // Clear the "already loaded this account" guard so
+                  // the refetch actually runs — otherwise the effect
+                  // short-circuits and the screen keeps showing the
+                  // pre-connection state.
+                  loadedAccountIdRef.current = null;
+                  if (accountId) fetchConfig(accountId);
+                }}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
+
         {/* API Credentials */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-foreground">{t('apiCredentialsTitle')}</CardTitle>
+            <CardTitle className="text-foreground">
+              {techProviderAppId && techProviderConfigId
+                ? t('embeddedSignup.manualTitle')
+                : t('apiCredentialsTitle')}
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
               {t('apiCredentialsDesc')}
             </CardDescription>

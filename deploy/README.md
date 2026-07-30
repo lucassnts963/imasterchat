@@ -7,8 +7,8 @@ aplicadas por script — sem SQL Editor manual.
 ## Antes de começar
 
 - VPS com Docker e Docker Compose v2.
-- Dois hostnames apontando pra VPS: um do app (`app.seudominio.com.br`) e um da
-  API do Supabase (`api.seudominio.com.br`). Podem ser subdomínios do mesmo
+- Dois hostnames apontando pra VPS: um do app (`app.imasterchat.com.br`) e um da
+  API do Supabase (`api.imasterchat.com.br`). Podem ser subdomínios do mesmo
   domínio.
 - Um proxy reverso com TLS na frente (Caddy ou Nginx). O Supabase self-hosted
   **não** sobe HTTPS sozinho, e o WhatsApp Cloud API só entrega webhook em HTTPS.
@@ -32,9 +32,9 @@ SERVICE_ROLE_KEY=<JWT assinado com o JWT_SECRET, role "service_role">
 DASHBOARD_USERNAME=<login do Studio>
 DASHBOARD_PASSWORD=<senha do Studio>
 
-API_EXTERNAL_URL=https://api.seudominio.com.br
-SUPABASE_PUBLIC_URL=https://api.seudominio.com.br
-SITE_URL=https://app.seudominio.com.br
+API_EXTERNAL_URL=https://api.imasterchat.com.br
+SUPABASE_PUBLIC_URL=https://api.imasterchat.com.br
+SITE_URL=https://app.imasterchat.com.br
 ```
 
 `ANON_KEY` e `SERVICE_ROLE_KEY` são JWTs derivados do `JWT_SECRET` — gere pelo
@@ -64,8 +64,8 @@ Idempotente: rode de novo a cada deploy que trouxer migração nova.
 Acrescente ao mesmo `.env`:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://api.seudominio.com.br
-NEXT_PUBLIC_SITE_URL=https://app.seudominio.com.br
+NEXT_PUBLIC_SUPABASE_URL=https://api.imasterchat.com.br
+NEXT_PUBLIC_SITE_URL=https://app.imasterchat.com.br
 NEXT_PUBLIC_APP_LOCALE=pt-BR
 
 # 64 hex — criptografa os tokens de WhatsApp de cada cliente:
@@ -93,7 +93,7 @@ docker compose -f supabase-stack/docker-compose.yml \
 
 ## 5. Primeiro acesso
 
-1. Crie sua conta em `https://app.seudominio.com.br/signup`.
+1. Crie sua conta em `https://app.imasterchat.com.br/signup`.
 2. Ela nasce `pending` (é o comportamento correto — veja
    `docs/cobranca-manual.md`). Libere a si mesmo e vire admin da plataforma:
 
@@ -120,14 +120,14 @@ serviço `app`:
 
 ```yaml
 extra_hosts:
-  - 'api.seudominio.com.br:172.17.0.1'
+  - 'api.imasterchat.com.br:172.17.0.1'
 ```
 
 **Trocar qualquer `NEXT_PUBLIC_*` exige rebuild** (`up -d --build`), não só
 restart — são inlined no bundle.
 
 **Webhook da Meta precisa de HTTPS válido** apontando para
-`https://app.seudominio.com.br/api/whatsapp/webhook`. Certificado autoassinado a
+`https://app.imasterchat.com.br/api/whatsapp/webhook`. Certificado autoassinado a
 Meta rejeita silenciosamente.
 
 **`pgvector`**: a migração 030 roda `CREATE EXTENSION IF NOT EXISTS vector`. A
