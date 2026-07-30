@@ -35,6 +35,10 @@ interface Profile {
   beta_features: string[];
   account_id: string | null;
   account_role: AccountRole | null;
+  /** Cross-tenant platform-admin flag (migration 037). Drives the
+   *  /admin entry in the sidebar; the real enforcement lives in the
+   *  /admin page guard and every /api/admin route. */
+  is_platform_admin: boolean;
 }
 
 interface AccountSummary {
@@ -102,6 +106,9 @@ interface AuthContextValue {
   canEditSettings: boolean;
   /** True if the caller can send messages and edit operational data (agent+). */
   canSendMessages: boolean;
+  /** True if the caller is a cross-tenant platform admin (037). UI-only
+   *  convenience — server routes re-check on every request. */
+  isPlatformAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -138,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role",
+          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role, is_platform_admin",
         )
         .eq("user_id", userId)
         .maybeSingle();
@@ -212,6 +219,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           beta_features: data.beta_features ?? [],
           account_id: data.account_id ?? null,
           account_role: accountRole,
+          // Narrow defensively for deployments that haven't run 037 yet
+          // — null reads as "not a platform admin", which fails closed.
+          is_platform_admin: data.is_platform_admin === true,
         });
         setAccount(accountRow);
       } else {
@@ -330,8 +340,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canManageMembers: role ? canManageMembersFor(role) : false,
       canEditSettings: role ? canEditSettingsFor(role) : false,
       canSendMessages: role ? canSendMessagesFor(role) : false,
+      isPlatformAdmin: profile?.is_platform_admin ?? false,
     };
-  }, [profile?.account_role, profile?.account_id]);
+  }, [profile?.account_role, profile?.account_id, profile?.is_platform_admin]);
 
   return (
     <AuthContext.Provider
@@ -383,6 +394,7 @@ export function useAuth(): AuthContextValue {
       canManageMembers: false,
       canEditSettings: false,
       canSendMessages: false,
+      isPlatformAdmin: false,
     };
   }
   return ctx;
