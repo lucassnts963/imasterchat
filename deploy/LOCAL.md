@@ -83,6 +83,15 @@ Abra <http://localhost:3000>.
 > (navegador e servidor são o mesmo host, sem `/etc/hosts`), e você tem hot
 > reload. Use o container quando quiser validar a imagem que vai pra VPS.
 
+## E-mails no ambiente local (Mailpit)
+
+Nenhum SMTP é necessário para testar. Todo e-mail que o Supabase Auth enviar
+(recuperação de senha, convite, troca de e-mail) é capturado pelo **Mailpit**
+em <http://localhost:54324> — abra a caixa lá e clique no link. A confirmação
+de cadastro está **desativada** no local (`enable_confirmations = false`):
+conta nova entra logada direto, sem e-mail. Em produção, configure um SMTP
+real na stack — veja a seção "E-mails de auth (SMTP)" do `deploy/README.md`.
+
 ## 6. Roteiro de teste
 
 **Bloqueio e aprovação manual** — o fluxo novo, vale testar primeiro:

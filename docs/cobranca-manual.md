@@ -52,6 +52,16 @@ automaticamente — a migração nunca tranca um cliente que já estava rodando.
 3. Se atrasar: mude para `past_due` (avisa mas não corta) ou `blocked` (corta).
 4. Pagou: volta para `active`. Nada foi perdido — veja abaixo.
 
+### Cliente esqueceu a senha
+
+O caminho normal é o próprio cliente usar "Esqueci a senha" no login — o
+Supabase envia o e-mail de redefinição (exige o SMTP configurado; veja
+"E-mails de auth (SMTP)" no `deploy/README.md`). Enquanto o SMTP não estiver
+configurado, o plano B é você redefinir manualmente: **Supabase Studio →
+Authentication → Users → ⋯ na linha do usuário → Reset password** (ou envie
+um novo convite de acesso). Não há como recuperar a senha antiga — só definir
+uma nova.
+
 ## O que acontece com uma conta bloqueada
 
 **As mensagens continuam chegando e sendo salvas.** O webhook do WhatsApp segue
