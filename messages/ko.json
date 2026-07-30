@@ -1911,7 +1911,8 @@
       "updateError": "계정을 업데이트할 수 없습니다",
       "updatedToast": "계정이 업데이트되었습니다",
       "empty": "아직 계정이 없습니다",
-      "forbidden": "이 페이지에 접근할 권한이 없습니다."
+      "forbidden": "이 페이지에 접근할 권한이 없습니다.",
+      "refresh": "새로고침"
     }
   },
   "Interactive": {

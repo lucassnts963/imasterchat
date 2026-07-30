@@ -1911,7 +1911,8 @@
       "updateError": "Não foi possível atualizar a conta",
       "updatedToast": "Conta atualizada",
       "empty": "Nenhuma conta ainda",
-      "forbidden": "Você não tem acesso a esta página."
+      "forbidden": "Você não tem acesso a esta página.",
+      "refresh": "Atualizar"
     }
   },
   "Interactive": {

@@ -30,6 +30,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { hasMinRole, isAccountRole, type AccountRole } from "./roles";
+// Billing vocabulary lives in a dependency-free module so client
+// components can import it without dragging `next/headers` in through
+// this file. Re-exported here for the server-side callers that already
+// import their account plumbing from one place.
+import {
+  isBillingGated,
+  isBillingStatus,
+  type BillingStatus,
+} from "@/lib/billing/status";
+
+export {
+  BILLING_STATUSES,
+  isBillingGated,
+  isBillingStatus,
+  type BillingStatus,
+} from "@/lib/billing/status";
 
 // ------------------------------------------------------------
 // Errors
@@ -100,33 +116,6 @@ export function toErrorResponse(err: unknown): NextResponse {
 // ------------------------------------------------------------
 // Account context
 // ------------------------------------------------------------
-
-/**
- * Manual-billing state of an account. Mirrors the Postgres
- * `billing_status_enum` from migration 037. `pending` and `blocked`
- * are the gated states; `active` and `past_due` have full access
- * (`past_due` additionally shows a warning banner client-side).
- */
-export const BILLING_STATUSES = [
-  "pending",
-  "active",
-  "past_due",
-  "blocked",
-] as const;
-
-export type BillingStatus = (typeof BILLING_STATUSES)[number];
-
-export function isBillingStatus(value: unknown): value is BillingStatus {
-  return (
-    typeof value === "string" &&
-    (BILLING_STATUSES as ReadonlyArray<string>).includes(value)
-  );
-}
-
-/** The two statuses that deny dashboard/API access. */
-export function isBillingGated(status: BillingStatus): boolean {
-  return status === "pending" || status === "blocked";
-}
 
 export interface AccountContext {
   /** Supabase SSR client, RLS scoped to the calling user. */

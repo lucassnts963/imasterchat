@@ -9,6 +9,7 @@ import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
+import { accountAllowsSideEffects } from '@/lib/billing/side-effects'
 import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
@@ -708,6 +709,29 @@ async function processMessage(
   await flagBroadcastReplyIfAny(accountId, contactRecord.id)
 
   // ============================================================
+  // Manual-billing gate (migration 037).
+  //
+  // Everything above this line has already run: the contact,
+  // conversation, and message rows are persisted for gated accounts
+  // too, so approving or unblocking one restores a complete history.
+  // What follows is the paid surface — flows, automations, and AI
+  // auto-replies, all of which SEND WhatsApp messages on the
+  // operator's behalf — and that stops for `pending` / `blocked`
+  // accounts. The lookup fails open (see accountAllowsSideEffects).
+  //
+  // The public-API webhook dispatch further down is deliberately NOT
+  // gated: it notifies the operator's own endpoint and messages
+  // nobody, so silencing it would just create an unexplained gap in
+  // their event stream.
+  // ============================================================
+  const sideEffectsAllowed = await accountAllowsSideEffects(accountId)
+  if (!sideEffectsAllowed) {
+    console.warn(
+      `[billing] account ${accountId} is gated — inbound stored, side effects skipped`,
+    )
+  }
+
+  // ============================================================
   // Flow runner dispatch.
   //
   // If the runner consumes the message (it either advanced an active
@@ -726,7 +750,9 @@ async function processMessage(
   // no active flows take the runner's early-exit "no_match" path
   // basically for free (one indexed SELECT for the active run).
   // ============================================================
-  const flowResult = await dispatchInboundToFlows({
+  const flowResult = !sideEffectsAllowed
+    ? { consumed: false }
+    : await dispatchInboundToFlows({
     accountId,
     userId: configOwnerUserId,
     contactId: contactRecord.id,
@@ -745,7 +771,7 @@ async function processMessage(
             meta_message_id: message.id,
           },
     isFirstInboundMessage,
-  })
+      })
   const flowConsumed = flowResult.consumed
 
   // Fire any automations that react to this webhook event. All dispatches
@@ -789,7 +815,7 @@ async function processMessage(
   // logging zero steps. `runAutomationsForTrigger` owns its own try/catch
   // and never throws; the `.catch` is belt-and-braces so one trigger
   // type's failure can't skip the rest of the loop.
-  for (const triggerType of automationTriggers) {
+  for (const triggerType of sideEffectsAllowed ? automationTriggers : []) {
     await runAutomationsForTrigger({
       accountId,
       triggerType,
@@ -809,7 +835,12 @@ async function processMessage(
   // the account has enabled it. Awaited inside `after()` (same reason as
   // the webhook dispatch below); `dispatchInboundToAiReply` owns its
   // eligibility gates + try/catch and never throws.
-  if (!flowConsumed && !interactiveReplyId && inboundText.trim()) {
+  if (
+    sideEffectsAllowed &&
+    !flowConsumed &&
+    !interactiveReplyId &&
+    inboundText.trim()
+  ) {
     await dispatchInboundToAiReply({
       accountId,
       conversationId: conversation.id,

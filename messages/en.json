@@ -1911,7 +1911,8 @@
       "updateError": "Could not update the account",
       "updatedToast": "Account updated",
       "empty": "No accounts yet",
-      "forbidden": "You do not have access to this page."
+      "forbidden": "You do not have access to this page.",
+      "refresh": "Refresh"
     }
   },
   "Interactive": {
