@@ -78,7 +78,7 @@ UPDATE public.accounts
          CASE WHEN billing_notes IS NULL THEN '' ELSE E'\n' END ||
          '[037] auto-promoted pre-billing account'
  WHERE billing_status = 'pending'
-   AND billing_notes IS DISTINCT FROM NULL IS FALSE
+   AND billing_notes IS NULL
    AND NOT EXISTS (
      SELECT 1 FROM public.accounts a2
       WHERE a2.id = accounts.id
