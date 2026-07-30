@@ -1,0 +1,50 @@
+# ============================================================
+# iMasterChat local — app em container, Supabase self-hosted ao lado.
+#
+# Diferença para deploy/docker-compose.app.yml: aqui não existe domínio
+# público. O problema disso é que `NEXT_PUBLIC_SUPABASE_URL` é UMA
+# string usada por dois lugares que enxergam a rede de formas
+# diferentes — o navegador (que não resolve nome de serviço do Docker) e
+# o servidor Next dentro do container (que não alcança `localhost` do
+# host).
+#
+# A saída é um hostname que resolve dos dois lados para o mesmo Kong:
+#
+#   1. no host:        echo "127.0.0.1 supabase.local" | sudo tee -a /etc/hosts
+#   2. no container:   extra_hosts abaixo aponta para o gateway do Docker
+#
+# Navegador  → 127.0.0.1:8000        → Kong (porta publicada)
+# Container  → host-gateway:8000     → Kong (mesma porta publicada)
+#
+# Veja deploy/LOCAL.md para o passo a passo.
+# ============================================================
+
+services:
+  app:
+    build:
+      context: ..
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://supabase.local:8000}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+        NEXT_PUBLIC_APP_LOCALE: ${NEXT_PUBLIC_APP_LOCALE:-pt-BR}
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://supabase.local:8000}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # Só é exigido pelo webhook da Meta. Para ver a interface local
+      # qualquer valor serve — o webhook não vai receber nada sem um
+      # túnel HTTPS público de qualquer forma.
+      META_APP_SECRET: ${META_APP_SECRET:-local-dev-secret}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      NEXT_PUBLIC_BILLING_CONTACT: ${NEXT_PUBLIC_BILLING_CONTACT:-}
+      NEXT_PUBLIC_BILLING_PIX_KEY: ${NEXT_PUBLIC_BILLING_PIX_KEY:-}
+    extra_hosts:
+      # Faz `supabase.local` apontar para o host de dentro do container,
+      # onde o Kong está publicado na 8000.
+      - 'supabase.local:host-gateway'
+    ports:
+      - '${HOST_PORT:-3000}:3000'
+    restart: unless-stopped
