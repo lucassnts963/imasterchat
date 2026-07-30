@@ -26,7 +26,14 @@ export type ThemeId = (typeof THEME_IDS)[number];
 
 export const DEFAULT_THEME: ThemeId = "elucas";
 
-export const STORAGE_KEY = "wacrm.theme";
+export const STORAGE_KEY = "imasterchat.theme";
+
+/**
+ * Pre-rebrand key. The boot script in `src/app/layout.tsx` migrates a
+ * value found here to STORAGE_KEY once, then deletes it, so a browser
+ * that used the app under the old brand keeps its chosen accent.
+ */
+export const LEGACY_STORAGE_KEY = "wacrm.theme";
 
 /**
  * MODE — the light/dark dimension, orthogonal to the accent theme.
@@ -46,7 +53,10 @@ export type Mode = (typeof MODES)[number];
 
 export const DEFAULT_MODE: Mode = "dark";
 
-export const MODE_STORAGE_KEY = "wacrm.mode";
+export const MODE_STORAGE_KEY = "imasterchat.mode";
+
+/** Pre-rebrand key — same one-time migration as LEGACY_STORAGE_KEY. */
+export const LEGACY_MODE_STORAGE_KEY = "wacrm.mode";
 
 export function isMode(value: unknown): value is Mode {
   return (

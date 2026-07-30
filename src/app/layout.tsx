@@ -9,6 +9,8 @@ import { ThemedToaster } from "@/components/themed-toaster";
 import {
   DEFAULT_MODE,
   DEFAULT_THEME,
+  LEGACY_MODE_STORAGE_KEY,
+  LEGACY_STORAGE_KEY,
   MODE_STORAGE_KEY,
   MODES,
   STORAGE_KEY,
@@ -66,16 +68,37 @@ const THEME_BOOT_SCRIPT = `
 (function(){
   var d = document.documentElement;
   try {
+    // One-time migration from the pre-rebrand wacrm.* keys: a browser
+    // that used the app under the old brand keeps its chosen accent
+    // and mode under the new keys, and the old keys are removed.
     var THEME_KEY = ${JSON.stringify(STORAGE_KEY)};
+    var THEME_LEGACY_KEY = ${JSON.stringify(LEGACY_STORAGE_KEY)};
     var THEME_DEFAULT = ${JSON.stringify(DEFAULT_THEME)};
     var THEMES = ${JSON.stringify(THEME_IDS)};
     var savedTheme = localStorage.getItem(THEME_KEY);
+    var legacyTheme = localStorage.getItem(THEME_LEGACY_KEY);
+    if (legacyTheme !== null) {
+      if (savedTheme === null && THEMES.indexOf(legacyTheme) !== -1) {
+        localStorage.setItem(THEME_KEY, legacyTheme);
+        savedTheme = legacyTheme;
+      }
+      localStorage.removeItem(THEME_LEGACY_KEY);
+    }
     d.dataset.theme = THEMES.indexOf(savedTheme) !== -1 ? savedTheme : THEME_DEFAULT;
 
     var MODE_KEY = ${JSON.stringify(MODE_STORAGE_KEY)};
+    var MODE_LEGACY_KEY = ${JSON.stringify(LEGACY_MODE_STORAGE_KEY)};
     var MODE_DEFAULT = ${JSON.stringify(DEFAULT_MODE)};
     var MODES = ${JSON.stringify(MODES)};
     var savedMode = localStorage.getItem(MODE_KEY);
+    var legacyMode = localStorage.getItem(MODE_LEGACY_KEY);
+    if (legacyMode !== null) {
+      if (savedMode === null && MODES.indexOf(legacyMode) !== -1) {
+        localStorage.setItem(MODE_KEY, legacyMode);
+        savedMode = legacyMode;
+      }
+      localStorage.removeItem(MODE_LEGACY_KEY);
+    }
     d.dataset.mode = MODES.indexOf(savedMode) !== -1 ? savedMode : MODE_DEFAULT;
   } catch (_e) {
     d.dataset.theme = ${JSON.stringify(DEFAULT_THEME)};
