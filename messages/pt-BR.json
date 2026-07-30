@@ -73,6 +73,16 @@
       "openDeals": "{count} {count, plural, =1 {negócio aberto} other {negócios abertos}}",
       "noChange": "Sem alteração {suffix}"
     },
+    "aiCost": {
+      "title": "Custo de IA (mês atual)",
+      "estimatedBadge": "estimativa",
+      "ofBudget": "de {budget}",
+      "usedOfBudget": "{pct}% do orçamento mensal usado",
+      "nearBudget": "O saldo de IA está acabando — {pct}% do orçamento mensal usado",
+      "overBudget": "Orçamento mensal de IA estourado",
+      "noBudget": "Nenhum orçamento mensal definido — configure um em Agentes de IA → Configurar para ser avisado antes de o saldo acabar.",
+      "manage": "Gerenciar IA"
+    },
     "quickActions": {
       "newContact": "Novo contato",
       "newDeal": "Novo negócio",
@@ -1704,6 +1714,10 @@
       "handoffTo": "Passar para",
       "handoffToDesc": "Quando o bot não consegue ajudar — ou atinge o limite de respostas — ele pausa e encaminha a conversa para cá, com uma breve nota sobre o que aconteceu.",
       "handoffQueue": "Fila sem atribuição (qualquer atendente pode assumir)",
+      "monthlyBudget": "Orçamento mensal de IA (US$)",
+      "monthlyBudgetDesc": "A OpenAI/Anthropic cobra sua chave em dólar americano. O painel estima o gasto do mês e avisa quando ele se aproxima deste valor. Deixe vazio para não ter orçamento.",
+      "monthlyBudgetPlaceholder": "50,00",
+      "invalidBudget": "Informe um valor de orçamento positivo (ou deixe vazio).",
       "remove": "Remover",
       "save": "Salvar",
       "missingModel": "Informe o nome de um modelo.",

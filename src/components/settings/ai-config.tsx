@@ -74,6 +74,8 @@ export function AiConfig() {
   const [maxPerConversation, setMaxPerConversation] = useState(3);
   // Empty string = leave unassigned (shared queue).
   const [handoffAgentId, setHandoffAgentId] = useState('');
+  // Free text so the admin can clear the field; '' = no budget (null).
+  const [monthlyBudget, setMonthlyBudget] = useState('');
   const [members, setMembers] = useState<AccountMember[]>([]);
 
   // Guard keyed on the account (not a bare boolean) so an in-place
@@ -100,6 +102,9 @@ export function AiConfig() {
         setAutoReplyEnabled(data.auto_reply_enabled);
         setMaxPerConversation(data.auto_reply_max_per_conversation ?? 3);
         setHandoffAgentId(data.handoff_agent_id ?? '');
+        setMonthlyBudget(
+          data.monthly_budget_usd != null ? String(data.monthly_budget_usd) : '',
+        );
         setHasStoredKey(Boolean(data.has_key));
         setApiKey(data.has_key ? MASKED_KEY : '');
         setKeyEdited(false);
@@ -151,6 +156,9 @@ export function AiConfig() {
     auto_reply_enabled: autoReplyEnabled,
     auto_reply_max_per_conversation: maxPerConversation,
     handoff_agent_id: handoffAgentId || null,
+    monthly_budget_usd: monthlyBudget.trim()
+      ? Number(monthlyBudget.replace(',', '.'))
+      : null,
   });
 
   const handleTest = async () => {
@@ -179,6 +187,13 @@ export function AiConfig() {
     if (!model.trim()) {
       toast.error(t('missingModel'));
       return;
+    }
+    if (monthlyBudget.trim()) {
+      const parsed = Number(monthlyBudget.replace(',', '.'));
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        toast.error(t('invalidBudget'));
+        return;
+      }
     }
     if (!configured && !keyEdited) {
       toast.error(t('missingApiKey'));
@@ -219,6 +234,7 @@ export function AiConfig() {
         setAutoReplyEnabled(false);
         setSystemPrompt('');
         setHandoffAgentId('');
+        setMonthlyBudget('');
       } else {
         const data = await res.json();
         toast.error(data.error ?? t('removeFailed'));
@@ -482,6 +498,25 @@ export function AiConfig() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="ai-budget">{t('monthlyBudget')}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t('monthlyBudgetDesc')}
+                </p>
+              </div>
+              <Input
+                id="ai-budget"
+                type="text"
+                inputMode="decimal"
+                value={monthlyBudget}
+                onChange={(e) => setMonthlyBudget(e.target.value)}
+                placeholder={t('monthlyBudgetPlaceholder')}
+                disabled={disabled}
+                className="w-28"
+              />
             </div>
           </CardContent>
         </Card>

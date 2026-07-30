@@ -29,6 +29,7 @@ import type {
 import { MetricCard } from '@/components/dashboard/metric-card'
 import { SkeletonCard } from '@/components/dashboard/skeleton'
 import { QuickActions } from '@/components/dashboard/quick-actions'
+import { AiCostCard } from '@/components/dashboard/ai-cost-card'
 import { ConversationsChart } from '@/components/dashboard/conversations-chart'
 import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
@@ -190,6 +191,9 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <QuickActions />
+
+      {/* AI spend vs budget (admins; hidden when AI isn't configured) */}
+      <AiCostCard />
 
       {/* Charts row */}
       {/* items-stretch (the grid default) stretches the two columns to

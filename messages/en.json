@@ -73,6 +73,16 @@
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}"
     },
+    "aiCost": {
+      "title": "AI cost (this month)",
+      "estimatedBadge": "estimate",
+      "ofBudget": "of {budget}",
+      "usedOfBudget": "{pct}% of the monthly budget used",
+      "nearBudget": "AI balance is running out — {pct}% of the monthly budget used",
+      "overBudget": "Monthly AI budget exceeded",
+      "noBudget": "No monthly budget set — define one in AI Agents → Set up to get a warning before the balance runs out.",
+      "manage": "Manage AI"
+    },
     "quickActions": {
       "newContact": "New Contact",
       "newDeal": "New Deal",
@@ -1704,6 +1714,10 @@
       "handoffTo": "Hand off to",
       "handoffToDesc": "When the bot can’t help — or hits the reply cap — it pauses and routes the chat here, with a short note on what happened.",
       "handoffQueue": "Unassigned queue (any agent can pick it up)",
+      "monthlyBudget": "Monthly AI budget (US$)",
+      "monthlyBudgetDesc": "OpenAI/Anthropic bill your key in US dollars. The dashboard estimates month-to-date spend and warns when it nears this amount. Leave empty for no budget.",
+      "monthlyBudgetPlaceholder": "50.00",
+      "invalidBudget": "Enter a positive budget amount (or leave it empty).",
       "remove": "Remove",
       "save": "Save",
       "missingModel": "Enter a model name.",

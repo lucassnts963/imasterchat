@@ -30,7 +30,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key',
+        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -112,6 +112,20 @@ export async function POST(request: Request) {
         .maybeSingle()
       if (!member) return bad('handoff_agent_id must be a member of this account')
       handoffAgentId = rawHandoff
+    }
+
+    // Monthly AI budget in USD (migration 040): a positive number sets
+    // it, an explicit null clears it, absent leaves it unchanged — the
+    // same partial-save contract as handoff_agent_id.
+    const budgetProvided = 'monthly_budget_usd' in body
+    let monthlyBudgetUsd: number | null = null
+    if (budgetProvided && body.monthly_budget_usd !== null) {
+      const rawBudget = Number(body.monthly_budget_usd)
+      if (!Number.isFinite(rawBudget) || rawBudget <= 0) {
+        return bad('monthly_budget_usd must be a positive number or null')
+      }
+      // numeric(10,2) column — round to cents and stay inside precision.
+      monthlyBudgetUsd = Math.min(99_999_999, Math.round(rawBudget * 100) / 100)
     }
 
     const rawKey = typeof body.api_key === 'string' ? body.api_key.trim() : ''
@@ -209,6 +223,7 @@ export async function POST(request: Request) {
     // Only touch the handoff target when the form actually sent the field,
     // so a partial save (e.g. flipping a toggle) doesn't wipe it.
     if (handoffProvided) shared.handoff_agent_id = handoffAgentId
+    if (budgetProvided) shared.monthly_budget_usd = monthlyBudgetUsd
     if (rawEmbeddingsKey) {
       shared.embeddings_api_key = encrypt(rawEmbeddingsKey)
     } else if (clearEmbeddingsKey) {
