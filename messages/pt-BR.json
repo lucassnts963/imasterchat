@@ -1781,6 +1781,7 @@
     }
   },
   "SignupPage": {
+    "emailAlreadyRegistered": "Este e-mail já tem uma conta. Entre com sua senha ou use “Esqueci a senha”.",
     "titleJoin": "Criar conta e participar",
     "title": "Criar conta",
     "descJoin": "Verifique seu e-mail e depois aceite o convite para entrar na sua equipe.",

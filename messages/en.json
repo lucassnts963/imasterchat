@@ -1781,6 +1781,7 @@
     }
   },
   "SignupPage": {
+    "emailAlreadyRegistered": "This email already has an account. Sign in with your password, or use “Forgot password”.",
     "titleJoin": "Create account & join",
     "title": "Create account",
     "descJoin": "Verify your email, then accept the invitation to join your team.",

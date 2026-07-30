@@ -71,7 +71,7 @@ function SignupPageInner() {
       ? `${window.location.origin}/join/${encodeURIComponent(inviteToken)}`
       : undefined;
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -83,11 +83,41 @@ function SignupPageInner() {
     });
 
     if (error) {
-      setError(error.message);
+      // With autoconfirm on, GoTrue reports a duplicate email as an
+      // explicit 422 instead of the anti-enumeration stub handled
+      // below — same user story, same translated message.
+      setError(
+        error.code === "user_already_exists"
+          ? t("emailAlreadyRegistered")
+          : error.message,
+      );
       setLoading(false);
       return;
     }
 
+    // With email confirmation disabled the signup already returned a
+    // session — go straight in. Full-page navigation (not router.push)
+    // for the same reason as /login: the fresh auth cookies must reach
+    // the middleware on a top-level request (issue #365). The billing
+    // gate routes a pending account to /blocked by itself.
+    if (data.session) {
+      window.location.href = inviteToken
+        ? `/join/${encodeURIComponent(inviteToken)}`
+        : "/dashboard";
+      return;
+    }
+
+    // Anti-enumeration: for an already-registered email GoTrue returns
+    // success with a user stub whose identities array is empty and no
+    // session. Without this branch that lands on "check your email" —
+    // an email that will never arrive.
+    if (data.user && data.user.identities?.length === 0) {
+      setError(t("emailAlreadyRegistered"));
+      setLoading(false);
+      return;
+    }
+
+    // Real pending confirmation (production with SMTP configured).
     setSuccess(true);
     setLoading(false);
   };
