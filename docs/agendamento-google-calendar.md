@@ -189,12 +189,132 @@ o corpo. Concretamente: a tabela `appointments` (item 3 da Abordagem A) vale
 construir **agora**, com o n8n gravando nela via API — assim o histórico de
 agendamentos já nasce dentro do produto, e a versão nativa só troca quem escreve.
 
+---
+
+## Como funciona na prática
+
+### A conversa, passo a passo
+
+```
+Cliente:  "oi, queria marcar um exame de vista"
+            │
+            ├─ Meta entrega no webhook do iMasterChat
+            ├─ App grava contato, conversa e mensagem (sempre)
+            └─ Automação `new_message_received` → POST para o n8n
+                        │
+IA (n8n):   lê o histórico da conversa (memória por telefone)
+            usa a tool `calendar:availability` na agenda da ótica
+            │
+            └─ responde via POST /api/v1/messages
+Bot:      "Claro! Tenho quinta 14h, quinta 16h ou sexta 09h. Qual fica melhor?"
+
+Cliente:  "quinta de tarde"
+            │
+IA:         entende "quinta 14h ou 16h", já sabe que hoje é terça
+            (a data atual é injetada no prompt — o modelo não sabe sozinho)
+Bot:      "Quinta às 14h ou às 16h?"
+
+Cliente:  "14h"
+            │
+IA:         valida a regra seg–sex e o horário comercial
+            usa a tool `event:create` → grava na Google Agenda
+            grava também em `appointments` no app (histórico no produto)
+Bot:      "Pronto! Exame marcado para quinta, 14h. Te espero aqui 😊"
+```
+
+A atendente vê **toda** essa conversa na caixa de entrada do iMasterChat, em
+tempo real, sem precisar fazer nada. O bot não é um canal paralelo — as
+mensagens dele são gravadas como mensagens da conversa, marcadas como geradas
+por IA.
+
+### Quem garante a regra de negócio
+
+Duas camadas, e as duas são necessárias:
+
+1. **O prompt** diz o comportamento: horário de funcionamento, duração da
+   consulta, tom, o que fazer quando não há vaga.
+2. **Um nó `IF` antes de gravar** valida o que o modelo decidiu: é dia útil? está
+   dentro da janela? o slot ainda está livre?
+
+A segunda camada existe porque prompt não é garantia. Modelo alucina data,
+inventa horário, confunde "quinta que vem". Se a validação falhar, não grava —
+vira handoff.
+
+### Os casos em que o humano é acionado
+
+Essa é a outra metade da autonomia: o bot precisa saber **quando parar**.
+
+| Situação | O que o bot faz |
+|---|---|
+| Fora do horário comercial pedido, ou data muito à frente | Explica e chama humano |
+| Cliente já tem consulta marcada e quer remarcar/cancelar | Chama humano (mexer em agendamento existente é mais arriscado que criar) |
+| Não entendeu depois de 2 tentativas | Chama humano em vez de insistir |
+| Cliente reclama, cita preço fora de tabela, assunto sensível | Chama humano |
+| Cliente pede explicitamente falar com atendente | Chama humano na hora |
+| Erro na Google Agenda (token expirado, API fora) | Chama humano — nunca finge que agendou |
+
+### O que "chamar humano" significa dentro do app
+
+O iMasterChat **já tem esse mecanismo pronto**, e é bom. Quando um handoff
+acontece:
+
+- A conversa vira `status = 'pending'` (aparece na fila de pendentes).
+- `ai_autoreply_disabled = true` na conversa — o bot **para de responder aquela
+  thread para sempre**, mesmo que o cliente mande mais mensagens. Sem isso o bot
+  ficaria atropelando a atendente.
+- Uma nota interna é escrita em `ai_handoff_summary`, com a última fala do
+  cliente citada — a atendente entende o contexto sem ler tudo
+  (`src/lib/ai/handoff.ts`).
+- Opcionalmente atribui a um atendente específico (`handoff_agent_id`).
+- Um banner aparece na conversa dentro da caixa de entrada
+  (`src/components/inbox/ai-thread-banner.tsx`), com botão para assumir e, depois,
+  para devolver a conversa ao bot.
+
+### A lacuna: o n8n não consegue disparar isso hoje
+
+Esse mecanismo está ligado à IA nativa. Com o n8n sendo o cérebro, ele precisa de
+um jeito de dizer "para tudo, chama gente" — e **não existe**:
+
+- `/api/v1/conversations` só tem `GET`. Não há `PATCH`, não há atribuição.
+- O único endpoint que mexe em `assigned_agent_id` é
+  `/api/ai/autoreply/[conversationId]`, autenticado por **sessão de usuário** —
+  o n8n não tem sessão, tem chave de API.
+
+Então **falta uma rota**: `POST /api/v1/conversations/{id}/handoff`, com escopo
+próprio, que faça exatamente o que o handoff nativo faz (status pendente, nota
+interna, atribuição opcional). É trabalho pequeno — meio dia — e é justamente o
+contrato que a versão nativa usaria depois. Sem ela, o "chama humano" vira
+gambiarra: marcar o contato com uma etiqueta e torcer para alguém olhar.
+
+### Onde a atendente vive
+
+Na caixa de entrada do iMasterChat, como já vive hoje. Ela vê a conversa inteira
+(bot e cliente), a fila de pendentes, o banner de handoff com o resumo, e assume
+com um clique. **Nada disso muda entre as duas abordagens** — muda só quem gera a
+resposta do bot.
+
+### O que a ótica configura, e onde
+
+| O quê | Onde |
+|---|---|
+| Horários de atendimento, duração da consulta, antecedência | Prompt do agente no n8n (depois: tela de configuração no app) |
+| Bloquear um dia (feriado, viagem) | Direto na Google Agenda — o bot respeita na hora |
+| Desligar o bot numa conversa específica | Botão "assumir conversa" na caixa de entrada |
+| Desligar o bot inteiro | Chave `is_active` na configuração de IA |
+
+O bloqueio por evento na Google Agenda é consequência direta da decisão "Google
+Agenda é a verdade" — a ótica não precisa aprender uma segunda ferramenta para
+bloquear horário.
+
 ## Próximos passos
 
 1. Criar a credencial de Google Calendar no n8n e a chave de API do iMasterChat.
 2. Definir com a cliente: duração da consulta, horários exatos seg–sex, janela de
    antecedência, política de remarcação/cancelamento.
-3. Montar o workflow do n8n e testar o diálogo no número de teste.
+3. **Rota de handoff na API v1** (`POST /api/v1/conversations/{id}/handoff`) — sem
+   ela o n8n não consegue acionar humano de forma decente. Meio dia de trabalho,
+   e é o mesmo contrato que a versão nativa usa depois.
 4. Migração `appointments` no app (tabela + endpoint de escrita na API v1) para o
    histórico já nascer no produto.
-5. Depois de rodar com a ótica: decidir se o volume justifica a versão nativa.
+5. Montar o workflow do n8n e testar o diálogo no número de teste.
+6. Depois de rodar com a ótica: decidir se o volume justifica a versão nativa.
