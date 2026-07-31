@@ -25,8 +25,8 @@ import { buttonVariants } from "@/components/ui/button";
 // Dados exibidos no rodapé. A verificação de negócio da Meta confere o
 // site contra o cadastro da empresa — preencha com sua razão social e
 // CNPJ para os dois baterem. Deixar vazio omite a linha.
-const LEGAL_NAME = "";
-const CNPJ = "";
+const LEGAL_NAME = "LUCAS DE OLIVEIRA S";
+const CNPJ = "42.659.473/0001-45";
 
 export const metadata: Metadata = {
   title: "iMasterChat — Atendimento e CRM para WhatsApp",
