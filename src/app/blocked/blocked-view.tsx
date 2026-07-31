@@ -20,6 +20,21 @@ interface BlockedViewProps {
   contact: string | null;
   /** PIX key shown for manual payment. */
   pixKey: string | null;
+  /** PIX QR code image — base64 PNG, with or without a data: prefix. */
+  pixQr: string | null;
+}
+
+// Accepts the raw base64 the operator pasted into the env var either
+// bare or already as a data URI; anything else (e.g. an http URL by
+// mistake) is dropped so we never emit a broken/foreign <img src>.
+function pixQrSrc(value: string | null): string | null {
+  if (!value) return null;
+  const v = value.trim();
+  if (v.startsWith("data:image/")) return v;
+  if (/^[A-Za-z0-9+/=\s]+$/.test(v)) {
+    return `data:image/png;base64,${v.replace(/\s/g, "")}`;
+  }
+  return null;
 }
 
 // Client half of the /blocked page: translated copy + sign-out. The
@@ -31,9 +46,11 @@ export function BlockedView({
   status,
   contact,
   pixKey,
+  pixQr,
 }: BlockedViewProps) {
   const t = useTranslations("Billing");
   const pending = status === "pending";
+  const qrSrc = pixQrSrc(pixQr);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -69,12 +86,29 @@ export function BlockedView({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!pending && pixKey ? (
+          {!pending && (pixKey || qrSrc) ? (
             <div className="rounded-lg border border-border bg-card-2 p-3 text-center">
-              <div className="text-xs text-muted-foreground mb-1">
-                {t("pixLabel")}
-              </div>
-              <code className="text-sm font-mono break-all">{pixKey}</code>
+              {qrSrc ? (
+                <>
+                  {/* White frame so phone cameras can read it on the
+                      dark theme — QR readers need light quiet zones. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element --
+                      src is an inline data URI; next/image adds nothing */}
+                  <img
+                    src={qrSrc}
+                    alt={t("pixQrAlt")}
+                    className="mx-auto mb-3 h-44 w-44 rounded-md bg-white p-2"
+                  />
+                </>
+              ) : null}
+              {pixKey ? (
+                <>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    {t("pixLabel")}
+                  </div>
+                  <code className="text-sm font-mono break-all">{pixKey}</code>
+                </>
+              ) : null}
             </div>
           ) : null}
 

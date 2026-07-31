@@ -111,4 +111,10 @@ NEXT_PUBLIC_BILLING_CONTACT=https://wa.me/5591999999999
 
 # Chave PIX mostrada na tela de bloqueio
 NEXT_PUBLIC_BILLING_PIX_KEY=chave@exemplo.com
+
+# QR Code PIX (PNG em base64, com ou sem o prefixo data:) exibido na
+# tela de bloqueio junto com a chave. Gere o base64 a partir da imagem
+# do QR estático do seu banco:
+#   node -e "console.log(require('fs').readFileSync('qr.png').toString('base64'))"
+NEXT_PUBLIC_BILLING_PIX_QR=iVBORw0KGgo...
 ```

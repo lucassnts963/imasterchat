@@ -1920,6 +1920,7 @@
     "blockedTitle": "Conta temporariamente suspensa",
     "blockedDesc": "O acesso à conta \"{accountName}\" está suspenso por pendência de pagamento. Regularize o pagamento para restaurar o acesso — nada é perdido, e as mensagens do WhatsApp continuam sendo recebidas enquanto o acesso está suspenso.",
     "pixLabel": "Chave PIX para pagamento",
+    "pixQrAlt": "QR Code PIX — escaneie para pagar",
     "contactCta": "Falar com o suporte",
     "signOut": "Sair",
     "pastDueBanner": "Sua conta tem uma fatura pendente. Regularize o pagamento para evitar a suspensão.",

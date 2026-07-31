@@ -40,6 +40,7 @@ export default async function BlockedPage() {
       status={status}
       contact={process.env.NEXT_PUBLIC_BILLING_CONTACT ?? null}
       pixKey={process.env.NEXT_PUBLIC_BILLING_PIX_KEY ?? null}
+      pixQr={process.env.NEXT_PUBLIC_BILLING_PIX_QR ?? null}
     />
   );
 }

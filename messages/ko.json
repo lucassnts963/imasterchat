@@ -1920,6 +1920,7 @@
     "blockedTitle": "계정이 일시적으로 정지됨",
     "blockedDesc": "\"{accountName}\" 계정은 결제 미납으로 접근이 정지되었습니다. 결제를 완료하면 접근이 복구됩니다 — 데이터는 유지되며, 정지 중에도 수신 WhatsApp 메시지는 계속 저장됩니다.",
     "pixLabel": "결제용 PIX 키",
+    "pixQrAlt": "PIX QR 코드 — 스캔하여 결제",
     "contactCta": "지원팀에 문의",
     "signOut": "로그아웃",
     "pastDueBanner": "계정에 미납 청구서가 있습니다. 정지를 피하려면 결제를 완료해 주세요.",

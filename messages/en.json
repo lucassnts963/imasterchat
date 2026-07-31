@@ -1920,6 +1920,7 @@
     "blockedTitle": "Account temporarily suspended",
     "blockedDesc": "Access to \"{accountName}\" is suspended due to a pending payment. Settle the invoice to restore access — nothing is lost, and incoming WhatsApp messages keep being stored while access is suspended.",
     "pixLabel": "PIX key for payment",
+    "pixQrAlt": "PIX QR code — scan to pay",
     "contactCta": "Talk to support",
     "signOut": "Sign out",
     "pastDueBanner": "Your account has a pending invoice. Please settle it to avoid suspension.",

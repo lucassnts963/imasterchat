@@ -115,6 +115,9 @@ META_APP_ID=<App ID>
 
 NEXT_PUBLIC_BILLING_CONTACT=https://wa.me/55XXXXXXXXXXX
 NEXT_PUBLIC_BILLING_PIX_KEY=<sua chave PIX>
+# Opcional: QR Code PIX (PNG em base64) exibido na tela de bloqueio.
+#   node -e "console.log(require('fs').readFileSync('qr.png').toString('base64'))"
+NEXT_PUBLIC_BILLING_PIX_QR=<base64 do PNG>
 
 HOST_PORT=3000
 ```
