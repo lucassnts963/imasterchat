@@ -1,5 +1,6 @@
 {
   "LoginPage": {
+    "privacyPolicy": "개인정보 처리방침",
     "titleAccept": "로그인하여 수락하기",
     "titleWelcome": "다시 오신 것을 환영합니다",
     "descAccept": "로그인하시면 초대 페이지로 이동합니다.",
@@ -1782,6 +1783,7 @@
     }
   },
   "SignupPage": {
+    "privacyPolicy": "개인정보 처리방침",
     "emailAlreadyRegistered": "이 이메일로 이미 계정이 있습니다. 비밀번호로 로그인하거나 ‘비밀번호 찾기’를 이용하세요.",
     "titleJoin": "계정 생성 후 참여",
     "title": "계정 만들기",

@@ -271,6 +271,15 @@ function SignupPageInner() {
               {t("signIn")}
             </Link>
           </p>
+
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            <Link
+              href="/privacidade"
+              className="hover:text-foreground underline underline-offset-2"
+            >
+              {t("privacyPolicy")}
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>

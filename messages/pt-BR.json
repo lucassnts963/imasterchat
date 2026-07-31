@@ -1,5 +1,6 @@
 {
   "LoginPage": {
+    "privacyPolicy": "Política de Privacidade",
     "titleAccept": "Entre para aceitar",
     "titleWelcome": "Bem-vindo de volta",
     "descAccept": "Entre e levaremos você ao convite.",
@@ -1782,6 +1783,7 @@
     }
   },
   "SignupPage": {
+    "privacyPolicy": "Política de Privacidade",
     "emailAlreadyRegistered": "Este e-mail já tem uma conta. Entre com sua senha ou use “Esqueci a senha”.",
     "titleJoin": "Criar conta e participar",
     "title": "Criar conta",

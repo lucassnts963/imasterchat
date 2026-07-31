@@ -1,5 +1,6 @@
 {
   "LoginPage": {
+    "privacyPolicy": "Privacy Policy",
     "titleAccept": "Sign in to accept",
     "titleWelcome": "Welcome back",
     "descAccept": "Sign in and we'll take you to the invitation.",
@@ -1782,6 +1783,7 @@
     }
   },
   "SignupPage": {
+    "privacyPolicy": "Privacy Policy",
     "emailAlreadyRegistered": "This email already has an account. Sign in with your password, or use “Forgot password”.",
     "titleJoin": "Create account & join",
     "title": "Create account",
