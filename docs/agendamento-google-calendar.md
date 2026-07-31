@@ -169,6 +169,26 @@ Regras seg–sex e janela de horário: no system prompt **e** validadas por um n
 
 ---
 
+## Decisão tomada
+
+**n8n é o cérebro na v1.** A versão nativa fica registrada como plano futuro
+(seção "Plano futuro" no fim deste documento).
+
+O que já foi construído do lado do app para sustentar isso — e que continua
+valendo quando o cérebro mudar:
+
+| Peça | Onde |
+|---|---|
+| Tabela `appointments`, account-scoped, com trava contra duplo agendamento | `supabase/migrations/041_appointments.sql` |
+| `POST /api/v1/conversations/{id}/handoff` | `src/app/api/v1/conversations/[id]/handoff/route.ts` |
+| `GET`/`POST /api/v1/appointments` e `GET`/`PATCH /api/v1/appointments/{id}` | `src/app/api/v1/appointments/**` |
+| Validação de slot (data inválida, passado, duração absurda) | `src/lib/api/v1/appointments.ts` |
+| Escopos `conversations:handoff`, `appointments:read`, `appointments:write` | `src/lib/api-keys/scopes.ts` |
+
+A coluna `created_via` (`manual` / `n8n` / `native`) existe para medir a
+migração em vez de adivinhá-la: dá para ver a proporção de agendamentos por
+cérebro ao longo do tempo.
+
 ## Recomendação
 
 **n8n primeiro, app depois** — e não como gambiarra, como sequência deliberada.
@@ -318,3 +338,77 @@ bloquear horário.
    histórico já nascer no produto.
 5. Montar o workflow do n8n e testar o diálogo no número de teste.
 6. Depois de rodar com a ótica: decidir se o volume justifica a versão nativa.
+
+---
+
+## Plano futuro: agendamento nativo
+
+Registro do que falta para o iMasterChat agendar sozinho, sem n8n. Não é para
+agora — é para quando o diálogo estiver provado com a ótica e o volume
+justificar. A ordem abaixo é de dependência, não de preferência.
+
+### 1. Tool calling na camada de IA
+
+O maior item, e pré-requisito de todo o resto. Hoje `generateReply` é chamada uma
+vez e devolve texto. Precisa virar um laço de agente:
+
+- `ChatMessage` ganha o papel `tool` e blocos de conteúdo
+  (`src/lib/ai/types.ts`).
+- `ProviderArgs` ganha `tools` (`src/lib/ai/providers/shared.ts`).
+- `openai.ts` manda `tools`/`tool_choice` e lê `tool_calls`.
+- `anthropic.ts` manda `tools` e para de filtrar blocos que não sejam texto — o
+  filtro atual descartaria um `tool_use` em silêncio.
+- `generate.ts` ganha o laço: chama, executa a tool, realimenta o resultado,
+  repete até resposta final ou teto de iterações.
+- `auto-reply.ts` passa o catálogo de tools e trata turnos intermediários.
+
+Feito na mão: não há SDK no projeto, os dois providers são `fetch` cru. Isso é
+uma escolha do codebase, não um descuido — manter assim.
+
+### 2. OAuth do Google
+
+Também greenfield: não há `googleapis`, `next-auth`, nem qualquer lib de OAuth.
+Precisa de fluxo de consentimento por conta, refresh token criptografado com
+`ENCRYPTION_KEY` (mesmo mecanismo dos tokens de WhatsApp), renovação, e uma tela
+de "conectar Google Agenda" em Configurações.
+
+### 3. As tools em si
+
+Três, com assinatura estreita e validação **no servidor**:
+
+- `check_availability(date_range)` → consulta `freebusy` e devolve slots livres.
+- `book_appointment(starts_at, ends_at, contact_id)` → valida regra, cria evento,
+  grava em `appointments`.
+- `request_human(reason)` → o mesmo efeito da rota de handoff.
+
+O modelo escolhe **qual** ferramenta usar e **quando**. Ele não decide se o slot
+é válido — isso é do servidor. `src/lib/api/v1/appointments.ts` já tem essa
+validação e deve ser reaproveitada.
+
+### 4. Ajustes no que já existe
+
+- **Data e hora no contexto.** `buildConversationContext` devolve só texto: o
+  modelo não sabe que dia é hoje, nem o fuso do negócio, nem o nome do contato.
+  Precisa de um injetor de contexto. Vale fazer **antes** de tudo, porque o n8n
+  tem exatamente o mesmo problema.
+- **Teto de respostas por conversa.** `auto_reply_max_per_conversation` tem
+  default 3 e é reivindicado por `claim_ai_reply_slot`. Um diálogo de
+  agendamento gasta mais e morre no meio. Precisa de contador separado para
+  turnos de tool, ou teto próprio.
+- **`ai_usage_log.mode`** só aceita `('auto_reply','draft')` — migração para
+  logar turnos de tool distintamente.
+- **Playground** (`src/components/agents/ai-playground.tsx`) precisa renderizar
+  chamadas de tool para dar para testar o diálogo sem WhatsApp. É o harness certo
+  e já roda o mesmo caminho da produção.
+
+### 5. Configuração pela ótica
+
+Horário de funcionamento, duração da consulta e antecedência hoje vivem no prompt
+do n8n. Na versão nativa viram tela de configuração — e aí a regra passa a ser
+validável e testável, não texto livre.
+
+### O que NÃO muda na migração
+
+A tabela `appointments`, os escopos, a rota de handoff e a experiência da
+atendente na caixa de entrada. É por isso que essas peças foram construídas
+agora: migrar é trocar quem escreve, não reescrever o que foi escrito.
