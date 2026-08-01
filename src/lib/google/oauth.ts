@@ -6,8 +6,14 @@
 // buys nothing here. Three endpoints and a token refresh is the whole
 // surface.
 //
-// We ask for `calendar` (read + write events) and `userinfo.email`.
-// The email is not decoration: the failure worth preventing is an
+// Scopes are the narrowest set that does the job, which matters twice:
+// Google reviews them before a consent screen goes public, and the
+// operator reads them on the way in. `calendar.events` writes and edits
+// bookings; `calendar.freebusy` answers "is this taken" without seeing
+// what it is. The broad `calendar` scope would also grant managing the
+// calendars themselves, which this never does.
+//
+// `userinfo.email` is not decoration: the failure worth preventing is an
 // operator connecting the wrong Google account and the shop's bookings
 // landing in a personal calendar nobody opens.
 // ============================================================
@@ -17,7 +23,8 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
 
 export const GOOGLE_CALENDAR_SCOPES = [
-  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.freebusy',
   'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ')
 
