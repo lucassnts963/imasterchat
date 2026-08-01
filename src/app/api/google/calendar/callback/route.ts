@@ -24,7 +24,8 @@ import { OAUTH_STATE_COOKIE } from '../connect/route'
 /** Where the operator lands, with the outcome in the query string. */
 function settingsUrl(request: Request, params: Record<string, string>): URL {
   const url = new URL('/settings', request.url)
-  url.searchParams.set('panel', 'google-calendar')
+  // `?tab=` is what the settings page reads (settings-sections.ts).
+  url.searchParams.set('tab', 'scheduling')
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value)
   }

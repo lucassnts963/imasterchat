@@ -40,7 +40,8 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
-    "menuSignOut": "Sign out"
+    "menuSignOut": "Sign out",
+    "agenda": "Agenda"
   },
   "Header": {
     "dashboard": "Dashboard",
@@ -1565,7 +1566,8 @@
       "fields": "Fields & tags",
       "deals": "Deals & currency",
       "members": "Team members",
-      "api": "API keys"
+      "api": "API keys",
+      "scheduling": "Scheduling"
     },
     "groups": {
       "account": "Account",
@@ -1780,6 +1782,51 @@
         "created": "Quick reply created.",
         "updated": "Quick reply updated."
       }
+    },
+    "scheduling": {
+      "title": "Scheduling",
+      "description": "Connect Google Calendar and set the rules the server enforces when the agent books.",
+      "loading": "Loading...",
+      "loadError": "Could not load the settings.",
+      "connectionTitle": "Google Calendar",
+      "connectionDesc": "Google Calendar is the source of truth for availability. Blocking a day there is enough — the bot respects it immediately.",
+      "notConfigured": "This deployment has no Google credentials. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and NEXT_PUBLIC_SITE_URL.",
+      "connect": "Connect Google Calendar",
+      "disconnect": "Disconnect",
+      "connectedUnknownAccount": "Google account connected",
+      "calendarLabel": "Calendar: {id}",
+      "connectSuccess": "Google Calendar connected.",
+      "connectFailed": "Could not connect ({code}).",
+      "disconnected": "Google Calendar disconnected.",
+      "disconnectError": "Could not disconnect.",
+      "rulesTitle": "Scheduling rules",
+      "rulesDesc": "The server checks every booking against these. The model picks the time; it does not pick whether the time is legal.",
+      "activeLabel": "Let the agent book on its own",
+      "activeHint": "Off, the scheduling tools do not even appear to the model.",
+      "activeWithoutCalendar": "Without Google Calendar connected, days the shop blocks directly in Google are invisible to the bot.",
+      "timezone": "Timezone",
+      "timezoneHint": "IANA identifier, e.g. America/Sao_Paulo.",
+      "slotMinutes": "Appointment length (minutes)",
+      "leadTime": "Minimum notice (minutes)",
+      "leadTimeHint": "Nothing inside this window is offered.",
+      "maxAdvance": "Book up to this many days ahead",
+      "hours": "Opening hours",
+      "hoursHint": "Windows on the shop clock. A day with no window is a closed day.",
+      "closed": "Closed",
+      "addWindow": "Add window",
+      "removeWindow": "Remove window",
+      "save": "Save",
+      "saved": "Rules saved.",
+      "saveError": "Could not save.",
+      "dayNames": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ]
     }
   },
   "SignupPage": {
@@ -1971,5 +2018,65 @@
     "previewBodyPlaceholder": "Message body…",
     "previewButtonFallback": "Button",
     "previewMenuFallback": "Menu"
+  },
+  "Agenda": {
+    "title": "Agenda",
+    "description": "Booked appointments — by the agent or by you. Availability comes from Google Calendar.",
+    "week": "Week",
+    "day": "Day",
+    "today": "Today",
+    "previous": "Previous period",
+    "next": "Next period",
+    "newButton": "New appointment",
+    "empty": "Nothing booked",
+    "loadError": "Could not load the agenda.",
+    "unknownContact": "Unnamed contact",
+    "viaAgent": "Booked by the agent",
+    "viaManual": "Booked by hand",
+    "notOnCalendar": "Not on Google Calendar",
+    "openConversation": "Open conversation",
+    "newDialog": {
+      "title": "New appointment",
+      "description": "Date and time in the shop timezone ({timezone}).",
+      "contact": "Customer",
+      "contactSearch": "Search by name or phone...",
+      "noContacts": "No contacts found.",
+      "date": "Date",
+      "time": "Time",
+      "duration": "Duration (minutes)",
+      "subject": "Subject",
+      "subjectPlaceholder": "Eye exam, frame fitting...",
+      "cancel": "Cancel",
+      "save": "Book",
+      "created": "Appointment created.",
+      "createdUnsynced": "Appointment created, but it did not reach Google Calendar. Check before confirming with the customer.",
+      "error": "Could not create the appointment."
+    },
+    "detail": {
+      "unknownContact": "Unnamed contact",
+      "viaAgent": "Booked by the agent",
+      "viaManual": "Booked by hand",
+      "status": {
+        "scheduled": "Confirmed",
+        "completed": "Showed up",
+        "no_show": "No-show",
+        "cancelled": "Cancelled"
+      },
+      "notOnCalendar": "This appointment never reached Google Calendar. The shop will not see it — sort it out before the time comes.",
+      "cancelledBecause": "Cancelled: {reason}",
+      "openConversation": "Open conversation",
+      "reschedule": "Reschedule",
+      "confirmReschedule": "Confirm new time",
+      "back": "Back",
+      "newDate": "New date",
+      "newTime": "New time",
+      "cancel": "Cancel appointment",
+      "cancelReason": "Cancellation reason",
+      "cancelReasonPlaceholder": "Optional",
+      "rescheduled": "Appointment moved.",
+      "cancelled": "Appointment cancelled.",
+      "unsyncedWarning": "Saved here, but Google Calendar was not updated.",
+      "error": "Could not update the appointment."
+    }
   }
 }

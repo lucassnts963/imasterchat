@@ -40,7 +40,8 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
-    "menuSignOut": "Sair"
+    "menuSignOut": "Sair",
+    "agenda": "Agenda"
   },
   "Header": {
     "dashboard": "Painel",
@@ -1565,7 +1566,8 @@
       "fields": "Campos e etiquetas",
       "deals": "Negócios e moeda",
       "members": "Membros da equipe",
-      "api": "Chaves de API"
+      "api": "Chaves de API",
+      "scheduling": "Agendamento"
     },
     "groups": {
       "account": "Conta",
@@ -1780,6 +1782,51 @@
         "created": "Resposta rápida criada.",
         "updated": "Resposta rápida atualizada."
       }
+    },
+    "scheduling": {
+      "title": "Agendamento",
+      "description": "Conecte a Google Agenda e defina as regras que o servidor aplica quando o agente marca.",
+      "loading": "Carregando…",
+      "loadError": "Não foi possível carregar as configurações.",
+      "connectionTitle": "Google Agenda",
+      "connectionDesc": "A Google Agenda é a fonte da verdade da disponibilidade. Bloquear um dia lá basta — o bot respeita na hora.",
+      "notConfigured": "Este servidor não tem credenciais do Google configuradas. Defina GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e NEXT_PUBLIC_SITE_URL.",
+      "connect": "Conectar Google Agenda",
+      "disconnect": "Desconectar",
+      "connectedUnknownAccount": "Conta Google conectada",
+      "calendarLabel": "Calendário: {id}",
+      "connectSuccess": "Google Agenda conectada.",
+      "connectFailed": "Não foi possível conectar ({code}).",
+      "disconnected": "Google Agenda desconectada.",
+      "disconnectError": "Não foi possível desconectar.",
+      "rulesTitle": "Regras de agendamento",
+      "rulesDesc": "O servidor valida cada marcação contra estas regras. O modelo escolhe o horário; ele não escolhe se o horário vale.",
+      "activeLabel": "Deixar o agente marcar sozinho",
+      "activeHint": "Desligado, as ferramentas de agendamento nem aparecem para o modelo.",
+      "activeWithoutCalendar": "Sem a Google Agenda conectada, os dias que a loja bloquear direto no Google ficam invisíveis para o bot.",
+      "timezone": "Fuso horário",
+      "timezoneHint": "Identificador IANA, ex.: America/Sao_Paulo.",
+      "slotMinutes": "Duração da consulta (minutos)",
+      "leadTime": "Antecedência mínima (minutos)",
+      "leadTimeHint": "Nada é oferecido dentro desta janela.",
+      "maxAdvance": "Agendar até quantos dias à frente",
+      "hours": "Horário de funcionamento",
+      "hoursHint": "Janelas no relógio da loja. Um dia sem janela é um dia fechado.",
+      "closed": "Fechado",
+      "addWindow": "Adicionar janela",
+      "removeWindow": "Remover janela",
+      "save": "Salvar",
+      "saved": "Regras salvas.",
+      "saveError": "Não foi possível salvar.",
+      "dayNames": [
+        "Domingo",
+        "Segunda",
+        "Terça",
+        "Quarta",
+        "Quinta",
+        "Sexta",
+        "Sábado"
+      ]
     }
   },
   "SignupPage": {
@@ -1971,5 +2018,65 @@
     "previewBodyPlaceholder": "Corpo da mensagem…",
     "previewButtonFallback": "Botão",
     "previewMenuFallback": "Menu"
+  },
+  "Agenda": {
+    "title": "Agenda",
+    "description": "Consultas marcadas — pelo agente ou por você. A disponibilidade vem da Google Agenda.",
+    "week": "Semana",
+    "day": "Dia",
+    "today": "Hoje",
+    "previous": "Período anterior",
+    "next": "Próximo período",
+    "newButton": "Novo agendamento",
+    "empty": "Nada marcado",
+    "loadError": "Não foi possível carregar a agenda.",
+    "unknownContact": "Contato sem nome",
+    "viaAgent": "Marcado pelo agente",
+    "viaManual": "Marcado manualmente",
+    "notOnCalendar": "Não está na Google Agenda",
+    "openConversation": "Abrir conversa",
+    "newDialog": {
+      "title": "Novo agendamento",
+      "description": "Data e hora no fuso da loja ({timezone}).",
+      "contact": "Cliente",
+      "contactSearch": "Buscar por nome ou telefone…",
+      "noContacts": "Nenhum contato encontrado.",
+      "date": "Data",
+      "time": "Hora",
+      "duration": "Duração (minutos)",
+      "subject": "Assunto",
+      "subjectPlaceholder": "Exame de vista, ajuste de armação…",
+      "cancel": "Cancelar",
+      "save": "Agendar",
+      "created": "Agendamento criado.",
+      "createdUnsynced": "Agendamento criado, mas não foi para a Google Agenda. Confira antes de confirmar com o cliente.",
+      "error": "Não foi possível criar o agendamento."
+    },
+    "detail": {
+      "unknownContact": "Contato sem nome",
+      "viaAgent": "Marcado pelo agente",
+      "viaManual": "Marcado manualmente",
+      "status": {
+        "scheduled": "Confirmado",
+        "completed": "Compareceu",
+        "no_show": "Não compareceu",
+        "cancelled": "Cancelado"
+      },
+      "notOnCalendar": "Este agendamento não chegou à Google Agenda. A loja não vai vê-lo — resolva antes do horário.",
+      "cancelledBecause": "Cancelado: {reason}",
+      "openConversation": "Abrir conversa",
+      "reschedule": "Remarcar",
+      "confirmReschedule": "Confirmar novo horário",
+      "back": "Voltar",
+      "newDate": "Nova data",
+      "newTime": "Novo horário",
+      "cancel": "Cancelar agendamento",
+      "cancelReason": "Motivo do cancelamento",
+      "cancelReasonPlaceholder": "Opcional",
+      "rescheduled": "Agendamento remarcado.",
+      "cancelled": "Agendamento cancelado.",
+      "unsyncedWarning": "Salvo aqui, mas a Google Agenda não foi atualizada.",
+      "error": "Não foi possível atualizar o agendamento."
+    }
   }
 }
