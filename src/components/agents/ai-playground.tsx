@@ -3,15 +3,40 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Bot, RotateCcw, Send, Loader2, UserCircle2, ArrowRight } from 'lucide-react';
+import {
+  Bot,
+  RotateCcw,
+  Send,
+  Loader2,
+  UserCircle2,
+  ArrowRight,
+  Wrench,
+  AlertTriangle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+
+/** One tool the agent ran while producing a turn. */
+interface Step {
+  tool: string;
+  arguments: Record<string, unknown>;
+  result: string;
+  is_error: boolean;
+  duration_ms: number;
+}
 
 interface Turn {
   role: 'user' | 'assistant';
   content: string;
   /** assistant-only: the agent signalled a human handoff on this turn. */
   handoff?: boolean;
+  /**
+   * assistant-only: what the agent DID before answering. Rendering it
+   * is what makes this a harness rather than a demo — the booking
+   * dialogue gets tuned here, against the same code path production
+   * runs, instead of against a real customer.
+   */
+  steps?: Step[];
 }
 
 export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
@@ -63,6 +88,7 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
               ? data.reply
               : '',
           handoff: Boolean(data.handoff),
+          steps: Array.isArray(data.steps) ? (data.steps as Step[]) : undefined,
         },
       ]);
     } catch {
@@ -126,40 +152,81 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
         )}
 
         {turns.map((turn, i) => (
-          <div
-            key={i}
-            className={cn(
-              'flex gap-2',
-              turn.role === 'user' ? 'justify-end' : 'justify-start',
+          <div key={i} className="space-y-2">
+            {/* Tools ran before the answer, so they read above it. */}
+            {turn.role === 'assistant' && turn.steps && turn.steps.length > 0 && (
+              <div className="ml-7 space-y-1.5">
+                {turn.steps.map((step, s) => (
+                  <details
+                    key={s}
+                    className={cn(
+                      'rounded-lg border px-2.5 py-1.5 text-xs',
+                      step.is_error
+                        ? 'border-amber-500/40 bg-amber-500/5'
+                        : 'border-border bg-muted/40',
+                    )}
+                  >
+                    <summary className="flex cursor-pointer items-center gap-1.5 text-muted-foreground">
+                      {step.is_error ? (
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      ) : (
+                        <Wrench className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      )}
+                      <span className="font-mono text-foreground">{step.tool}</span>
+                      <span className="ml-auto tabular-nums">{step.duration_ms}ms</span>
+                    </summary>
+                    <div className="mt-1.5 space-y-1.5 border-t border-border/50 pt-1.5">
+                      <pre className="overflow-x-auto font-mono text-[11px] text-muted-foreground">
+                        {JSON.stringify(step.arguments, null, 2)}
+                      </pre>
+                      <p className="whitespace-pre-wrap text-foreground/80">
+                        {step.result}
+                      </p>
+                    </div>
+                  </details>
+                ))}
+              </div>
             )}
-          >
-            {turn.role === 'assistant' && (
-              <Bot className="mt-1 h-5 w-5 shrink-0 text-primary" />
-            )}
+
             <div
               className={cn(
-                'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm',
-                turn.role === 'user'
-                  ? 'rounded-br-sm bg-primary text-primary-foreground'
-                  : 'rounded-bl-sm bg-muted text-foreground',
+                'flex gap-2',
+                turn.role === 'user' ? 'justify-end' : 'justify-start',
               )}
             >
-              {turn.content && <p className="whitespace-pre-wrap">{turn.content}</p>}
-              {turn.role === 'assistant' && turn.handoff && (
-                <p
+              {turn.role === 'assistant' && (
+                <Bot className="mt-1 h-5 w-5 shrink-0 text-primary" />
+              )}
+              {/* A pure-handoff turn has no text; skip the empty bubble. */}
+              {(turn.content || turn.role === 'user' || turn.handoff) && (
+                <div
                   className={cn(
-                    'flex items-center gap-1 text-xs text-amber-500',
-                    turn.content && 'mt-1.5 border-t border-border/50 pt-1.5',
+                    'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm',
+                    turn.role === 'user'
+                      ? 'rounded-br-sm bg-primary text-primary-foreground'
+                      : 'rounded-bl-sm bg-muted text-foreground',
                   )}
                 >
-                  <UserCircle2 className="h-3.5 w-3.5" />
-                  {t('handoff')}
-                </p>
+                  {turn.content && (
+                    <p className="whitespace-pre-wrap">{turn.content}</p>
+                  )}
+                  {turn.role === 'assistant' && turn.handoff && (
+                    <p
+                      className={cn(
+                        'flex items-center gap-1 text-xs text-amber-500',
+                        turn.content && 'mt-1.5 border-t border-border/50 pt-1.5',
+                      )}
+                    >
+                      <UserCircle2 className="h-3.5 w-3.5" />
+                      {t('handoff')}
+                    </p>
+                  )}
+                </div>
+              )}
+              {turn.role === 'user' && (
+                <UserCircle2 className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
               )}
             </div>
-            {turn.role === 'user' && (
-              <UserCircle2 className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
-            )}
           </div>
         ))}
 

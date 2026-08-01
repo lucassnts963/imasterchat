@@ -2,11 +2,15 @@ import { supabaseAdmin } from './admin-client'
 import { loadAiConfig } from './config'
 import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
-import { generateReply } from './generate'
+import { runAgent } from './agent'
+import { buildEnvironment } from './environment'
+import { buildToolCatalog } from './tools/registry'
+import { recordAgentSteps } from './steps'
 import { buildSystemPrompt } from './defaults'
 import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
+import { handOffConversation } from '@/lib/conversations/handoff'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
@@ -106,54 +110,69 @@ export async function dispatchInboundToAiReply(
       latestUserMessage(messages),
     )
 
+    // Who we're talking to and what day it is. Cheap, and it removes a
+    // whole class of confidently-wrong answers about dates.
+    const environment = await buildEnvironment({ db, accountId, contactId })
+
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
+      environment,
     })
 
-    const { text, handoff, usage } = await generateReply({
+    // The tools this account actually has. `request_human` is always
+    // there; scheduling appears once Google is connected.
+    const tools = await buildToolCatalog({ db, accountId, conversationId })
+
+    const { text, handoff, handoffSource, usage, steps } = await runAgent({
       config,
       systemPrompt,
       messages,
+      tools,
+      ctx: { db, accountId, conversationId, contactId, config },
     })
 
     // Record token spend on the account's BYO key. Fire-and-forget so it
     // never adds latency to the customer-facing send: `logAiUsage`
     // swallows its own errors, so the floating promise can't reject.
     // Logged regardless of handoff — the provider call happened either
-    // way.
+    // way. A run that used tools is logged as 'agent' so the cost of the
+    // loop is separable from a plain reply.
     void logAiUsage(db, {
       accountId,
       conversationId,
-      mode: 'auto_reply',
+      mode: steps.length > 0 ? 'agent' : 'auto_reply',
       provider: config.provider,
       model: config.model,
       usage,
     })
 
+    // Same treatment for the audit trail — never on the critical path.
+    if (steps.length > 0) {
+      void recordAgentSteps(db, { accountId, conversationId, steps })
+    }
+
     if (handoff || !text) {
-      // The model can't (or shouldn't) answer — stop auto-replying on
-      // this thread and hand it to a human. We (a) pause the bot here
-      // (sticky until re-enabled), (b) route the conversation to the
-      // configured handoff agent — null leaves it in the shared queue —
-      // and (c) leave a short internal note so whoever picks it up has
-      // context. Assigning fires the `on_conversation_assigned` trigger,
-      // which notifies the agent.
-      const summary = buildHandoffSummary({
-        messages,
-        replyCount: conv.ai_reply_count ?? 0,
-      })
-      const update: Record<string, unknown> = {
-        ai_autoreply_disabled: true,
-        ai_handoff_summary: summary,
+      // The model can't (or shouldn't) answer. `request_human` already
+      // wrote the handoff, with a reason better than anything we could
+      // reconstruct here — don't overwrite it. Otherwise record it now:
+      // pause the bot on this thread (sticky until re-enabled), route to
+      // the configured agent (null leaves it in the shared queue), and
+      // leave a note for whoever picks it up. Assigning fires the
+      // `on_conversation_assigned` trigger, which notifies the agent.
+      if (handoffSource !== 'tool') {
+        await handOffConversation({
+          db,
+          accountId,
+          conversationId,
+          summary: buildHandoffSummary({
+            messages,
+            replyCount: conv.ai_reply_count ?? 0,
+          }),
+          assignTo: config.handoffAgentId,
+        })
       }
-      // Only set the assignee when a target is configured AND the thread
-      // isn't already owned — never stomp an existing human assignment.
-      if (config.handoffAgentId && !conv.assigned_agent_id) {
-        update.assigned_agent_id = config.handoffAgentId
-      }
-      await db.from('conversations').update(update).eq('id', conversationId)
       return
     }
 

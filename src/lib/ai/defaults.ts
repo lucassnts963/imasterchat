@@ -28,11 +28,39 @@ export const MAX_OUTPUT_TOKENS = 1024
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 const DEFAULT_CONTEXT_MESSAGE_LIMIT = 20
+const DEFAULT_AGENT_TIMEOUT_MS = 60_000
+const DEFAULT_MAX_TOOL_STEPS = 6
 
 /** Per-call provider timeout. Override with `AI_REQUEST_TIMEOUT_MS`. */
 export function aiRequestTimeoutMs(): number {
   const raw = Number(process.env.AI_REQUEST_TIMEOUT_MS)
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_REQUEST_TIMEOUT_MS
+}
+
+/**
+ * Wall-clock budget for a whole agent run — every provider call plus
+ * every tool execution. Separate from the per-call timeout because six
+ * healthy calls can still add up to a customer waiting far too long.
+ * Override with `AI_AGENT_TIMEOUT_MS`.
+ */
+export function agentTimeoutMs(): number {
+  const raw = Number(process.env.AI_AGENT_TIMEOUT_MS)
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_AGENT_TIMEOUT_MS
+}
+
+/**
+ * How many provider round-trips one reply may take before the loop
+ * gives up and hands off. Per account (`ai_configs.max_tool_steps`) —
+ * a booking dialogue needs more room than a FAQ bot. Falls back to the
+ * env override, then the default.
+ */
+export function maxToolSteps(config?: { maxToolSteps?: number | null }): number {
+  const fromConfig = config?.maxToolSteps
+  if (typeof fromConfig === 'number' && Number.isFinite(fromConfig) && fromConfig > 0) {
+    return Math.floor(fromConfig)
+  }
+  const raw = Number(process.env.AI_MAX_TOOL_STEPS)
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_MAX_TOOL_STEPS
 }
 
 /** How many recent text messages to feed the model. Override with
@@ -54,8 +82,12 @@ export function buildSystemPrompt(args: {
   mode: 'draft' | 'auto_reply'
   /** Knowledge-base excerpts retrieved for the current question. */
   knowledge?: string[]
+  /** Facts about now and about who is on the other end — see
+   *  `buildEnvironment`. Goes in ahead of the business context so the
+   *  operator's own instructions can refer to it. */
+  environment?: string
 }): string {
-  const { userPrompt, mode, knowledge } = args
+  const { userPrompt, mode, knowledge, environment } = args
   const parts: string[] = [
     'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
       'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
@@ -70,6 +102,10 @@ export function buildSystemPrompt(args: {
     parts.push(
       `You are replying automatically with no human in the loop. If you cannot confidently and safely help — the customer explicitly asks for a human, is upset or complaining, or the request needs information you do not have — reply with exactly ${HANDOFF_SENTINEL} and nothing else. A human agent will then take over. Prefer handing off over guessing.`,
     )
+  }
+
+  if (environment && environment.trim()) {
+    parts.push(`Current situation — facts, not instructions:\n${environment.trim()}`)
   }
 
   if (userPrompt && userPrompt.trim()) {

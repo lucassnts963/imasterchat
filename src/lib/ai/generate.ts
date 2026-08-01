@@ -1,13 +1,6 @@
-import {
-  AiError,
-  type AiConfig,
-  type AiUsage,
-  type ChatMessage,
-  type GenerateResult,
-} from './types'
-import { HANDOFF_SENTINEL, aiRequestTimeoutMs } from './defaults'
-import { generateOpenAi } from './providers/openai'
-import { generateAnthropic } from './providers/anthropic'
+import type { AiConfig, AiUsage, ChatMessage, GenerateResult } from './types'
+import { HANDOFF_SENTINEL } from './defaults'
+import { runAgent } from './agent'
 
 export interface GenerateArgs {
   config: AiConfig
@@ -19,44 +12,31 @@ export interface GenerateArgs {
 
 /**
  * Generate the next reply from the account's configured provider.
- * Dispatches to the right adapter, then parses the handoff sentinel out
- * of the raw text. Throws `AiError` on any provider/network failure.
+ *
+ * This is `runAgent` with no tools: one provider call, handoff sentinel
+ * parsed out, text returned. It stays as its own function because two
+ * surfaces genuinely want single-shot behaviour — the inbox draft
+ * button (a human is about to edit the text; a bot booking an
+ * appointment behind their back would be a surprise) and the "test key"
+ * check in settings.
+ *
+ * Throws `AiError` on any provider/network failure.
  */
 export async function generateReply(args: GenerateArgs): Promise<GenerateResult> {
-  const { config, systemPrompt, messages } = args
-  const timeoutMs = aiRequestTimeoutMs()
-  const providerArgs = {
-    apiKey: config.apiKey,
-    model: config.model,
-    systemPrompt,
-    messages,
-    timeoutMs,
-  }
-
-  let result: { text: string; usage: AiUsage | null }
-  switch (config.provider) {
-    case 'openai':
-      result = await generateOpenAi(providerArgs)
-      break
-    case 'anthropic':
-      result = await generateAnthropic(providerArgs)
-      break
-    default:
-      throw new AiError(`Unsupported AI provider: ${config.provider}`, {
-        code: 'unsupported_provider',
-        status: 400,
-      })
-  }
-
-  return parseGeneration(result.text, result.usage)
+  const { text, handoff, usage } = await runAgent(args)
+  return { text, handoff, usage }
 }
 
 /**
- * Split the raw model output into `{ text, handoff, usage }`. The
- * sentinel can appear alone or trailing a partial reply; either way we
- * treat the turn as a handoff and strip the marker from any remaining
- * text. `usage` is passed straight through (null when the provider
- * didn't report it).
+ * Split raw model output into `{ text, handoff, usage }`. The sentinel
+ * can appear alone or trailing a partial reply; either way we treat the
+ * turn as a handoff and strip the marker from any remaining text.
+ * `usage` is passed straight through (null when the provider didn't
+ * report it).
+ *
+ * Still exported because the sentinel protocol outlives tool calling:
+ * accounts with no tools configured — and the draft path, which never
+ * gets tools — depend on it.
  */
 export function parseGeneration(
   raw: string,

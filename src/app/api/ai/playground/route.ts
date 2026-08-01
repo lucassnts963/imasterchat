@@ -3,7 +3,9 @@ import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { loadAiConfig } from '@/lib/ai/config'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
-import { generateReply } from '@/lib/ai/generate'
+import { runAgent } from '@/lib/ai/agent'
+import { buildEnvironment } from '@/lib/ai/environment'
+import { buildToolCatalog } from '@/lib/ai/tools/registry'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
 import { latestUserMessage } from '@/lib/ai/query'
 import { AiError, type ChatMessage } from '@/lib/ai/types'
@@ -78,14 +80,55 @@ export async function POST(request: Request) {
       config,
       latestUserMessage(messages),
     )
+    // No contact here — the environment block still carries the date,
+    // which is most of what makes a booking dialogue testable at all.
+    const environment = await buildEnvironment({
+      db: supabase,
+      accountId,
+      contactId: null,
+    })
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
+      environment,
     })
 
-    const { text, handoff } = await generateReply({ config, systemPrompt, messages })
-    return NextResponse.json({ reply: text, handoff })
+    // Same catalog the live bot gets. Tools that need a conversation
+    // report that they can't act rather than silently no-op'ing, so the
+    // operator sees where the dialogue would have taken a real action.
+    const tools = await buildToolCatalog({
+      db: supabase,
+      accountId,
+      conversationId: null,
+    })
+
+    const { text, handoff, steps } = await runAgent({
+      config,
+      systemPrompt,
+      messages,
+      tools,
+      ctx: {
+        db: supabase,
+        accountId,
+        conversationId: null,
+        contactId: null,
+        config,
+      },
+    })
+    return NextResponse.json({
+      reply: text,
+      handoff,
+      // What the agent actually did, so the dialogue can be tuned here
+      // instead of on a real customer.
+      steps: steps.map((s) => ({
+        tool: s.toolName,
+        arguments: s.arguments,
+        result: s.result,
+        is_error: s.isError,
+        duration_ms: s.durationMs,
+      })),
+    })
   } catch (err) {
     if (err instanceof AiError) {
       return NextResponse.json(

@@ -29,6 +29,7 @@
 
 import { requireApiKey } from '@/lib/auth/api-context';
 import { ok, fail, toApiErrorResponse } from '@/lib/api/v1/respond';
+import { handOffConversation } from '@/lib/conversations/handoff';
 
 /** Matches the inbox banner's note column; longer notes are truncated. */
 const MAX_REASON_LEN = 500;
@@ -60,68 +61,28 @@ export async function POST(
         ? body.assign_to
         : null;
 
-    const { data: conv, error: convErr } = await ctx.supabase
-      .from('conversations')
-      .select('id, assigned_agent_id')
-      .eq('id', id)
-      .eq('account_id', ctx.accountId)
-      .maybeSingle<{ id: string; assigned_agent_id: string | null }>();
+    const result = await handOffConversation({
+      db: ctx.supabase,
+      accountId: ctx.accountId,
+      conversationId: id,
+      summary: `🤖 ${reason}`,
+      assignTo,
+    });
 
-    if (convErr) {
-      console.error('[api/v1/handoff] conversation lookup error:', convErr);
-      return fail('internal', 'Failed to load conversation', 500);
-    }
-    if (!conv) return fail('not_found', 'Conversation not found', 404);
-
-    // Named assignee must be a member of THIS account. The key is
-    // account-scoped but `assign_to` is caller-supplied, so without this
-    // check a valid key could park a thread on a stranger's user id.
-    if (assignTo) {
-      const { data: member, error: memberErr } = await ctx.supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('user_id', assignTo)
-        .eq('account_id', ctx.accountId)
-        .maybeSingle();
-
-      if (memberErr) {
-        console.error('[api/v1/handoff] member lookup error:', memberErr);
-        return fail('internal', 'Failed to verify the assignee', 500);
+    if (!result.ok) {
+      if (result.failure === 'not_found') {
+        return fail('not_found', result.message, 404);
       }
-      if (!member) {
+      if (result.failure === 'invalid_assignee') {
         return fail('bad_request', "'assign_to' is not a member of this account", 400);
       }
-    }
-
-    const update: Record<string, unknown> = {
-      status: 'pending',
-      ai_autoreply_disabled: true,
-      ai_handoff_summary: `🤖 ${reason}`,
-    };
-    // Never steal a thread a human already owns — if someone is already
-    // on it, the handoff is a no-op for assignment and only flags the
-    // queue and the reason.
-    if (assignTo && !conv.assigned_agent_id) {
-      update.assigned_agent_id = assignTo;
-    }
-
-    const { error: upErr } = await ctx.supabase
-      .from('conversations')
-      .update(update)
-      .eq('id', id)
-      .eq('account_id', ctx.accountId);
-
-    if (upErr) {
-      console.error('[api/v1/handoff] update error:', upErr);
-      return fail('internal', 'Failed to hand off the conversation', 500);
+      return fail('internal', result.message, 500);
     }
 
     return ok({
       conversation_id: id,
       status: 'pending',
-      assigned_agent_id:
-        (update.assigned_agent_id as string | undefined) ??
-        conv.assigned_agent_id,
+      assigned_agent_id: result.assignedAgentId,
       reason,
     });
   } catch (err) {

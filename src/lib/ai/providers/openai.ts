@@ -1,8 +1,14 @@
-import { AiError, type ProviderResult } from '../types'
+import {
+  AiError,
+  type ChatMessage,
+  type ProviderResult,
+  type ToolCall,
+} from '../types'
 import { MAX_OUTPUT_TOKENS } from '../defaults'
 import {
   mergeConsecutive,
   normalizeUsage,
+  parseToolArguments,
   providerHttpError,
   toNetworkError,
   type ProviderArgs,
@@ -10,8 +16,15 @@ import {
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 
+interface OpenAiToolCall {
+  id?: string
+  function?: { name?: string; arguments?: string }
+}
+
 interface OpenAiResponse {
-  choices?: { message?: { content?: string } }[]
+  choices?: {
+    message?: { content?: string; tool_calls?: OpenAiToolCall[] }
+  }[]
   usage?: {
     prompt_tokens?: number
     completion_tokens?: number
@@ -20,12 +33,48 @@ interface OpenAiResponse {
 }
 
 /**
+ * Map our provider-neutral turns onto Chat Completions' shape.
+ *
+ * Tool results are their own `tool` role here (Anthropic instead folds
+ * them into a user turn), and an assistant turn that called tools
+ * carries `tool_calls` with the arguments re-serialized to the JSON
+ * string the API expects. Text-only turns pass through unchanged.
+ */
+function toOpenAiMessages(messages: ChatMessage[]): Record<string, unknown>[] {
+  return messages.map((m) => {
+    if (m.role === 'tool') {
+      return {
+        role: 'tool',
+        tool_call_id: m.toolCallId,
+        content: m.content,
+      }
+    }
+    if (m.role === 'assistant' && m.toolCalls?.length) {
+      return {
+        role: 'assistant',
+        // The API wants null, not '', when the turn is pure tool calls.
+        content: m.content.trim() || null,
+        tool_calls: m.toolCalls.map((call) => ({
+          id: call.id,
+          type: 'function',
+          function: {
+            name: call.name,
+            arguments: JSON.stringify(call.arguments),
+          },
+        })),
+      }
+    }
+    return { role: m.role, content: m.content }
+  })
+}
+
+/**
  * Call OpenAI's Chat Completions endpoint with the caller's own key.
  * Returns the raw assistant text + token usage (handoff parsing happens
  * in `generateReply`).
  */
 export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult> {
-  const { apiKey, model, systemPrompt, messages, timeoutMs } = args
+  const { apiKey, model, systemPrompt, messages, timeoutMs, tools } = args
 
   let res: Response
   try {
@@ -39,9 +88,24 @@ export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult
         model,
         messages: [
           { role: 'system', content: systemPrompt },
-          ...mergeConsecutive(messages),
+          ...toOpenAiMessages(mergeConsecutive(messages)),
         ],
         max_completion_tokens: MAX_OUTPUT_TOKENS,
+        // Omitted entirely when the account has no tools, so the request
+        // stays identical to the pre-tool-calling one.
+        ...(tools?.length
+          ? {
+              tools: tools.map((t) => ({
+                type: 'function',
+                function: {
+                  name: t.name,
+                  description: t.description,
+                  parameters: t.parameters,
+                },
+              })),
+              tool_choice: 'auto',
+            }
+          : {}),
       }),
       signal: AbortSignal.timeout(timeoutMs),
     })
@@ -54,8 +118,21 @@ export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult
   }
 
   const data = (await res.json().catch(() => null)) as OpenAiResponse | null
-  const text = data?.choices?.[0]?.message?.content
-  if (!text || typeof text !== 'string' || !text.trim()) {
+  const message = data?.choices?.[0]?.message
+  const raw = message?.content
+  const text = typeof raw === 'string' ? raw.trim() : ''
+
+  const toolCalls: ToolCall[] = (message?.tool_calls ?? [])
+    .filter((c) => c.id && c.function?.name)
+    .map((c) => ({
+      id: c.id!,
+      name: c.function!.name!,
+      ...parseToolArguments(c.function?.arguments),
+    }))
+
+  // Empty is only a failure when the model neither spoke nor acted —
+  // a turn that is purely tool calls arrives with content: null.
+  if (!text && toolCalls.length === 0) {
     throw new AiError('OpenAI returned an empty response.', {
       code: 'empty_response',
     })
@@ -65,5 +142,5 @@ export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult
     completion: data?.usage?.completion_tokens,
     total: data?.usage?.total_tokens,
   })
-  return { text, usage }
+  return { text, usage, toolCalls }
 }

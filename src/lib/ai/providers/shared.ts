@@ -1,4 +1,4 @@
-import { AiError, type AiUsage, type ChatMessage } from '../types'
+import { AiError, type AiUsage, type ChatMessage, type ToolSpec } from '../types'
 
 // ============================================================
 // Bits shared by the OpenAI + Anthropic adapters.
@@ -10,6 +10,9 @@ export interface ProviderArgs {
   systemPrompt: string
   messages: ChatMessage[]
   timeoutMs: number
+  /** Tools the model may call. Omitted / empty → the request goes out
+   *  exactly as it did before tool calling existed. */
+  tools?: ToolSpec[]
 }
 
 /**
@@ -94,16 +97,60 @@ export async function providerHttpError(
  * Collapse consecutive same-role turns into one (joined with blank
  * lines). Anthropic requires strictly alternating roles; merging is
  * also harmless for OpenAI and keeps the transcript compact.
+ *
+ * Only plain text turns merge. A turn carrying `toolCalls`, a tool
+ * result, or anything with the `tool` role is passed through untouched:
+ * folding one into its neighbour would break the id pairing both
+ * providers use to match a call to its result, and the API would reject
+ * the payload (or worse, silently answer the wrong call).
  */
 export function mergeConsecutive(messages: ChatMessage[]): ChatMessage[] {
+  const mergeable = (m: ChatMessage): boolean =>
+    m.role !== 'tool' && !m.toolCalls?.length && !m.toolCallId
+
   const out: ChatMessage[] = []
   for (const m of messages) {
     const last = out[out.length - 1]
-    if (last && last.role === m.role) {
+    if (last && last.role === m.role && mergeable(last) && mergeable(m)) {
       last.content = `${last.content}\n\n${m.content}`
     } else {
-      out.push({ role: m.role, content: m.content })
+      out.push({ ...m })
     }
   }
   return out
+}
+
+/**
+ * Parse the arguments a model wrote for a tool call. OpenAI hands them
+ * over as a JSON string composed token by token, so malformed JSON is a
+ * real (if uncommon) outcome — and one the loop recovers from by
+ * telling the model, rather than by throwing. Returns `{}` plus an
+ * explanation when it can't parse.
+ */
+export function parseToolArguments(raw: unknown): {
+  arguments: Record<string, unknown>
+  argumentsError?: string
+} {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return { arguments: raw as Record<string, unknown> }
+  }
+  if (typeof raw !== 'string' || !raw.trim()) {
+    // No arguments at all is legitimate for a zero-parameter tool.
+    return { arguments: {} }
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {
+        arguments: {},
+        argumentsError: 'Tool arguments must be a JSON object.',
+      }
+    }
+    return { arguments: parsed as Record<string, unknown> }
+  } catch {
+    return {
+      arguments: {},
+      argumentsError: 'Tool arguments were not valid JSON.',
+    }
+  }
 }
