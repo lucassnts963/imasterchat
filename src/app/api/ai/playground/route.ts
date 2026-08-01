@@ -5,7 +5,11 @@ import { loadAiConfig } from '@/lib/ai/config'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { runAgent } from '@/lib/ai/agent'
 import { buildEnvironment } from '@/lib/ai/environment'
-import { buildToolCatalog } from '@/lib/ai/tools/registry'
+import {
+  buildToolCatalog,
+  resolveSchedulingContext,
+} from '@/lib/ai/tools/registry'
+import { describeWeeklyHours } from '@/lib/scheduling/settings'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
 import { latestUserMessage } from '@/lib/ai/query'
 import { AiError, type ChatMessage } from '@/lib/ai/types'
@@ -80,12 +84,17 @@ export async function POST(request: Request) {
       config,
       latestUserMessage(messages),
     )
-    // No contact here — the environment block still carries the date,
-    // which is most of what makes a booking dialogue testable at all.
+    const scheduling = await resolveSchedulingContext(supabase, accountId)
+
+    // No contact here — the environment block still carries the date and
+    // the shop hours, which is most of what makes a booking dialogue
+    // testable at all.
     const environment = await buildEnvironment({
       db: supabase,
       accountId,
       contactId: null,
+      timezone: scheduling?.settings.timezone,
+      openingHours: scheduling ? describeWeeklyHours(scheduling.settings) : null,
     })
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
@@ -101,6 +110,7 @@ export async function POST(request: Request) {
       db: supabase,
       accountId,
       conversationId: null,
+      scheduling,
     })
 
     const { text, handoff, steps } = await runAgent({

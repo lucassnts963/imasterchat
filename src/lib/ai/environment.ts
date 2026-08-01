@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { formatInZone } from '@/lib/time/zone'
 
 // ============================================================
 // What the model is allowed to know before it starts talking.
@@ -27,6 +28,12 @@ export interface EnvironmentArgs {
   contactId: string | null
   /** IANA zone. Everything time-shaped is rendered in it. */
   timezone?: string
+  /**
+   * The shop's opening hours, already rendered. Stated as fact so the
+   * model does not offer Saturday and then get refused by the server —
+   * a bot that knows the rule negotiates; one that doesn't argues.
+   */
+  openingHours?: string | null
   /** Injectable for tests. */
   now?: Date
 }
@@ -43,31 +50,9 @@ interface AppointmentRow {
   title: string | null
 }
 
-/**
- * Render an instant in a given zone as `Saturday, 2026-08-01 19:30`.
- * `en-CA` is the shortest route to ISO-ordered date parts, which is
- * what we want the model to see — `01/08/2026` is ambiguous to a reader
- * that has met both conventions.
- */
-export function formatInZone(date: Date, timezone: string): string {
-  const day = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    weekday: 'long',
-  }).format(date)
-  const ymd = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-  const hm = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
-  return `${day}, ${ymd} ${hm}`
-}
+// Re-exported so the existing import surface (and its test) stays put;
+// the implementation now lives with the rest of the zone math.
+export { formatInZone }
 
 /**
  * Build the environment block appended to the system prompt.
@@ -81,6 +66,7 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     accountId,
     contactId,
     timezone = DEFAULT_TIMEZONE,
+    openingHours = null,
     now = new Date(),
   } = args
 
@@ -88,6 +74,10 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     `Current date and time: ${formatInZone(now, timezone)} (${timezone}).`,
     'Use this for anything relative — "today", "tomorrow", "next Thursday". Never guess the date.',
   ]
+
+  if (openingHours?.trim()) {
+    lines.push(`Opening hours: ${openingHours.trim()}`)
+  }
 
   if (contactId) {
     const [contact, appointment] = await Promise.all([

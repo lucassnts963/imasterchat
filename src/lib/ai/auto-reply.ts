@@ -4,7 +4,8 @@ import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { runAgent } from './agent'
 import { buildEnvironment } from './environment'
-import { buildToolCatalog } from './tools/registry'
+import { buildToolCatalog, resolveSchedulingContext } from './tools/registry'
+import { describeWeeklyHours } from '@/lib/scheduling/settings'
 import { recordAgentSteps } from './steps'
 import { buildSystemPrompt } from './defaults'
 import { buildHandoffSummary } from './handoff'
@@ -110,9 +111,20 @@ export async function dispatchInboundToAiReply(
       latestUserMessage(messages),
     )
 
+    // Resolved once and shared: the tool catalog needs it to decide
+    // whether booking exists, and the environment block needs the shop's
+    // timezone and hours.
+    const scheduling = await resolveSchedulingContext(db, accountId)
+
     // Who we're talking to and what day it is. Cheap, and it removes a
     // whole class of confidently-wrong answers about dates.
-    const environment = await buildEnvironment({ db, accountId, contactId })
+    const environment = await buildEnvironment({
+      db,
+      accountId,
+      contactId,
+      timezone: scheduling?.settings.timezone,
+      openingHours: scheduling ? describeWeeklyHours(scheduling.settings) : null,
+    })
 
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
@@ -122,8 +134,13 @@ export async function dispatchInboundToAiReply(
     })
 
     // The tools this account actually has. `request_human` is always
-    // there; scheduling appears once Google is connected.
-    const tools = await buildToolCatalog({ db, accountId, conversationId })
+    // there; scheduling appears only when it is switched on.
+    const tools = await buildToolCatalog({
+      db,
+      accountId,
+      conversationId,
+      scheduling,
+    })
 
     const { text, handoff, handoffSource, usage, steps } = await runAgent({
       config,
