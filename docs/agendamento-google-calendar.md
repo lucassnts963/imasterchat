@@ -10,6 +10,9 @@ Decisões já tomadas:
 - **IA confirma sozinha, com limites** — dentro das regras (horário comercial,
   janela de dias, 1 agendamento por cliente); fora disso, handoff para humano.
 - **Uma agenda só** — a loja atende um cliente por vez no horário.
+- **O cérebro é nativo** — o agendamento é feature do produto, não workflow
+  externo. Ver [Decisão tomada](#decisão-tomada); as duas abordagens comparadas
+  abaixo ficam registradas porque explicam o formato do que foi construído.
 
 ---
 
@@ -171,11 +174,32 @@ Regras seg–sex e janela de horário: no system prompt **e** validadas por um n
 
 ## Decisão tomada
 
-**n8n é o cérebro na v1.** A versão nativa fica registrada como plano futuro
-(seção "Plano futuro" no fim deste documento).
+**O cérebro é nativo. O n8n não entra.**
 
-O que já foi construído do lado do app para sustentar isso — e que continua
-valendo quando o cérebro mudar:
+A comparação acima recomendava o caminho inverso — n8n primeiro, port depois — e
+o argumento dela continua válido *para o problema que ela enxergava*: só
+agendamento, prazo curto, diálogo desconhecido. A decisão mudou porque o escopo
+mudou. O tool calling deixou de ser custo do agendamento e virou base de duas
+outras coisas que a ótica não é a última a precisar:
+
+- **vault por conta** — a IA mantém uma wiki do negócio e do cliente, que cresce a
+  cada conversa (metodologia LLM Wiki de Karpathy);
+- **laço de agente auditável** — cada passo persistido, contexto de ambiente
+  injetado, teto de passos e orçamento.
+
+Construir isso no n8n seria construir fora do produto o que precisa estar dentro
+dele. E o argumento de prazo se inverte: o laço nativo é pago uma vez e serve
+toda conta nova; o workflow do n8n é pago de novo a cada cliente.
+
+Decisões de desenho que acompanham:
+
+| Decisão | Escolha |
+|---|---|
+| Agenda | Uma por conta — um calendário Google |
+| Confirmação de agendamento | O bot confirma sozinho; a regra é validada no servidor |
+| Vault | O agente propõe rascunho; humano aprova antes de virar resposta |
+
+O que já está construído e continua valendo integralmente:
 
 | Peça | Onde |
 |---|---|
@@ -185,29 +209,21 @@ valendo quando o cérebro mudar:
 | Validação de slot (data inválida, passado, duração absurda) | `src/lib/api/v1/appointments.ts` |
 | Escopos `conversations:handoff`, `appointments:read`, `appointments:write` | `src/lib/api-keys/scopes.ts` |
 
-A coluna `created_via` (`manual` / `n8n` / `native`) existe para medir a
-migração em vez de adivinhá-la: dá para ver a proporção de agendamentos por
-cérebro ao longo do tempo.
+Nada disso foi trabalho perdido com a virada. A tabela, os escopos e a rota de
+handoff foram desenhados justamente para sobreviver à troca de cérebro — e
+sobreviveram, só que a troca aconteceu antes de o n8n existir. A API v1 continua
+sendo a porta para qualquer cérebro externo que um cliente queira plugar.
 
-## Recomendação
+A coluna `created_via` mantém os três valores (`manual` / `n8n` / `native`): o
+`native` é o caminho do produto, o `manual` é a tela de agenda, e o `n8n` fica
+disponível para quem já tenha automação própria.
 
-**n8n primeiro, app depois** — e não como gambiarra, como sequência deliberada.
-
-O motivo não é só prazo. É que ninguém sabe ainda qual é o diálogo certo de
-agendamento para essa ótica: como o cliente pede horário, quantas idas e vindas,
-o que acontece quando não tem vaga, quando ele quer remarcar. Descobrir isso
-mexendo em prompt no n8n custa minutos; descobrir construindo tool calling na
-mão custa semanas — e você construiria a feature errada.
-
-Quando o diálogo estiver provado com clientes reais, aí a Abordagem A vira um
-port do que já funciona, com requisito conhecido.
-
-**A condição para isso não virar dívida**: o contrato entre app e n8n hoje
-(webhook de saída para fora, API v1 para dentro) precisa ser o mesmo contrato que
-a feature nativa usaria depois. Migrar deve ser trocar o cérebro, não reescrever
-o corpo. Concretamente: a tabela `appointments` (item 3 da Abordagem A) vale
-construir **agora**, com o n8n gravando nela via API — assim o histórico de
-agendamentos já nasce dentro do produto, e a versão nativa só troca quem escreve.
+**O que a decisão custa, e vale registrar**: o diálogo certo de agendamento ainda
+é desconhecido — quantas idas e vindas, o que fazer quando não tem vaga, como o
+cliente remarca. Afinar isso num prompt do n8n custaria minutos. Aqui o harness
+equivalente é o Playground, que roda o mesmo caminho de código da produção; por
+isso ele renderizar os passos de tool não é enfeite, é o que torna a iteração
+barata.
 
 ---
 
@@ -220,27 +236,33 @@ Cliente:  "oi, queria marcar um exame de vista"
             │
             ├─ Meta entrega no webhook do iMasterChat
             ├─ App grava contato, conversa e mensagem (sempre)
-            └─ Automação `new_message_received` → POST para o n8n
+            └─ `after()` → dispatchInboundToAiReply → runAgent
                         │
-IA (n8n):   lê o histórico da conversa (memória por telefone)
-            usa a tool `calendar:availability` na agenda da ótica
+runAgent:   monta o prompt: ambiente (hoje é terça, fuso, nome do contato),
+            regras do vault, histórico da conversa, catálogo de tools
             │
-            └─ responde via POST /api/v1/messages
+            ├─ passo 1: check_availability(quinta, sexta)
+            │           servidor cruza horário comercial × freebusy × appointments
+            └─ passo 2: o modelo escreve a resposta com os slots que recebeu
 Bot:      "Claro! Tenho quinta 14h, quinta 16h ou sexta 09h. Qual fica melhor?"
 
 Cliente:  "quinta de tarde"
             │
-IA:         entende "quinta 14h ou 16h", já sabe que hoje é terça
-            (a data atual é injetada no prompt — o modelo não sabe sozinho)
+runAgent:   entende "quinta 14h ou 16h" — sabe que hoje é terça porque a data
+            está no bloco de ambiente, não porque o modelo adivinhou
 Bot:      "Quinta às 14h ou às 16h?"
 
 Cliente:  "14h"
             │
-IA:         valida a regra seg–sex e o horário comercial
-            usa a tool `event:create` → grava na Google Agenda
-            grava também em `appointments` no app (histórico no produto)
+runAgent:   book_appointment(quinta 14h, quinta 15h)
+            └─ servidor revalida a regra, cria o evento no Google,
+               grava em `appointments` (created_via = 'native')
+               as travas da 041 barram duplo agendamento mesmo sob retry
 Bot:      "Pronto! Exame marcado para quinta, 14h. Te espero aqui 😊"
 ```
+
+Cada passo desses fica gravado em `ai_agent_steps` — dá para abrir a conversa
+depois e ver qual tool foi chamada, com quais argumentos e o que voltou.
 
 A atendente vê **toda** essa conversa na caixa de entrada do iMasterChat, em
 tempo real, sem precisar fazer nada. O bot não é um canal paralelo — as
@@ -251,14 +273,17 @@ por IA.
 
 Duas camadas, e as duas são necessárias:
 
-1. **O prompt** diz o comportamento: horário de funcionamento, duração da
-   consulta, tom, o que fazer quando não há vaga.
-2. **Um nó `IF` antes de gravar** valida o que o modelo decidiu: é dia útil? está
-   dentro da janela? o slot ainda está livre?
+1. **O prompt** diz o comportamento: tom, o que fazer quando não há vaga, quando
+   parar e chamar gente.
+2. **O servidor, dentro da tool**, valida o que o modelo decidiu: é dia útil?
+   está na janela de antecedência? o slot ainda está livre? — reusando `parseSlot`
+   (`src/lib/api/v1/appointments.ts`) e `availability.ts`.
 
 A segunda camada existe porque prompt não é garantia. Modelo alucina data,
-inventa horário, confunde "quinta que vem". Se a validação falhar, não grava —
-vira handoff.
+inventa horário, confunde "quinta que vem". Validação falhou → não grava, e o
+erro volta para o modelo como `tool_result`, que então se corrige ou chama
+humano. É a diferença entre o modelo *escolher a ação* e o modelo *decidir a
+regra*: só a primeira é dele.
 
 ### Os casos em que o humano é acionado
 
@@ -290,21 +315,21 @@ acontece:
   (`src/components/inbox/ai-thread-banner.tsx`), com botão para assumir e, depois,
   para devolver a conversa ao bot.
 
-### A lacuna: o n8n não consegue disparar isso hoje
+### A lacuna que existia — e como ficou resolvida
 
-Esse mecanismo está ligado à IA nativa. Com o n8n sendo o cérebro, ele precisa de
-um jeito de dizer "para tudo, chama gente" — e **não existe**:
+Esse mecanismo nasceu preso à IA nativa: `/api/v1/conversations` só tinha `GET`, e
+o único endpoint que mexia em `assigned_agent_id` era
+`/api/ai/autoreply/[conversationId]`, autenticado por **sessão de usuário**. Um
+cérebro externo não tinha como dizer "para tudo, chama gente" — sobrava marcar o
+contato com uma etiqueta e torcer para alguém olhar.
 
-- `/api/v1/conversations` só tem `GET`. Não há `PATCH`, não há atribuição.
-- O único endpoint que mexe em `assigned_agent_id` é
-  `/api/ai/autoreply/[conversationId]`, autenticado por **sessão de usuário** —
-  o n8n não tem sessão, tem chave de API.
+`POST /api/v1/conversations/{id}/handoff` fechou isso, com escopo próprio e
+fazendo exatamente o que o handoff nativo faz (status pendente, silêncio da IA na
+thread, nota interna, atribuição opcional).
 
-Então **falta uma rota**: `POST /api/v1/conversations/{id}/handoff`, com escopo
-próprio, que faça exatamente o que o handoff nativo faz (status pendente, nota
-interna, atribuição opcional). É trabalho pequeno — meio dia — e é justamente o
-contrato que a versão nativa usaria depois. Sem ela, o "chama humano" vira
-gambiarra: marcar o contato com uma etiqueta e torcer para alguém olhar.
+Com o cérebro nativo, a tool `request_human(reason)` produz **o mesmo efeito pela
+mesma função** — a rota e a tool chamam `src/lib/conversations/handoff.ts`. A
+atendente não tem como saber qual dos dois pediu ajuda, e é esse o ponto.
 
 ### Onde a atendente vive
 
@@ -317,7 +342,7 @@ resposta do bot.
 
 | O quê | Onde |
 |---|---|
-| Horários de atendimento, duração da consulta, antecedência | Prompt do agente no n8n (depois: tela de configuração no app) |
+| Horários de atendimento, duração da consulta, antecedência | Tela "Regras de agendamento" em Configurações — regra validável, não texto livre |
 | Bloquear um dia (feriado, viagem) | Direto na Google Agenda — o bot respeita na hora |
 | Desligar o bot numa conversa específica | Botão "assumir conversa" na caixa de entrada |
 | Desligar o bot inteiro | Chave `is_active` na configuração de IA |
@@ -328,24 +353,21 @@ bloquear horário.
 
 ## Próximos passos
 
-1. Criar a credencial de Google Calendar no n8n e a chave de API do iMasterChat.
-2. Definir com a cliente: duração da consulta, horários exatos seg–sex, janela de
-   antecedência, política de remarcação/cancelamento.
-3. **Rota de handoff na API v1** (`POST /api/v1/conversations/{id}/handoff`) — sem
-   ela o n8n não consegue acionar humano de forma decente. Meio dia de trabalho,
-   e é o mesmo contrato que a versão nativa usa depois.
-4. Migração `appointments` no app (tabela + endpoint de escrita na API v1) para o
-   histórico já nascer no produto.
-5. Montar o workflow do n8n e testar o diálogo no número de teste.
-6. Depois de rodar com a ótica: decidir se o volume justifica a versão nativa.
+1. ~~Rota de handoff na API v1~~ — feita.
+2. ~~Migração `appointments`~~ — feita (041).
+3. **Laço de agente com tool calling** — o pré-requisito de tudo abaixo.
+4. Credencial OAuth do Google Calendar (Google Cloud Console) para o app.
+5. Definir com a cliente: duração da consulta, horários exatos seg–sex, janela de
+   antecedência, política de remarcação/cancelamento — agora vira configuração de
+   tela, não prompt.
+6. Afinar o diálogo no Playground antes de encostar no número de teste.
 
 ---
 
-## Plano futuro: agendamento nativo
+## O plano: agendamento nativo
 
-Registro do que falta para o iMasterChat agendar sozinho, sem n8n. Não é para
-agora — é para quando o diálogo estiver provado com a ótica e o volume
-justificar. A ordem abaixo é de dependência, não de preferência.
+O que falta para o iMasterChat agendar sozinho. A ordem abaixo é de dependência,
+não de preferência.
 
 ### 1. Tool calling na camada de IA
 
@@ -374,12 +396,14 @@ de "conectar Google Agenda" em Configurações.
 
 ### 3. As tools em si
 
-Três, com assinatura estreita e validação **no servidor**:
+Assinatura estreita e validação **no servidor**:
 
-- `check_availability(date_range)` → consulta `freebusy` e devolve slots livres.
-- `book_appointment(starts_at, ends_at, contact_id)` → valida regra, cria evento,
-  grava em `appointments`.
-- `request_human(reason)` → o mesmo efeito da rota de handoff.
+- `check_availability(date_from, date_to)` → horário comercial × `freebusy` ×
+  `appointments` → slots livres já filtrados pela regra.
+- `book_appointment(starts_at, ends_at, title?)` → valida, cria evento, grava.
+- `reschedule_appointment(appointment_id, starts_at, ends_at)`.
+- `cancel_appointment(appointment_id, reason?)`.
+- `request_human(reason)` → o mesmo efeito da rota de handoff, pela mesma função.
 
 O modelo escolhe **qual** ferramenta usar e **quando**. Ele não decide se o slot
 é válido — isso é do servidor. `src/lib/api/v1/appointments.ts` já tem essa
@@ -389,26 +413,39 @@ validação e deve ser reaproveitada.
 
 - **Data e hora no contexto.** `buildConversationContext` devolve só texto: o
   modelo não sabe que dia é hoje, nem o fuso do negócio, nem o nome do contato.
-  Precisa de um injetor de contexto. Vale fazer **antes** de tudo, porque o n8n
-  tem exatamente o mesmo problema.
+  `src/lib/ai/environment.ts` resolve isso, e vale **por si só** — mesmo sem tool
+  alguma, corrige o bot que promete "amanhã" sem saber que dia é hoje.
 - **Teto de respostas por conversa.** `auto_reply_max_per_conversation` tem
   default 3 e é reivindicado por `claim_ai_reply_slot`. Um diálogo de
-  agendamento gasta mais e morre no meio. Precisa de contador separado para
-  turnos de tool, ou teto próprio.
+  agendamento gasta mais e morre no meio. O teto continua contando **mensagens
+  enviadas ao cliente**, não passos de tool — o que muda é o default subir para
+  12 quando a conta tem agendamento ativo. Contador paralelo seria inventar um
+  conceito onde já existe um correto.
 - **`ai_usage_log.mode`** só aceita `('auto_reply','draft')` — migração para
-  logar turnos de tool distintamente.
+  logar turnos de agente distintamente.
 - **Playground** (`src/components/agents/ai-playground.tsx`) precisa renderizar
   chamadas de tool para dar para testar o diálogo sem WhatsApp. É o harness certo
   e já roda o mesmo caminho da produção.
 
 ### 5. Configuração pela ótica
 
-Horário de funcionamento, duração da consulta e antecedência hoje vivem no prompt
-do n8n. Na versão nativa viram tela de configuração — e aí a regra passa a ser
-validável e testável, não texto livre.
+Horário de funcionamento, duração da consulta e antecedência viram tela de
+configuração (`ai_scheduling_settings`) — e aí a regra passa a ser validável e
+testável, não texto livre num prompt.
 
-### O que NÃO muda na migração
+### 6. A tela de agenda
+
+Semana, dia e lista dos próximos, em `/agenda`. Criar, remarcar e cancelar
+manualmente pela mesma `scheduling/store.ts` que a tool usa. Cada card mostra a
+origem (`native` / `manual`) e leva à conversa que originou.
+
+Um caso que a tela **precisa** mostrar em vez de esconder: agendamento com
+`google_event_id` nulo. É a linha gravada cujo evento no Google falhou — a 041
+deixou a coluna nullable justamente para esse estado ser visível. Ele precisa de
+gente.
+
+### O que NÃO muda
 
 A tabela `appointments`, os escopos, a rota de handoff e a experiência da
-atendente na caixa de entrada. É por isso que essas peças foram construídas
-agora: migrar é trocar quem escreve, não reescrever o que foi escrito.
+atendente na caixa de entrada. Foram construídos para sobreviver à troca de
+cérebro, e sobreviveram.
