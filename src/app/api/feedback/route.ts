@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentAccount, toErrorResponse } from '@/lib/auth/account'
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { supabaseAdmin } from '@/lib/admin/client'
 import { esc, isTelegramConfigured, sendTelegramAlert } from '@/lib/observability/telegram'
 
@@ -36,6 +37,12 @@ const MAX_SCREENSHOT_BYTES = 3_000_000
 export async function POST(request: Request) {
   try {
     const { supabase, accountId, userId } = await getCurrentAccount()
+
+    // Autenticado não quer dizer sem teto: cada relato pode carregar
+    // ~3 MB de imagem, e uma sessão comprometida — ou um clique nervoso
+    // — encheria a tabela de eventos rapidinho.
+    const limit = checkRateLimit(`feedback:${userId}`, RATE_LIMITS.feedback)
+    if (!limit.success) return rateLimitResponse(limit)
 
     const body = (await request.json().catch(() => null)) as {
       kind?: unknown
