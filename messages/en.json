@@ -1737,7 +1737,8 @@
       "modelSearch": "Search models…",
       "modelCustom": "Use “{model}”",
       "modelPrice": "US$ {input} / {output} per 1M",
-      "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher."
+      "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher.",
+      "loading": "Loading the AI configuration…"
     },
     "aiKnowledge": {
       "loadFailed": "Failed to load knowledge base",

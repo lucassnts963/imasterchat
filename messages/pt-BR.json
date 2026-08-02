@@ -1737,7 +1737,8 @@
       "modelSearch": "Buscar modelo…",
       "modelCustom": "Usar «{model}»",
       "modelPrice": "US$ {input} / {output} por 1M",
-      "modelUnknown": "Modelo fora da nossa tabela de preços — a projeção de custo vai usar a faixa equivalente, então será mais grosseira."
+      "modelUnknown": "Modelo fora da nossa tabela de preços — a projeção de custo vai usar a faixa equivalente, então será mais grosseira.",
+      "loading": "Carregando a configuração de IA…"
     },
     "aiKnowledge": {
       "loadFailed": "Falha ao carregar a base de conhecimento",
