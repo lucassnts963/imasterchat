@@ -90,8 +90,11 @@ export function buildSystemPrompt(args: {
    *  what is true right now, and what is known about this customer.
    *  See `describeVaultContext`. */
   vault?: string[]
+  /** Subjects the shop forbids the bot from handling. See
+   *  `describeGuardrails`. */
+  guardrails?: string | null
 }): string {
-  const { userPrompt, mode, knowledge, environment, vault } = args
+  const { userPrompt, mode, knowledge, environment, vault, guardrails } = args
   const parts: string[] = [
     'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
       'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
@@ -135,6 +138,14 @@ export function buildSystemPrompt(args: {
           .map((k, i) => `[${i + 1}] ${k}`)
           .join('\n\n---\n\n')}`,
     )
+  }
+
+  // Last, deliberately. These are the boundary, and the boundary should
+  // be the most recent thing the model read — after the operator's own
+  // instructions, after the knowledge base, after everything that might
+  // otherwise read as permission to answer just this once.
+  if (guardrails && guardrails.trim()) {
+    parts.push(guardrails.trim())
   }
 
   return parts.join('\n\n')

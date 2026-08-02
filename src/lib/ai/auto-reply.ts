@@ -4,6 +4,12 @@ import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { runAgent } from './agent'
 import { buildEnvironment } from './environment'
+import {
+  describeGuardrails,
+  guardrailHandoffSummary,
+  loadGuardrails,
+  matchKeywordGuardrail,
+} from './guardrails'
 import { describeVaultContext, loadVaultContext } from './vault/retrieve'
 import { buildToolCatalog, resolveSchedulingContext } from './tools/registry'
 import { describeWeeklyHours } from '@/lib/scheduling/settings'
@@ -104,6 +110,29 @@ export async function dispatchInboundToAiReply(
     const messages = await buildConversationContext(db, conversationId)
     if (messages.length === 0) return
 
+    // The shop's own list of what the bot must not touch. Loaded before
+    // anything is spent, because half of it is enforced right here.
+    const guardrails = await loadGuardrails(db, accountId)
+
+    // Keyword guardrails run BEFORE the model — no provider call, no
+    // chance of the model being argued out of it. A customer who says
+    // "advogado" gets a person, and gets one whether or not the LLM
+    // would have agreed that this counts.
+    const tripped = matchKeywordGuardrail(
+      latestUserMessage(messages),
+      guardrails.keywords,
+    )
+    if (tripped) {
+      await handOffConversation({
+        db,
+        accountId,
+        conversationId,
+        summary: guardrailHandoffSummary(tripped),
+        assignTo: config.handoffAgentId,
+      })
+      return
+    }
+
     // Account-wide throttle on the shared BYO key. The per-conversation
     // cap bounds one thread; this bounds a burst across many threads (a
     // marketing blast landing 200 replies at once) so we never run the
@@ -154,6 +183,7 @@ export async function dispatchInboundToAiReply(
       knowledge,
       environment,
       vault: describeVaultContext(vault),
+      guardrails: describeGuardrails(guardrails),
     })
 
     // The tools this account actually has. `request_human` is always

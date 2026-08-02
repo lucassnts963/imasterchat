@@ -1567,7 +1567,8 @@
       "deals": "Negócios e moeda",
       "members": "Membros da equipe",
       "api": "Chaves de API",
-      "scheduling": "Agendamento"
+      "scheduling": "Agendamento",
+      "guardrails": "Limites do agente"
     },
     "groups": {
       "account": "Conta",
@@ -1831,6 +1832,34 @@
         "Sexta",
         "Sábado"
       ]
+    },
+    "guardrails": {
+      "title": "Quando chamar uma pessoa",
+      "description": "Assuntos que o agente não pode tratar sozinho. Fora daqui ele continua respondendo normalmente.",
+      "loading": "Carregando…",
+      "loadError": "Não foi possível carregar as regras.",
+      "saveError": "Não foi possível salvar.",
+      "added": "Regra adicionada.",
+      "remove": "Remover regra",
+      "builtin": "padrão",
+      "topicsTitle": "Por assunto",
+      "topicsDesc": "O agente lê e decide se a conversa entrou nesse assunto. Pega o cliente que negocia sem nunca dizer “desconto” — e, por depender do julgamento dele, pode errar.",
+      "keywordsTitle": "Por palavra",
+      "keywordsDesc": "Verificado antes de o agente responder, sem gastar chamada. Não tem como ser convencido do contrário — e não pega quem escreveu de outro jeito.",
+      "noTopics": "Nenhum assunto bloqueado.",
+      "noKeywords": "Nenhuma palavra bloqueada.",
+      "addTitle": "Adicionar regra",
+      "addDesc": "Use assunto para algo que o cliente pode dizer de várias formas; palavra para termo exato que nunca pode passar.",
+      "kindTopic": "Assunto",
+      "kindKeyword": "Palavra",
+      "valueTopicLabel": "Assunto que exige uma pessoa",
+      "valueTopicPlaceholder": "Ex.: troca de lente fora do prazo de garantia",
+      "valueKeywordLabel": "Palavra ou expressão",
+      "valueKeywordPlaceholder": "Ex.: reclamação",
+      "noteLabel": "Aviso para a atendente (opcional)",
+      "notePlaceholder": "Ex.: verificar a nota fiscal antes de responder",
+      "noteHint": "Aparece na nota que a atendente lê antes de abrir a conversa.",
+      "add": "Adicionar"
     }
   },
   "SignupPage": {

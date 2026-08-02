@@ -1567,7 +1567,8 @@
       "deals": "Deals & currency",
       "members": "Team members",
       "api": "API keys",
-      "scheduling": "Scheduling"
+      "scheduling": "Scheduling",
+      "guardrails": "Agent limits"
     },
     "groups": {
       "account": "Account",
@@ -1831,6 +1832,34 @@
         "Friday",
         "Saturday"
       ]
+    },
+    "guardrails": {
+      "title": "When to call a person",
+      "description": "Subjects the agent may not handle on its own. Everything else it keeps answering normally.",
+      "loading": "Loading…",
+      "loadError": "Could not load the rules.",
+      "saveError": "Could not save.",
+      "added": "Rule added.",
+      "remove": "Remove rule",
+      "builtin": "default",
+      "topicsTitle": "By subject",
+      "topicsDesc": "The agent reads it and decides whether the conversation went there. Catches the customer who negotiates without ever saying “discount” — and, resting on its judgement, can be wrong.",
+      "keywordsTitle": "By word",
+      "keywordsDesc": "Checked before the agent replies, spending no call. It cannot be talked out of it — and it misses anyone who phrased it differently.",
+      "noTopics": "No blocked subjects.",
+      "noKeywords": "No blocked words.",
+      "addTitle": "Add a rule",
+      "addDesc": "Use a subject for something a customer can phrase many ways; a word for an exact term that must never get through.",
+      "kindTopic": "Subject",
+      "kindKeyword": "Word",
+      "valueTopicLabel": "Subject that requires a person",
+      "valueTopicPlaceholder": "e.g. lens replacement outside warranty",
+      "valueKeywordLabel": "Word or phrase",
+      "valueKeywordPlaceholder": "e.g. complaint",
+      "noteLabel": "Note for the attendant (optional)",
+      "notePlaceholder": "e.g. check the invoice before replying",
+      "noteHint": "Shows in the note the attendant reads before opening the thread.",
+      "add": "Add"
     }
   },
   "SignupPage": {
