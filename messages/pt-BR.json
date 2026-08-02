@@ -1992,7 +1992,14 @@
         "duplicate": "Duplicada",
         "orphan": "Sem conexão",
         "gap": "Lacuna"
-      }
+      },
+      "edit": "Editar",
+      "editTitle": "Título da página",
+      "editHint": "Ao salvar, a página é aprovada com a sua versão — é ela que o agente vai usar nas respostas.",
+      "cancelEdit": "Descartar",
+      "saveEdit": "Salvar",
+      "saveAndApprove": "Salvar e aprovar",
+      "saved": "Página salva e aprovada."
     }
   },
   "Notifications": {

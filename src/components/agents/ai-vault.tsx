@@ -9,12 +9,14 @@ import {
   Info,
   Loader2,
   Network,
+  Pencil,
   Trash2,
   X,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { VaultGraph, type GraphLink, type GraphNode } from './vault-graph';
 
 // ============================================================
@@ -134,6 +136,35 @@ export function AiVault() {
     }
   }
 
+  /**
+   * Save an edit. There is no "save as draft" — approving is what makes
+   * a page real, and a curator fixing a typo mid-review would otherwise
+   * have to approve twice. An edited approved page becomes a new
+   * version and is re-indexed; an edited draft is approved with the fix
+   * already applied.
+   */
+  async function save(page: VaultPage, edits: { title: string; content: string }) {
+    setBusyId(page.id);
+    try {
+      const res = await fetch(`/api/ai/vault/${page.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved', ...edits }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? t('actionError'));
+        return;
+      }
+      toast.success(t('saved'));
+      await load();
+    } catch {
+      toast.error(t('actionError'));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'graph', label: t('tabs.graph') },
     { id: 'drafts', label: t('tabs.drafts'), count: drafts.length },
@@ -215,13 +246,14 @@ export function AiVault() {
           ) : (
             drafts.map((page) => (
               <PageCard
-                key={page.id}
+                key={`${page.id}:${page.updated_at}`}
                 page={page}
                 expanded={expanded === page.id}
                 onToggle={() =>
                   setExpanded((id) => (id === page.id ? null : page.id))
                 }
                 busy={busyId === page.id}
+                onSave={(edits) => save(page, edits)}
                 actions={
                   <>
                     <Button
@@ -256,13 +288,14 @@ export function AiVault() {
           ) : (
             approved.map((page) => (
               <PageCard
-                key={page.id}
+                key={`${page.id}:${page.updated_at}`}
                 page={page}
                 expanded={expanded === page.id}
                 onToggle={() =>
                   setExpanded((id) => (id === page.id ? null : page.id))
                 }
                 busy={busyId === page.id}
+                onSave={(edits) => save(page, edits)}
                 actions={
                   <Button
                     size="sm"
@@ -327,14 +360,29 @@ function PageCard({
   onToggle,
   busy,
   actions,
+  onSave,
 }: {
   page: VaultPage;
   expanded: boolean;
   onToggle: () => void;
   busy: boolean;
   actions: React.ReactNode;
+  /** Save an edit. Approving is what publishes it either way, so an
+   *  edited draft is approved with the edit applied and an edited
+   *  approved page becomes a new version. */
+  onSave: (edits: { title: string; content: string }) => void;
 }) {
   const t = useTranslations('Agents.vault');
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(page.title);
+  const [content, setContent] = useState(page.content);
+
+  // No effect resets these when the page changes: the parent keys this
+  // component on the page's identity AND its revision, so a reload after
+  // a save remounts it and the state starts fresh. Resetting from an
+  // effect would mean rendering stale text once before correcting it.
+
+  const dirty = title.trim() !== page.title || content.trim() !== page.content;
 
   return (
     <div className="rounded-xl border border-border bg-card">
@@ -357,10 +405,66 @@ function PageCard({
 
       {expanded && (
         <div className="space-y-3 border-t border-border px-4 py-3">
-          <p className="whitespace-pre-wrap text-sm text-foreground/90">
-            {page.content}
-          </p>
-          <div className="flex justify-end gap-2">{actions}</div>
+          {editing ? (
+            <div className="space-y-2">
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={t('editTitle')}
+                className="text-sm"
+              />
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={Math.min(16, Math.max(4, content.split(/\r?\n/).length + 1))}
+                className="w-full resize-y rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus:border-primary/50"
+              />
+              <p className="text-xs text-muted-foreground">{t('editHint')}</p>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap text-sm text-foreground/90">
+              {page.content}
+            </p>
+          )}
+
+          <div className="flex flex-wrap justify-end gap-2">
+            {editing ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setTitle(page.title);
+                    setContent(page.content);
+                    setEditing(false);
+                  }}
+                >
+                  {t('cancelEdit')}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={busy || !dirty || !title.trim() || !content.trim()}
+                  onClick={() => onSave({ title: title.trim(), content: content.trim() })}
+                >
+                  <Check className="mr-1 h-3.5 w-3.5" />
+                  {page.status === 'draft' ? t('saveAndApprove') : t('saveEdit')}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => setEditing(true)}
+                >
+                  <Pencil className="mr-1 h-3.5 w-3.5" /> {t('edit')}
+                </Button>
+                {actions}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

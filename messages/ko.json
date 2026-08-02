@@ -1992,7 +1992,14 @@
         "duplicate": "Duplicate",
         "orphan": "Orphan",
         "gap": "Gap"
-      }
+      },
+      "edit": "Edit",
+      "editTitle": "Page title",
+      "editHint": "Saving approves the page with your version — that is what the agent will use in replies.",
+      "cancelEdit": "Discard",
+      "saveEdit": "Save",
+      "saveAndApprove": "Save and approve",
+      "saved": "Page saved and approved."
     }
   },
   "Notifications": {
