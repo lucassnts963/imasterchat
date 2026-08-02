@@ -1,4 +1,5 @@
 import {
+  Bell,
   CalendarClock,
   Coins,
   FileText,
@@ -27,6 +28,7 @@ export const SETTINGS_SECTIONS = [
   'profile',
   'security',
   'appearance',
+  'push',
   'whatsapp',
   'templates',
   'quick-replies',
@@ -58,6 +60,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   profile: { id: 'profile', labelKey: 'sections.profile', icon: User, group: 'account' },
   security: { id: 'security', labelKey: 'sections.security', icon: Shield, group: 'account' },
   appearance: { id: 'appearance', labelKey: 'sections.appearance', icon: Palette, group: 'account' },
+  push: { id: 'push', labelKey: 'sections.push', icon: Bell, group: 'account' },
   whatsapp: { id: 'whatsapp', labelKey: 'sections.whatsapp', icon: PlugZap, group: 'workspace' },
   templates: { id: 'templates', labelKey: 'sections.templates', icon: FileText, group: 'workspace' },
   'quick-replies': { id: 'quick-replies', labelKey: 'sections.quick-replies', icon: Zap, group: 'workspace' },

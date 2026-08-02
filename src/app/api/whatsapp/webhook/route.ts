@@ -8,6 +8,7 @@ import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import { previewText, sendPushToAccount } from '@/lib/push/send'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
 import { accountAllowsSideEffects } from '@/lib/billing/side-effects'
 import {
@@ -828,6 +829,30 @@ async function processMessage(
         interactive_reply_id: interactiveReplyId ?? undefined,
       },
     }).catch((err) => console.error('[automations] dispatch failed:', err))
+  }
+
+  // Push for a new inbound message, to whoever asked for every one.
+  // Sent BEFORE the auto-reply runs, not after: the point is reaching
+  // someone whose app is closed, and the agent loop can take tens of
+  // seconds. Anyone on 'human_needed' hears nothing here — they are
+  // reached by the handoff, if it comes.
+  //
+  // Fire-and-forget; `sendPushToAccount` never throws and must not
+  // delay the 200 owed to Meta.
+  if (sideEffectsAllowed && inboundText.trim()) {
+    void sendPushToAccount(supabaseAdmin(), {
+      accountId,
+      urgency: 'all',
+      payload: {
+        title: contactRecord.name?.trim() || contactRecord.phone,
+        body: previewText(inboundText),
+        url: `/inbox?conversation=${conversation.id}`,
+        // One notification per conversation that updates in place — a
+        // customer sending five lines should not produce five alerts
+        // to dismiss.
+        tag: `msg:${conversation.id}`,
+      },
+    })
   }
 
   // AI auto-reply. Runs only for plain-text inbound the deterministic

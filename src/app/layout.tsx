@@ -41,6 +41,17 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [{ url: "/icon" }],
+    // iOS ignores the manifest's icons entirely and reads only this one
+    // when the app is added to the home screen. Without it the shortcut
+    // gets a blurry screenshot of the page instead of the logo.
+    apple: [{ url: "/pwa-icon?size=180", sizes: "180x180" }],
+  },
+  // Standalone on iOS, and a title that is not the <title> of whatever
+  // page happened to be open when the shortcut was created.
+  appleWebApp: {
+    capable: true,
+    title: "iMasterChat",
+    statusBarStyle: "black-translucent",
   },
   formatDetection: {
     email: false,

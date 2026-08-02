@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { previewText, sendPushToAccount } from '@/lib/push/send'
 
 // ============================================================
 // Handing a conversation to a human — the one implementation.
@@ -113,6 +114,26 @@ export async function handOffConversation(
     console.error('[handoff] update error:', upErr)
     return { ok: false, failure: 'internal', message: 'Failed to hand off the conversation' }
   }
+
+  // The one event that always deserves a phone buzzing. Every route
+  // into a handoff passes through here — request_human, a keyword
+  // guardrail, the model giving up — so this is the single place that
+  // knows a conversation now needs a person.
+  //
+  // Fire-and-forget: `sendPushToAccount` swallows its own errors, and a
+  // push service being slow must not delay the write that just marked
+  // the thread pending.
+  void sendPushToAccount(db, {
+    accountId,
+    urgency: 'human_needed',
+    payload: {
+      title: 'Atendimento precisa de você',
+      body: previewText(summary.replace(/^🤖\s*/, '')),
+      url: `/inbox?conversation=${conversationId}`,
+      tag: `handoff:${conversationId}`,
+      urgent: true,
+    },
+  })
 
   return {
     ok: true,

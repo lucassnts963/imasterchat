@@ -1571,7 +1571,8 @@
       "deals": "Deals & currency",
       "members": "Team members",
       "api": "API keys",
-      "scheduling": "Scheduling"
+      "scheduling": "Scheduling",
+      "push": "Device alerts"
     },
     "groups": {
       "account": "Account",
@@ -1840,6 +1841,28 @@
         "Friday",
         "Saturday"
       ]
+    },
+    "push": {
+      "title": "Device alerts",
+      "description": "Alerts on your phone or computer while the app is closed. With the app open, messages already arrive on their own.",
+      "thisDevice": "This device",
+      "perDevice": "The choice applies to this device only. Your phone can alert on everything while your computer stays quiet.",
+      "loading": "Loading…",
+      "saving": "Saving…",
+      "saved": "Preference saved.",
+      "turnedOff": "Notifications off on this device.",
+      "saveError": "Could not save.",
+      "permissionDenied": "You need to allow notifications in the browser.",
+      "blocked": "The browser is blocking notifications for this site. Allow them in browser settings and come back.",
+      "unsupported": "This browser does not support push notifications.",
+      "notConfigured": "This deployment has no notification keys (VAPID) configured yet.",
+      "modeOff": "Off",
+      "modeOffHint": "No alerts on this device.",
+      "modeHuman": "Only what needs a person",
+      "modeHumanHint": "Alerts when the agent stops and calls a human — a complaint, a blocked subject, a booking that failed. Most people want this.",
+      "modeAll": "Every message",
+      "modeAllHint": "Alerts on every customer message. In a busy shop that is all day.",
+      "iosNote": "On iPhone the app must be installed to the home screen before notifications work (iOS 16.4 or newer)."
     }
   },
   "SignupPage": {

@@ -1571,7 +1571,8 @@
       "deals": "Negócios e moeda",
       "members": "Membros da equipe",
       "api": "Chaves de API",
-      "scheduling": "Agendamento"
+      "scheduling": "Agendamento",
+      "push": "Avisos no celular"
     },
     "groups": {
       "account": "Conta",
@@ -1840,6 +1841,28 @@
         "Sexta",
         "Sábado"
       ]
+    },
+    "push": {
+      "title": "Avisos no celular",
+      "description": "Avisos no celular ou no computador quando o app está fechado. Com o app aberto, as mensagens já chegam sozinhas.",
+      "thisDevice": "Este aparelho",
+      "perDevice": "A escolha vale só para este aparelho. O celular pode avisar de tudo e o computador ficar quieto.",
+      "loading": "Carregando…",
+      "saving": "Salvando…",
+      "saved": "Preferência salva.",
+      "turnedOff": "Notificações desligadas neste aparelho.",
+      "saveError": "Não foi possível salvar.",
+      "permissionDenied": "Você precisa permitir notificações no navegador.",
+      "blocked": "O navegador está bloqueando notificações para este site. Libere nas configurações do navegador e volte aqui.",
+      "unsupported": "Este navegador não suporta notificações push.",
+      "notConfigured": "Este servidor ainda não tem as chaves de notificação (VAPID) configuradas.",
+      "modeOff": "Desligado",
+      "modeOffHint": "Nenhum aviso neste aparelho.",
+      "modeHuman": "Só o que precisa de gente",
+      "modeHumanHint": "Avisa quando o agente para e chama uma pessoa — reclamação, assunto bloqueado, erro no agendamento. É a opção da maioria.",
+      "modeAll": "Toda mensagem",
+      "modeAllHint": "Avisa a cada mensagem de cliente. Numa loja movimentada, isso é o dia inteiro.",
+      "iosNote": "No iPhone, é preciso instalar o app na tela de início antes de as notificações funcionarem (iOS 16.4 ou mais novo)."
     }
   },
   "SignupPage": {
