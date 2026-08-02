@@ -17,6 +17,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { HealthStrip } from './health-strip';
 
 // ============================================================
 // A tela que responde "quem está quebrado agora".
@@ -158,6 +159,11 @@ export function EventsPanel() {
 
   return (
     <div className="space-y-4">
+      {/* Estado atual antes da história: num dia ruim a primeira
+          pergunta não é "o que aconteceu", é "está quebrado agora, e
+          em qual cliente". */}
+      <HealthStrip />
+
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <button

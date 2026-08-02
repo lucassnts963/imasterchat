@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
@@ -63,7 +64,41 @@ const SECURITY_HEADERS = [
   },
 ] as const;
 
+/**
+ * A última migração que ESTE build espera encontrar no banco.
+ *
+ * Lida do disco a cada build, e não escrita à mão, porque uma
+ * constante mantida à mão erra justamente no dia em que importa: quem
+ * esquece de rodar a migração é a mesma pessoa que esqueceria de
+ * bumpar o número, e aí a verificação passa em silêncio dizendo que
+ * está tudo certo.
+ *
+ * O runtime compara isto com a tabela `applied_migrations`. Código
+ * novo contra banco velho tem três consequências já mapeadas — a 029
+ * faltando faz o bot nunca enviar, a 047 faz a contabilidade de custo
+ * ficar errada em silêncio, a 037 abre o gate de cobrança — e nenhuma
+ * delas dá sinal nenhum hoje.
+ *
+ * `supabase/migrations` não entra na imagem Docker (o build standalone
+ * copia só `.next` e `public`), então ler o diretório em runtime não
+ * funcionaria. Daí ser embutido aqui.
+ */
+function latestMigration(): string {
+  try {
+    return readdirSync("supabase/migrations")
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .pop() ?? "";
+  } catch {
+    return "";
+  }
+}
+
 const nextConfig: NextConfig = {
+  env: {
+    EXPECTED_MIGRATION: latestMigration(),
+  },
+
   // Emit a self-contained server bundle (.next/standalone) so the
   // Docker image can run without node_modules or the Next CLI.
   // Harmless outside Docker: `next start` keeps working as before.

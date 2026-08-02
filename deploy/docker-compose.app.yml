@@ -79,6 +79,7 @@ services:
   #                           blocks every future trigger for that contact
   #   /api/ai/vault/keeper    the vault stops learning
   #   /api/exchange/cron      the BRL figure ages silently
+  #   /api/health/cron        broken accounts are only found on use
   #
   # It ships here rather than as a host crontab so a deploy is one
   # `docker compose up` and not a set of instructions somebody follows
@@ -129,6 +130,11 @@ services:
             # ten conversations, sequentially and on purpose.
             curl -fsS -m 900 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
               http://app:3000/api/ai/vault/keeper >/dev/null || echo "[cron] keeper failed"
+            # A ronda de saude: bate na porta de cada dependencia antes
+            # de o cliente bater na nossa. Sem ela, a chave da IA que
+            # vence de madrugada so vira problema na segunda de manha.
+            curl -fsS -m 600 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
+              http://app:3000/api/health/cron >/dev/null || echo "[cron] health failed"
           fi
           sleep $${CRON_INTERVAL_SECONDS}
         done
