@@ -44,7 +44,9 @@ interface UsageResponse {
     calls: number;
     tokens: number;
   }[];
-  daily: { date: string; tokens: number; calls: number }[];
+  daily: { date: string; tokens: number; calls: number; cost_usd: number }[];
+  cost_usd: number;
+  price_fallback: boolean;
 }
 
 const WINDOWS = [7, 30, 90] as const;
@@ -54,6 +56,13 @@ const WINDOWS = [7, 30, 90] as const;
  * billing-class), mirroring the `ai_usage_log` SELECT policy and the
  * `GET /api/ai/usage` route. Renders nothing for non-admins.
  */
+/** Daily spend is often fractions of a cent; two decimals would
+ *  render every bar as US$ 0,00 and teach the reader nothing. */
+function formatUsd(value: number): string {
+  if (value === 0) return 'US$ 0';
+  return value < 0.01 ? `US$ ${value.toFixed(4)}` : `US$ ${value.toFixed(2)}`;
+}
+
 export function AiUsageCard() {
   const t = useTranslations('Agents.usage');
   const { accountId, accountRole, profileLoading } = useAuth();
@@ -62,6 +71,10 @@ export function AiUsageCard() {
   const [days, setDays] = useState<number>(30);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<UsageResponse | null>(null);
+  // Money first. A shop owner reading "48.2k tokens" learns nothing;
+  // "US$ 0,37" is the question they were actually asking. Tokens stay
+  // one click away for whoever is tuning the prompt.
+  const [unit, setUnit] = useState<'cost' | 'tokens'>('cost');
   const loadedRef = useRef<string | null>(null);
 
   const fetchUsage = useCallback(async (windowDays: number) => {
@@ -97,8 +110,13 @@ export function AiUsageCard() {
   if (profileLoading || !canView) return null;
 
   const tokensLabel = t('tokensCategory');
+  const costLabel = t('costCategory');
+  const label = unit === 'cost' ? costLabel : tokensLabel;
   const chartData =
-    data?.daily.map((d) => ({ day: format(parseISO(d.date), 'MMM d'), [tokensLabel]: d.tokens })) ??
+    data?.daily.map((d) => ({
+      day: format(parseISO(d.date), 'MMM d'),
+      [label]: unit === 'cost' ? Number(d.cost_usd.toFixed(4)) : d.tokens,
+    })) ??
     [];
   const hasSpend = (data?.totals.total_tokens ?? 0) > 0;
 
@@ -171,15 +189,34 @@ export function AiUsageCard() {
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-medium text-muted-foreground">
-                {t('tokensPerDay')}
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {unit === 'cost' ? t('costPerDay') : t('tokensPerDay')}
+                </p>
+                <div className="flex rounded-lg border border-border p-0.5">
+                  {(['cost', 'tokens'] as const).map((u) => (
+                    <button
+                      key={u}
+                      onClick={() => setUnit(u)}
+                      className={
+                        unit === u
+                          ? 'rounded-md bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground'
+                          : 'rounded-md px-2.5 py-1 text-[11px] text-muted-foreground'
+                      }
+                    >
+                      {u === 'cost' ? t('unitCost') : t('unitTokens')}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <BarChart
                 data={chartData}
                 index="day"
-                categories={[tokensLabel]}
+                categories={[label]}
                 colors={['violet']}
-                valueFormatter={(v) => formatCompactNumber(v)}
+                valueFormatter={(v) =>
+                  unit === 'cost' ? formatUsd(v) : formatCompactNumber(v)
+                }
                 showLegend={false}
                 yAxisWidth={48}
                 className="h-[200px]"

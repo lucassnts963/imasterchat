@@ -57,6 +57,29 @@ const FALLBACK_SMALL: ModelPrice = { input: 0.5, output: 2 }
 /** Standard-tier fallback for every other unknown model. */
 const FALLBACK_STANDARD: ModelPrice = { input: 3, output: 15 }
 
+/**
+ * The families this table knows, for the settings picker.
+ *
+ * Derived from the price table rather than kept as a second list:
+ * a model offered in the dropdown but absent here would be priced by
+ * class fallback, so the two would drift into the operator picking
+ * something whose cost we then guess at.
+ *
+ * It stays a suggestion, never an allow-list — model IDs churn fast
+ * and a forker must be able to type one this table has never heard
+ * of.
+ */
+export function knownModels(provider: 'openai' | 'anthropic'): {
+  id: string
+  price: ModelPrice
+}[] {
+  const isAnthropic = (id: string) => id.startsWith('claude')
+  return Object.entries(PRICES)
+    .filter(([id]) => (provider === 'anthropic') === isAnthropic(id))
+    .map(([id, price]) => ({ id, price }))
+    .sort((a, b) => a.price.input - b.price.input)
+}
+
 // Longest prefix first so "gpt-4o-mini" wins over "gpt-4o".
 const PREFIXES = Object.keys(PRICES).sort((a, b) => b.length - a.length)
 

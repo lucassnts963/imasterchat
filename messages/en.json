@@ -1729,7 +1729,11 @@
       "saveSuccess": "AI assistant saved.",
       "saveFailed": "Failed to save.",
       "removeSuccess": "AI configuration removed.",
-      "removeFailed": "Failed to remove."
+      "removeFailed": "Failed to remove.",
+      "modelSearch": "Search models…",
+      "modelCustom": "Use “{model}”",
+      "modelPrice": "US$ {input} / {output} per 1M",
+      "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher."
     },
     "aiKnowledge": {
       "loadFailed": "Failed to load knowledge base",
@@ -1955,7 +1959,11 @@
       "tokensCategory": "Tokens",
       "byModel": "By model",
       "modelStats": "{tokens} tok · {count, plural, =1 {# call} other {# calls}}",
-      "truncated": "Showing a partial window — usage is high enough that only the most recent records are summarized here."
+      "truncated": "Showing a partial window — usage is high enough that only the most recent records are summarized here.",
+      "costPerDay": "Cost per day",
+      "costCategory": "Cost",
+      "unitCost": "Money",
+      "unitTokens": "Tokens"
     },
     "vault": {
       "loadError": "Could not load the vault.",
@@ -2043,8 +2051,7 @@
       "stepsHint": "With tools, the prompt is re-sent on every step",
       "breakdown": "Where the cost is",
       "everyMessage": "All of this is re-sent on every message, in every conversation. That is why cutting what is always loaded is worth more than cutting what is retrieved.",
-      "estimateWarning": "An estimate. Tokens are counted by characters (~3.5 per token in Portuguese), not by a real tokenizer.",
-      "measured": "Actually measured: {calls} calls, {tokens} tokens sent on average — the estimate is {drift}% off.",
+      "estimateWarning": "Tokens start as a character estimate and are corrected by what the provider actually charged on this account.",
       "noMeasurement": "No calls recorded yet to compare against. Once the agent answers customers, the measured figure appears here.",
       "priceFallback": "This model is not in the price table — we used its class, so the figure is rougher still.",
       "sections": {
@@ -2056,7 +2063,9 @@
         "knowledge": "Knowledge base",
         "tools": "Tools",
         "transcript": "Conversation history"
-      }
+      },
+      "calibrated": "Corrected using {calls} real calls: the character estimate said {raw} tokens and was {drift}% off the measured figure. The number above is already adjusted.",
+      "calibratedMatch": "Checked against {calls} real calls — the estimate matched."
     }
   },
   "Notifications": {

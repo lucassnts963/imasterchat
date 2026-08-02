@@ -52,9 +52,24 @@ export interface CostSection {
 }
 
 export interface CostProjection {
-  /** Per section of the assembled prompt, largest first. */
+  /** Per section of the assembled prompt, largest first. Already
+   *  calibrated, so the shares still add up to `promptTokens`. */
   sections: CostSection[]
+  /** Calibrated when there is measured data, raw otherwise. */
   promptTokens: number
+  /** What the character estimate said before calibration. Kept so the
+   *  screen can show the correction rather than quietly applying it. */
+  rawPromptTokens: number
+  /**
+   * measured ÷ estimated, from this account's own logged calls. 1 when
+   * there is nothing to calibrate against.
+   *
+   * This is the "start from real data" loop: the character estimate is
+   * a guess about how Portuguese and JSON tokenize, and the provider
+   * has already told us the answer for THIS account's actual prompts.
+   * Believing our own guess over their number would be perverse.
+   */
+  calibrationFactor: number
   completionTokens: number
   /** Provider round-trips a single reply may take. */
   steps: number
@@ -145,9 +160,27 @@ export async function projectReplyCost(
     .filter((s) => s.chars > 0)
     .sort((a, b) => b.tokens - a.tokens)
 
-  const promptTokens = sections.reduce((sum, s) => sum + s.tokens, 0)
+  const rawPromptTokens = sections.reduce((sum, s) => sum + s.tokens, 0)
 
   const measured = await measuredAverages(db, accountId)
+
+  // Calibrate against what the provider actually charged for. Clamped:
+  // a handful of unusual calls (a very long conversation, a keeper run)
+  // must not swing the factor to something absurd, and a factor of 4
+  // would be a bug rather than a measurement.
+  const calibrationFactor =
+    measured && rawPromptTokens > 0
+      ? Math.min(3, Math.max(0.5, measured.avgPromptTokens / rawPromptTokens))
+      : 1
+
+  const promptTokens = Math.round(rawPromptTokens * calibrationFactor)
+  // Spread the correction across the sections so their shares still
+  // describe the calibrated total — a breakdown that does not sum to
+  // the headline is a breakdown nobody trusts.
+  const calibrated = sections.map((s) => ({
+    ...s,
+    tokens: Math.round(s.tokens * calibrationFactor),
+  }))
   // Prefer what the provider actually reported for completions — a
   // reply's length is the one part we cannot infer from configuration.
   const completionTokens = measured?.avgCompletionTokens || 180
@@ -164,8 +197,10 @@ export async function projectReplyCost(
   )
 
   return {
-    sections,
+    sections: calibrated,
     promptTokens,
+    rawPromptTokens,
+    calibrationFactor,
     completionTokens,
     steps,
     costPerReplyUsd: cost.usd,

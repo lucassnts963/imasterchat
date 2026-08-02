@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { daysAgoStart, lastNDayKeys, localDayKey } from '@/lib/dashboard/date-utils'
+import { estimateCostUsd } from '@/lib/ai/pricing'
 
 // Rows are aggregated in-process over a bounded window. An active
 // account writes a handful of rows per conversation, so 30 days sits
@@ -101,10 +102,19 @@ export async function GET(request: Request) {
     // Zero-filled daily buckets so the chart shows quiet days as gaps,
     // not missing points. Local-day keys, oldest → newest — the same
     // helper every other dashboard chart uses, so day boundaries agree.
-    const daily = new Map<string, { date: string; tokens: number; calls: number }>()
+    const daily = new Map<
+      string,
+      { date: string; tokens: number; calls: number; cost_usd: number }
+    >()
     for (const key of lastNDayKeys(days)) {
-      daily.set(key, { date: key, tokens: 0, calls: 0 })
+      daily.set(key, { date: key, tokens: 0, calls: 0, cost_usd: 0 })
     }
+    // Cost is summed per row, not derived from the totals: prices are
+    // per model, and an account that switched models mid-month would
+    // otherwise have every day priced at whichever model happened to
+    // be last.
+    let costUsd = 0
+    let priceFallback = false
 
     for (const r of rows) {
       promptTokens += r.prompt_tokens
@@ -123,10 +133,15 @@ export async function GET(request: Request) {
       m.tokens += r.total_tokens
       modelMap.set(mk, m)
 
+      const rowCost = estimateCostUsd(r.model, r.prompt_tokens, r.completion_tokens)
+      costUsd += rowCost.usd
+      if (rowCost.fallback) priceFallback = true
+
       const bucket = daily.get(localDayKey(r.created_at))
       if (bucket) {
         bucket.tokens += r.total_tokens
         bucket.calls += 1
+        bucket.cost_usd += rowCost.usd
       }
     }
 
@@ -135,6 +150,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       window_days: days,
       truncated,
+      cost_usd: costUsd,
+      price_fallback: priceFallback,
       totals: {
         calls: rows.length,
         prompt_tokens: promptTokens,

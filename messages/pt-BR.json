@@ -1729,7 +1729,11 @@
       "saveSuccess": "Assistente de IA salvo.",
       "saveFailed": "Falha ao salvar.",
       "removeSuccess": "Configuração de IA removida.",
-      "removeFailed": "Falha ao remover."
+      "removeFailed": "Falha ao remover.",
+      "modelSearch": "Buscar modelo…",
+      "modelCustom": "Usar «{model}»",
+      "modelPrice": "US$ {input} / {output} por 1M",
+      "modelUnknown": "Modelo fora da nossa tabela de preços — a projeção de custo vai usar a faixa equivalente, então será mais grosseira."
     },
     "aiKnowledge": {
       "loadFailed": "Falha ao carregar a base de conhecimento",
@@ -1955,7 +1959,11 @@
       "tokensCategory": "Tokens",
       "byModel": "Por modelo",
       "modelStats": "{tokens} tok · {count, plural, =1 {# chamada} other {# chamadas}}",
-      "truncated": "Exibindo uma janela parcial — o uso é alto o suficiente para que apenas os registros mais recentes sejam resumidos aqui."
+      "truncated": "Exibindo uma janela parcial — o uso é alto o suficiente para que apenas os registros mais recentes sejam resumidos aqui.",
+      "costPerDay": "Custo por dia",
+      "costCategory": "Custo",
+      "unitCost": "Moeda",
+      "unitTokens": "Tokens"
     },
     "vault": {
       "loadError": "Não foi possível carregar o vault.",
@@ -2043,8 +2051,7 @@
       "stepsHint": "Com ferramentas, o prompt é reenviado a cada passo",
       "breakdown": "Onde está o custo",
       "everyMessage": "Tudo isso é reenviado a cada mensagem, em toda conversa. É por isso que cortar o que é sempre carregado vale mais que cortar o que é buscado.",
-      "estimateWarning": "Estimativa. Os tokens são calculados por caracteres (~3,5 por token em português), não por um tokenizador real.",
-      "measured": "Medido de verdade: {calls} chamadas, média de {tokens} tokens enviados — a estimativa está {drift}% distante.",
+      "estimateWarning": "Os tokens começam como estimativa por caracteres e são corrigidos pelo que o provedor cobrou de verdade nesta conta.",
       "noMeasurement": "Ainda não há chamadas registradas para comparar. Assim que o agente responder clientes, o valor medido aparece aqui.",
       "priceFallback": "O preço deste modelo não está na tabela — usamos a faixa equivalente, então o valor é mais grosseiro ainda.",
       "sections": {
@@ -2056,7 +2063,9 @@
         "knowledge": "Base de conhecimento",
         "tools": "Ferramentas",
         "transcript": "Histórico da conversa"
-      }
+      },
+      "calibrated": "Corrigido com {calls} chamadas reais: a estimativa por caracteres dava {raw} tokens e ficou {drift}% abaixo do medido. O valor acima já está ajustado.",
+      "calibratedMatch": "Conferido com {calls} chamadas reais — a estimativa bateu."
     }
   },
   "Notifications": {

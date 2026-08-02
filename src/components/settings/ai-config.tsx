@@ -27,6 +27,7 @@ import {
 import { SettingsPanelHead } from './settings-panel-head';
 import { AiKnowledgeCard } from './ai-knowledge';
 import { AI_PROVIDER_DEFAULT_MODEL } from '@/lib/ai/defaults';
+import { ModelPicker, isUnknownModel } from '@/components/ui/model-picker';
 import type { AiProvider } from '@/lib/ai/types';
 import type { AccountMember } from '@/types';
 import { fetchAccountMembers, memberLabel } from '@/lib/account/members';
@@ -303,13 +304,23 @@ export function AiConfig() {
 
               <div className="space-y-2">
                 <Label htmlFor="ai-model">{t('model')}</Label>
-                <Input
+                <ModelPicker
                   id="ai-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder={AI_PROVIDER_DEFAULT_MODEL[provider]}
+                  provider={provider}
+                  value={model || AI_PROVIDER_DEFAULT_MODEL[provider]}
+                  onChange={setModel}
                   disabled={disabled}
+                  searchPlaceholder={t('modelSearch')}
+                  customLabel={(m) => t('modelCustom', { model: m })}
+                  priceLabel={(input, output) =>
+                    t('modelPrice', { input, output })
+                  }
                 />
+                {isUnknownModel(provider, model) && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('modelUnknown')}
+                  </p>
+                )}
               </div>
             </div>
 

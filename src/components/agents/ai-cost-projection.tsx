@@ -36,6 +36,8 @@ interface Projection {
   model?: string;
   sections?: Section[];
   promptTokens?: number;
+  rawPromptTokens?: number;
+  calibrationFactor?: number;
   completionTokens?: number;
   steps?: number;
   costPerReplyUsd?: number;
@@ -90,11 +92,12 @@ export function AiCostProjection() {
   }
 
   const total = data.promptTokens ?? 0;
-  // How far the estimate is from what the provider actually charged for.
-  const drift =
-    data.measured && total > 0
-      ? Math.round(((data.measured.avgPromptTokens - total) / total) * 100)
-      : null;
+  const factor = data.calibrationFactor ?? 1;
+  // Whether the raw character estimate needed correcting, and by how
+  // much. Shown rather than hidden: a number that silently corrects
+  // itself is a number nobody can sanity-check.
+  const corrected = Math.abs(factor - 1) > 0.02;
+  const driftPct = Math.round((factor - 1) * 100);
 
   return (
     <Card>
@@ -163,11 +166,13 @@ export function AiCostProjection() {
             <p>{t('estimateWarning')}</p>
             {data.measured ? (
               <p className="mt-1">
-                {t('measured', {
-                  calls: data.measured.calls,
-                  tokens: data.measured.avgPromptTokens,
-                  drift: drift === null ? 0 : drift,
-                })}
+                {corrected
+                  ? t('calibrated', {
+                      calls: data.measured.calls,
+                      raw: data.rawPromptTokens ?? 0,
+                      drift: driftPct,
+                    })
+                  : t('calibratedMatch', { calls: data.measured.calls })}
               </p>
             ) : (
               <p className="mt-1">{t('noMeasurement')}</p>
