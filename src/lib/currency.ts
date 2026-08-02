@@ -15,6 +15,20 @@
  *  default for new accounts, migration 039). */
 export const DEFAULT_CURRENCY = "BRL";
 
+/**
+ * O locale do app — nunca o do navegador.
+ *
+ * Mesma fonte que o `next-intl` lê em `src/i18n/request.ts`. Os
+ * componentes devem passar `useLocale()` explicitamente (é o
+ * next-intl que resolve o fallback quando o dicionário não existe);
+ * isto é o piso, para que um chamador que esqueça caia no locale da
+ * instalação em vez de no do sistema operacional de quem estiver
+ * olhando.
+ */
+export function appLocale(): string {
+  return process.env.NEXT_PUBLIC_APP_LOCALE || "en";
+}
+
 export interface CurrencyOption {
   /** ISO-4217 code, e.g. "USD". Stored verbatim in the DB. */
   code: string;
@@ -53,6 +67,19 @@ export const CURRENCIES: CurrencyOption[] = [
  * the app. `currency` defaults to USD so callers with nothing better
  * stay safe, but pass the account/deal currency wherever known.
  *
+ * O `locale` é EXPLÍCITO e nunca `undefined`.
+ *
+ * Passar `undefined` faz o Intl usar o locale do NAVEGADOR — não o do
+ * app. Numa máquina configurada em inglês, uma instalação que declara
+ * `NEXT_PUBLIC_APP_LOCALE=pt-BR` renderizava `R$1,234` em vez de
+ * `R$ 1.234`: separador de milhar errado, sem espaço depois do
+ * símbolo. A mesma confusão que já tinha sido relatada nas datas,
+ * num lugar onde ninguém olhou.
+ *
+ * As datas já recebem locale explícito (`src/lib/time/zone.ts`).
+ * Dinheiro seguir o sistema operacional de quem olha, enquanto data
+ * segue o app, é uma inconsistência que a tela denuncia.
+ *
  * Total by design: `Intl.NumberFormat` throws a RangeError on a
  * structurally invalid currency code, and `deals.currency` carries
  * NO DB CHECK (only `accounts.default_currency` does), so legacy
@@ -63,11 +90,12 @@ export const CURRENCIES: CurrencyOption[] = [
 export function formatCurrency(
   value: number,
   currency: string = DEFAULT_CURRENCY,
+  locale: string = appLocale(),
 ): string {
   const code = (currency || DEFAULT_CURRENCY).trim();
   const amount = Number(value) || 0;
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: code,
       minimumFractionDigits: 0,
@@ -76,7 +104,7 @@ export function formatCurrency(
   } catch {
     // Invalid ISO code — show the raw code + grouped number so the
     // value is still legible instead of throwing.
-    return `${code} ${new Intl.NumberFormat(undefined, {
+    return `${code} ${new Intl.NumberFormat(locale, {
       maximumFractionDigits: 0,
     }).format(amount)}`;
   }

@@ -40,7 +40,7 @@ import {
   DollarSign,
   LayoutTemplate,
 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 interface ContactDetailViewProps {
   open: boolean;
@@ -56,6 +56,7 @@ export function ContactDetailView({
   onUpdated,
 }: ContactDetailViewProps) {
   const t = useTranslations('Contacts.detailView');
+  const locale = useLocale();
   const supabase = createClient();
   const { accountId, defaultCurrency } = useAuth();
 
@@ -725,6 +726,7 @@ export function ContactDetailView({
                             {formatCurrency(
                               deal.value ?? 0,
                               deal.currency || defaultCurrency,
+                              locale,
                             )}
                           </span>
                           {deal.status && deal.status !== 'open' && (

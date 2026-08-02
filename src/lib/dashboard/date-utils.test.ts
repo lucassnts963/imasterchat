@@ -105,19 +105,46 @@ describe("lastNDayKeys", () => {
 });
 
 describe("mondayIndex", () => {
+  // `new Date(ano, mês, dia)` e NÃO `new Date("2026-05-18")`.
+  //
+  // A string só-data é parseada como meia-noite UTC. Em São Paulo
+  // (UTC−3) isso é domingo às 21h, então `getDay()` devolve domingo e
+  // o teste falha — mas só em fuso atrás de Greenwich. Era assim que
+  // estes dois passavam num CI em UTC e quebravam na máquina de quem
+  // desenvolve aqui.
+  //
+  // A forma numérica é meia-noite LOCAL em qualquer fuso, que é
+  // exatamente o contrato de `mondayIndex`: o dia da semana de quem
+  // está olhando. Os chamadores reais passam instantes de verdade
+  // (`new Date()` e o timestamptz do Postgres), nunca strings assim.
+  const seg = new Date(2026, 4, 18); // segunda, 18/05/2026
+  const ter = new Date(2026, 4, 19);
+  const sab = new Date(2026, 4, 23);
+  const dom = new Date(2026, 4, 24);
+
   it("maps Monday → 0 and Sunday → 6", () => {
-    expect(mondayIndex(new Date("2026-05-18"))).toBe(0); // Mon
-    expect(mondayIndex(new Date("2026-05-19"))).toBe(1); // Tue
-    expect(mondayIndex(new Date("2026-05-23"))).toBe(5); // Sat
-    expect(mondayIndex(new Date("2026-05-24"))).toBe(6); // Sun
+    expect(mondayIndex(seg)).toBe(0);
+    expect(mondayIndex(ter)).toBe(1);
+    expect(mondayIndex(sab)).toBe(5);
+    expect(mondayIndex(dom)).toBe(6);
   });
 
   it("aligns with DOW_SHORT_MON_FIRST labels", () => {
-    expect(DOW_SHORT_MON_FIRST[mondayIndex(new Date("2026-05-18"))]).toBe(
-      "Mon",
-    );
-    expect(DOW_SHORT_MON_FIRST[mondayIndex(new Date("2026-05-24"))]).toBe(
-      "Sun",
-    );
+    expect(DOW_SHORT_MON_FIRST[mondayIndex(seg)]).toBe("Mon");
+    expect(DOW_SHORT_MON_FIRST[mondayIndex(dom)]).toBe("Sun");
+  });
+
+  it("reads the LOCAL day, which is what the dashboard charts want", () => {
+    // Fixa a armadilha para ela não voltar. Num fuso atrás de UTC, o
+    // mesmo "18 de maio" escrito das duas formas é dia da semana
+    // diferente — e a diferença não é bug de `mondayIndex`, é o
+    // significado de cada construtor.
+    const meiaNoiteUtc = new Date("2026-05-18T00:00:00Z");
+    const offsetMin = meiaNoiteUtc.getTimezoneOffset();
+    if (offsetMin > 0) {
+      // Atrás de Greenwich (o caso do Brasil): ainda é domingo.
+      expect(mondayIndex(meiaNoiteUtc)).toBe(6);
+    }
+    expect(mondayIndex(seg)).toBe(0);
   });
 });
