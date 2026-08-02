@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { TimezonePicker } from '@/components/ui/timezone-picker';
 import {
   Card,
   CardContent,
@@ -284,11 +285,14 @@ export function SchedulingSettings() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="timezone">{t('timezone')}</Label>
-              <Input
+              <TimezonePicker
                 id="timezone"
                 value={settings.timezone}
-                onChange={(e) => patch({ timezone: e.target.value })}
+                onChange={(timezone) => patch({ timezone })}
                 disabled={readOnly}
+                placeholder={t('timezonePlaceholder')}
+                searchPlaceholder={t('timezoneSearch')}
+                emptyLabel={t('timezoneEmpty')}
               />
               <p className="text-xs text-muted-foreground">{t('timezoneHint')}</p>
             </div>
