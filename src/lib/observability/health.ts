@@ -336,6 +336,11 @@ function sourceOf(checkName: string) {
   if (checkName === 'ai_credentials') return 'ai' as const
   if (checkName === 'whatsapp_token') return 'whatsapp' as const
   if (checkName === 'google_calendar') return 'google' as const
+  // Migração faltando é problema do deploy, não da ronda. O default
+  // caía em 'cron' e o alerta chegava rotulado como se o agendador
+  // tivesse falhado — mandando quem fosse investigar para o lugar
+  // errado.
+  if (checkName === 'migrations') return 'app' as const
   return 'cron' as const
 }
 
