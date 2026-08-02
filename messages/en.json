@@ -2069,7 +2069,10 @@
         "transcript": "Conversation history"
       },
       "calibrated": "Corrected using {calls} real calls: the character estimate said {raw} tokens and was {drift}% off the measured figure. The number above is already adjusted.",
-      "calibratedMatch": "Checked against {calls} real calls — the estimate matched."
+      "calibratedMatch": "Checked against {calls} real calls — the estimate matched.",
+      "fxNote": "BRL figures are approximate at R$ {rate} per dollar ({age}). The provider charges in dollars on the card, with tax and spread on top.",
+      "fxToday": "today's rate",
+      "fxDays": "rate from {days} days ago"
     },
     "tools": {
       "title": "What the agent can do",

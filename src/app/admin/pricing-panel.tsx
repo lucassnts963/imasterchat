@@ -185,7 +185,16 @@ export function PricingPanel() {
             >
               <div>
                 <p className="text-lg font-semibold tabular-nums text-foreground">
-                  R$ {rate.rate.toFixed(4)}
+                  {/* Rendered through Intl, not toFixed: a screen in
+                      Portuguese showing "R$ 5.0746" reads as a
+                      thousands separator to a Brazilian, which is off
+                      by three orders of magnitude. */}
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                    minimumFractionDigits: 4,
+                    maximumFractionDigits: 4,
+                  }).format(rate.rate)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {rate.source === 'auto' ? 'Buscado automaticamente' : 'Definido à mão'}

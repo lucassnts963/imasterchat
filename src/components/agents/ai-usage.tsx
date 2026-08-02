@@ -47,6 +47,7 @@ interface UsageResponse {
   daily: { date: string; tokens: number; calls: number; cost_usd: number }[];
   cost_usd: number;
   price_fallback: boolean;
+  exchange_rate: { rate: number; ageDays: number } | null;
 }
 
 const WINDOWS = [7, 30, 90] as const;
@@ -58,9 +59,21 @@ const WINDOWS = [7, 30, 90] as const;
  */
 /** Daily spend is often fractions of a cent; two decimals would
  *  render every bar as US$ 0,00 and teach the reader nothing. */
-function formatUsd(value: number): string {
-  if (value === 0) return 'US$ 0';
-  return value < 0.01 ? `US$ ${value.toFixed(4)}` : `US$ ${value.toFixed(2)}`;
+/** Daily spend is often fractions of a cent, so two decimals would
+ *  render every bar as zero and teach the reader nothing. Falls back
+ *  to dollars when no exchange rate is set — inventing one would be
+ *  worse than showing the currency the provider actually bills in. */
+function formatMoney(value: number, inBrl: boolean): string {
+  if (value === 0) return inBrl ? 'R$ 0' : 'US$ 0';
+  const digits = value < 0.01 ? 4 : 2;
+  return inBrl
+    ? new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      }).format(value)
+    : `US$ ${value.toFixed(digits)}`;
 }
 
 export function AiUsageCard() {
@@ -115,7 +128,10 @@ export function AiUsageCard() {
   const chartData =
     data?.daily.map((d) => ({
       day: format(parseISO(d.date), 'MMM d'),
-      [label]: unit === 'cost' ? Number(d.cost_usd.toFixed(4)) : d.tokens,
+      [label]:
+        unit === 'cost'
+          ? Number((d.cost_usd * (data?.exchange_rate?.rate ?? 1)).toFixed(4))
+          : d.tokens,
     })) ??
     [];
   const hasSpend = (data?.totals.total_tokens ?? 0) > 0;
@@ -215,7 +231,9 @@ export function AiUsageCard() {
                 categories={[label]}
                 colors={['violet']}
                 valueFormatter={(v) =>
-                  unit === 'cost' ? formatUsd(v) : formatCompactNumber(v)
+                  unit === 'cost'
+                    ? formatMoney(v, Boolean(data?.exchange_rate))
+                    : formatCompactNumber(v)
                 }
                 showLegend={false}
                 yAxisWidth={48}

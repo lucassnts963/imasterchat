@@ -44,6 +44,11 @@ interface Projection {
   messagesLast30Days?: number;
   projectedMonthlyUsd?: number;
   priceEstimated?: boolean;
+  exchangeRate?: {
+    rate: number;
+    source: 'manual' | 'auto';
+    ageDays: number;
+  } | null;
   measured?: {
     calls: number;
     avgPromptTokens: number;
@@ -53,6 +58,18 @@ interface Projection {
 
 const money = (usd: number) =>
   usd < 0.01 ? `US$ ${usd.toFixed(5)}` : `US$ ${usd.toFixed(2)}`;
+
+/** Approximate BRL. Through Intl, because "R$ 5.07" reads as five
+ *  thousand to a Brazilian — the separator is not cosmetic here. */
+const brl = (usd: number, rate: number) => {
+  const value = usd * rate;
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: value < 0.01 ? 4 : 2,
+    maximumFractionDigits: value < 0.01 ? 4 : 2,
+  }).format(value);
+};
 
 export function AiCostProjection() {
   const t = useTranslations('Agents.costProjection');
@@ -96,6 +113,7 @@ export function AiCostProjection() {
   // Whether the raw character estimate needed correcting, and by how
   // much. Shown rather than hidden: a number that silently corrects
   // itself is a number nobody can sanity-check.
+  const fx = data.exchangeRate ?? null;
   const corrected = Math.abs(factor - 1) > 0.02;
   const driftPct = Math.round((factor - 1) * 100);
 
@@ -111,11 +129,21 @@ export function AiCostProjection() {
 
       <CardContent className="space-y-5">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label={t('perReply')} value={money(data.costPerReplyUsd ?? 0)} />
+          <Stat
+            label={t('perReply')}
+            value={money(data.costPerReplyUsd ?? 0)}
+            hint={
+              fx ? `≈ ${brl(data.costPerReplyUsd ?? 0, fx.rate)}` : undefined
+            }
+          />
           <Stat
             label={t('perMonth')}
             value={money(data.projectedMonthlyUsd ?? 0)}
-            hint={t('basedOn', { count: data.messagesLast30Days ?? 0 })}
+            hint={
+              fx
+                ? `≈ ${brl(data.projectedMonthlyUsd ?? 0, fx.rate)} · ${t('basedOn', { count: data.messagesLast30Days ?? 0 })}`
+                : t('basedOn', { count: data.messagesLast30Days ?? 0 })
+            }
           />
           <Stat label={t('promptTokens')} value={String(total)} />
           <Stat
@@ -178,6 +206,20 @@ export function AiCostProjection() {
               <p className="mt-1">{t('noMeasurement')}</p>
             )}
             {data.priceEstimated && <p className="mt-1">{t('priceFallback')}</p>}
+            {fx && (
+              <p className="mt-1">
+                {t('fxNote', {
+                  rate: new Intl.NumberFormat('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 4,
+                  }).format(fx.rate),
+                  age:
+                    fx.ageDays === 0
+                      ? t('fxToday')
+                      : t('fxDays', { days: fx.ageDays }),
+                })}
+              </p>
+            )}
           </div>
         </div>
       </CardContent>

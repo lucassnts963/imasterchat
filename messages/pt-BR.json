@@ -2069,7 +2069,10 @@
         "transcript": "Histórico da conversa"
       },
       "calibrated": "Corrigido com {calls} chamadas reais: a estimativa por caracteres dava {raw} tokens e ficou {drift}% abaixo do medido. O valor acima já está ajustado.",
-      "calibratedMatch": "Conferido com {calls} chamadas reais — a estimativa bateu."
+      "calibratedMatch": "Conferido com {calls} chamadas reais — a estimativa bateu.",
+      "fxNote": "Valores em real são aproximação a R$ {rate} por dólar ({age}). O provedor cobra em dólar no cartão, com IOF e spread por cima.",
+      "fxToday": "cotação de hoje",
+      "fxDays": "cotação de {days} dias atrás"
     },
     "tools": {
       "title": "O que o agente pode fazer",
