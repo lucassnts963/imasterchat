@@ -29,6 +29,15 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 function getClientIp(request: Request): string {
+  // `CF-Connecting-IP` primeiro, quando existe. A Cloudflare SOBRESCREVE
+  // esse header a cada request, então o cliente não consegue plantar um
+  // valor nele. `X-Forwarded-For` ela apenas ACRESCENTA: quem manda
+  // `X-Forwarded-For: 1.2.3.4` faz a lista chegar como "1.2.3.4, <ip
+  // real>", e a leitura da esquerda pega o valor forjado — o que
+  // transforma o limite por IP em algo que se contorna trocando um
+  // header.
+  const cf = request.headers.get("cf-connecting-ip");
+  if (cf) return cf.trim();
   const xff = request.headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0].trim();
   const xri = request.headers.get("x-real-ip");

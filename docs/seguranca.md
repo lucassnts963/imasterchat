@@ -49,7 +49,24 @@ próprio arquivo; virar problema depende de escalar.
 navegador reporta violação no console e **não bloqueia nada**. Vale
 promover para bloqueio depois de dois deploys sem violação.
 
-### 4. Rotas sem teto
+### 4. O IP do cliente é forjável
+
+Duas rotas limitam por IP (`/api/invitations/*`), e liam a entrada mais
+à esquerda de `X-Forwarded-For`. Proxies **acrescentam** a essa lista em
+vez de substituí-la: quem manda `X-Forwarded-For: 1.2.3.4` faz a lista
+chegar como `1.2.3.4, <ip real>`, e a leitura pela esquerda pega o valor
+forjado. O limite por IP virava algo que se contorna trocando um header.
+
+Corrigido: `CF-Connecting-IP` primeiro quando existe — a Cloudflare
+reescreve esse header a cada request, então não dá para plantar valor
+nele. Vale só com a nuvem laranja ligada e com `trusted_proxies` no
+Caddy; sem isso, continua sendo a aproximação antiga.
+
+O risco real era baixo (os tokens de convite são de 256 bits, e o
+próprio código chamava a enumeração de teórica), mas o conserto é de
+três linhas e passa a valer de verdade se a Cloudflare entrar.
+
+### 5. Rotas sem teto
 
 Várias rotas autenticadas não chamam `checkRateLimit`. Não é buraco de
 autenticação — todas exigem sessão — mas significa que uma sessão
@@ -100,8 +117,10 @@ o silêncio atual com o maior silêncio que a PRÓPRIA conta já teve em 14
 dias, então noite, domingo e feriado já estão embutidos no parâmetro e
 não geram falso alarme. Passou disso com folga, vira alerta.
 
-Se for usar Cloudflare: **deixe Bot Fight Mode desligado**, ou coloque
-`/api/whatsapp/webhook` num subdomínio em modo DNS-only (nuvem cinza).
+Se for usar Cloudflare: **deixe Bot Fight Mode desligado**. O plano B,
+só para o dia em que quiser ligá-lo, é dar à Meta um subdomínio em
+DNS-only (nuvem cinza) — está montado e comentado em
+[`deploy/Caddyfile.exemplo`](../deploy/Caddyfile.exemplo).
 
 E o Realtime do Supabase usa WebSocket — funciona proxied em todos os
 planos, mas é o segundo lugar para conferir se algo parar.
@@ -145,6 +164,13 @@ console.
 
 **5. Rate limit compartilhado** — só quando houver mais de uma
 instância. Hoje seria complexidade sem ganho.
+
+⚠️ **Se a Cloudflare entrar, `trusted_proxies` no Caddy não é opcional.**
+Sem ela, quem abre a conexão TCP é a Cloudflare, todo limite por IP
+conta o mundo inteiro como um visitante só — e isso vale também para os
+30 sign-ins por 5 minutos do GoTrue, que deixariam de ser por atacante e
+passariam a ser um balde global. A proteção contra força bruta ficaria
+pior do que é hoje. Ver [`deploy/Caddyfile.exemplo`](../deploy/Caddyfile.exemplo).
 
 O item 1 é o de maior retorno e o mais barato. O 3 é o que você
 perguntou, e é bom — mas resolve um problema que você provavelmente

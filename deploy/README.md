@@ -183,33 +183,30 @@ uma senha forte.
   de convite derivam a origem do request quando `NEXT_PUBLIC_SITE_URL`
   não cobre o caso (veja `ALLOWED_INVITE_HOSTS` no `.env.local.example`).
 
-Exemplo mínimo (Nginx, repetir o bloco para cada host):
+Com **Caddy** — que é o caso aqui — quase nada disso precisa ser
+escrito: certificado, renovação, HTTP/2 e WebSocket vêm de fábrica, e
+`reverse_proxy` já repassa `Host` e `X-Forwarded-*`.
 
-```nginx
-# no contexto http (uma vez só) — traduz o header de upgrade do WebSocket
-map $http_upgrade $connection_upgrade {
-  default upgrade;
-  ''      close;
+```caddy
+app.seudominio.com.br {
+  request_body { max_size 25MB }
+  reverse_proxy 127.0.0.1:3000
 }
 
-server {
-  server_name api.imasterchat.com.br;
-  # ... listen 443 ssl + certificados ...
-  client_max_body_size 25m;
-  location / {
-    proxy_pass http://127.0.0.1:8000;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Host $host;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection $connection_upgrade;
-    proxy_read_timeout 120s;
-  }
+api.seudominio.com.br {
+  request_body { max_size 25MB }
+  reverse_proxy 127.0.0.1:8000
 }
 ```
 
-(Com Caddy, `reverse_proxy 127.0.0.1:8000` já cobre WebSocket e TLS.)
+Arquivo completo e comentado em [`Caddyfile.exemplo`](./Caddyfile.exemplo),
+incluindo o que muda ao colocar a Cloudflare na frente — sem
+`trusted_proxies`, todo limite por IP passa a contar o mundo inteiro
+como um visitante só.
+
+Com **Nginx**, os equivalentes são `client_max_body_size 25m`, o `map`
+de `$http_upgrade` para WebSocket, e `proxy_set_header` para `Host`,
+`X-Forwarded-Proto` e `X-Forwarded-Host`.
 
 ### Migrar de VPS depois (provisória → permanente) só trocando o DNS
 

@@ -1,0 +1,111 @@
+# ============================================================
+# Caddyfile de referência para o iMasterChat numa VPS.
+#
+# Duas origens públicas, e é importante entender por quê: o navegador
+# do atendente fala com o APP, mas o login (`signInWithPassword`) vai
+# direto do navegador para o KONG do Supabase. São dois hosts, e
+# qualquer proteção precisa cobrir os dois — proteger só o app deixa a
+# autenticação exposta.
+#
+# O Caddy já resolve sozinho o que exigiria dez linhas no Nginx:
+# certificado, renovação, HTTP/2 e WebSocket. O que sobra para
+# configurar é o que ele não tem como adivinhar.
+# ============================================================
+
+{
+	# ------------------------------------------------------------
+	# SÓ FAZ SENTIDO SE A CLOUDFLARE ESTIVER NA FRENTE (nuvem laranja).
+	#
+	# Com o proxy ligado, quem abre a conexão TCP é a Cloudflare — então
+	# `remote_ip` vira o IP dela, e todo limite por IP passa a contar
+	# como se o mundo inteiro fosse um visitante só.
+	#
+	# `trusted_proxies cloudflare` mantém a lista de faixas deles
+	# atualizada sozinho, e é o que autoriza o Caddy a acreditar no
+	# header. Sem essa lista, qualquer um poderia mandar
+	# `CF-Connecting-IP` e escolher o próprio IP.
+	#
+	# Se você NÃO usa Cloudflare, apague este bloco inteiro: confiar num
+	# proxy que não existe é abrir a porta que ele deveria guardar.
+	# ------------------------------------------------------------
+	servers {
+		trusted_proxies cloudflare
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+# ------------------------------------------------------------
+# O app
+# ------------------------------------------------------------
+app.seudominio.com.br {
+	# Mídia sobe pelo /api/v1 e pelo webhook; o padrão do Caddy é
+	# generoso, mas deixar explícito evita surpresa com áudio longo.
+	request_body {
+		max_size 25MB
+	}
+
+	reverse_proxy 127.0.0.1:3000
+}
+
+# ------------------------------------------------------------
+# O Kong do Supabase — é aqui que o login acontece
+# ------------------------------------------------------------
+api.seudominio.com.br {
+	request_body {
+		max_size 25MB
+	}
+
+	# WebSocket do Realtime funciona sem nada especial: o Caddy repassa
+	# o upgrade por conta própria.
+	reverse_proxy 127.0.0.1:8000
+}
+
+# ============================================================
+# PLANO B — só se um dia você QUISER ligar o Bot Fight Mode
+#
+# Bot Fight Mode bloqueia webhook legítimo e não pode ser contornado
+# com regra WAF de Skip no plano grátis. Se ele bloquear a Meta, as
+# mensagens dos clientes param de chegar.
+#
+# A saída é dar à Meta uma porta que a Cloudflare não toca: um
+# subdomínio em DNS-only (nuvem cinza). O tráfego humano continua
+# protegido; o webhook entra direto.
+#
+# O preço é expor o IP da VPS nesse subdomínio. O bloco abaixo reduz o
+# estrago: nesse host, SÓ o caminho do webhook responde. Todo o resto
+# leva 404 e não serve de porta dos fundos para o app.
+#
+# Não implemente por antecipação. Bot Fight Mode vem desligado, e
+# enquanto estiver desligado isto aqui é complexidade sem ganho.
+# ============================================================
+
+# hook.seudominio.com.br {
+# 	handle /api/whatsapp/webhook* {
+# 		reverse_proxy 127.0.0.1:3000
+# 	}
+# 	handle {
+# 		respond 404
+# 	}
+# }
+
+# ============================================================
+# TLS COM A CLOUDFLARE EM MODO PROXY
+#
+# Com a nuvem laranja ligada, o desafio TLS-ALPN não funciona: a
+# Cloudflare termina o TLS e o desafio nunca chega até aqui. Duas
+# saídas:
+#
+#   a) Desafio por DNS. Exige um Caddy compilado com o módulo
+#      `caddy-dns/cloudflare` e um token de API com permissão de
+#      edição de zona:
+#
+#        tls {
+#          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+#        }
+#
+#   b) Certificado de origem da Cloudflare (validade de 15 anos),
+#      apontado com `tls /caminho/cert.pem /caminho/key.pem`, com o modo
+#      SSL da zona em "Full (strict)".
+#
+# A (a) é menos manual: renova sozinha, como todo o resto do Caddy.
+# ============================================================
