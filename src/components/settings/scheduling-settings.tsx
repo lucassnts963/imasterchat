@@ -269,6 +269,18 @@ export function SchedulingSettings() {
             </p>
           )}
 
+          {/* The inverse, and the one that actually wastes an afternoon:
+              calendar connected, rules filled in, switch off — so the
+              agent behaves as if booking did not exist and nothing says
+              why. Filling in this form is a clear statement of intent;
+              silence in response to it is the wrong answer. */}
+          {!settings.is_active && status?.connected && (
+            <p className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-muted-foreground">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              {t('connectedButInactive')}
+            </p>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="timezone">{t('timezone')}</Label>

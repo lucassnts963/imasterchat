@@ -1804,6 +1804,7 @@
       "activeLabel": "Deixar o agente marcar sozinho",
       "activeHint": "Desligado, as ferramentas de agendamento nem aparecem para o modelo.",
       "activeWithoutCalendar": "Sem a Google Agenda conectada, os dias que a loja bloquear direto no Google ficam invisíveis para o bot.",
+      "connectedButInactive": "A Google Agenda está conectada e as regras estão salvas, mas o agente não vai marcar nada: a chave acima está desligada, e com ela desligada as ferramentas de agendamento nem aparecem para o modelo.",
       "timezone": "Fuso horário",
       "timezoneHint": "Identificador IANA, ex.: America/Sao_Paulo.",
       "slotMinutes": "Duração da consulta (minutos)",

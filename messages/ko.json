@@ -1804,6 +1804,7 @@
       "activeLabel": "Let the agent book on its own",
       "activeHint": "Off, the scheduling tools do not even appear to the model.",
       "activeWithoutCalendar": "Without Google Calendar connected, days the shop blocks directly in Google are invisible to the bot.",
+      "connectedButInactive": "Google Calendar is connected and the rules are saved, but the agent will not book anything: the switch above is off, and with it off the scheduling tools do not even appear to the model.",
       "timezone": "Timezone",
       "timezoneHint": "IANA identifier, e.g. America/Sao_Paulo.",
       "slotMinutes": "Appointment length (minutes)",
