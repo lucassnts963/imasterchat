@@ -5,8 +5,7 @@ import {
   UnauthorizedError,
   PaymentRequiredError,
 } from "@/lib/auth/account";
-import { AdminAccountsPanel } from "./admin-panel";
-import { PricingPanel } from "./pricing-panel";
+import { AdminTabs } from "./admin-tabs";
 
 // Platform-admin surface. Lives OUTSIDE the (dashboard) route group so
 // it does not inherit that group's manual-billing gate — a platform
@@ -27,13 +26,10 @@ export default async function AdminPage() {
     throw err;
   }
 
-  return (
-    <div className="space-y-6">
-      <AdminAccountsPanel />
-      {/* Prices and the dollar are platform facts, not account
-          settings — one shop's typo must not become another's
-          budget. This is the only screen gated on is_platform_admin. */}
-      <PricingPanel />
-    </div>
-  );
+  // Prices and the dollar are platform facts, not account settings —
+  // one shop's typo must not become another's budget. Both live behind
+  // this is_platform_admin gate, in tabs rather than stacked: the
+  // accounts table fills the viewport by itself, and anything under it
+  // is invisible in practice.
+  return <AdminTabs />;
 }

@@ -73,7 +73,23 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   return (
     <TabsPrimitive.Panel
       data-slot="tabs-content"
-      className={cn("flex-1 text-sm outline-none", className)}
+      className={cn(
+        "flex-1 text-sm outline-none",
+        // Hide the panel on its way out.
+        //
+        // Base UI keeps an exiting panel mounted until its CSS
+        // transition ends, and marks it `inert` meanwhile. These panels
+        // declare no transition, so `transitionend` never fires and the
+        // panel stays mounted — laid out, taking full height, forever.
+        // Every tab on a screen ended up stacked: on /admin the pricing
+        // card started 1200px down, and on the agents page all five
+        // panels ran at once, canvas animation loop included.
+        //
+        // Keyed on `inert` because that is what Base UI actually sets,
+        // and it is exactly the elements that should not be on screen.
+        "[&[inert]]:hidden",
+        className
+      )}
       {...props}
     />
   )
