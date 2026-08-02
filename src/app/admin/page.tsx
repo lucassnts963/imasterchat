@@ -7,9 +7,11 @@ import {
 } from "@/lib/auth/account";
 import { AdminAccountsPanel } from "./admin-panel";
 
-// Platform-admin surface. Lives OUTSIDE the (dashboard) route group:
-// it is not tenant-scoped chrome, and its own layout must not run the
-// billing gate that the dashboard layout applies.
+// Platform-admin surface. Lives OUTSIDE the (dashboard) route group so
+// it does not inherit that group's manual-billing gate — a platform
+// admin whose own account is blocked still has to reach the panel that
+// unblocks accounts. It shares the chrome through its own layout, so
+// staying out of the group costs nothing visually.
 //
 // Access is enforced twice on purpose — here so a non-admin never
 // renders the page, and again inside every /api/admin route, which is

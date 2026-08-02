@@ -8,11 +8,17 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
 
-// Auth-gated dashboard shell. Extracted from the layout so the layout
-// itself can stay a server component and export metadata (noindex) —
-// client components can't export Next's metadata object.
+// The authed app's chrome: sidebar, header, presence, and the
+// redirect-to-login guard. A client component so the layouts that use
+// it can stay server components and export metadata (noindex).
+//
+// Shared by two route groups, which is why it lives here rather than
+// inside either of them. `(dashboard)` wraps it in the manual-billing
+// gate; `/admin` deliberately does NOT — a platform admin whose own
+// account is blocked still has to reach the panel that unblocks
+// accounts. Same chrome, different gate.
 
-function DashboardShellInner({ children }: { children: React.ReactNode }) {
+function AppShellInner({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const t = useTranslations("Shell");
@@ -56,10 +62,10 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <DashboardShellInner>{children}</DashboardShellInner>
+      <AppShellInner>{children}</AppShellInner>
     </AuthProvider>
   );
 }
