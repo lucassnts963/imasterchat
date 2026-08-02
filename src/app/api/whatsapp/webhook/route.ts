@@ -15,6 +15,7 @@ import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
 } from '@/lib/whatsapp/template-webhook'
+import { recordEvent } from '@/lib/observability/events'
 
 // The `after()` callback in POST runs within this route's max duration.
 // Inbound processing can fan out to per-media Meta verification calls, so
@@ -269,11 +270,36 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       }
 
       if (!configRows || configRows.length === 0) {
-        console.error('No config found for phone_number_id:', phoneNumberId)
+        // O cliente reconfigura o número na Meta, o phone_number_id
+        // muda, e 100% das mensagens passam a entrar e ser
+        // descartadas. Sem conta a que atribuir — é por isso que
+        // `account_id` do evento é nulável.
+        await recordEvent({
+          accountId: null,
+          source: 'whatsapp',
+          code: 'unknown_phone_number_id',
+          severity: 'critical',
+          message:
+            'Chegou mensagem para um phone_number_id que não pertence a nenhuma conta — a mensagem foi descartada.',
+          context: { phoneNumberId },
+        })
         continue
       }
 
       if (configRows.length > 1) {
+        await recordEvent({
+          accountId: configRows[0].account_id,
+          source: 'whatsapp',
+          code: 'duplicate_phone_number_id',
+          severity: 'critical',
+          message: `${configRows.length} contas reivindicam o mesmo phone_number_id — a mensagem foi descartada.`,
+          context: {
+            phoneNumberId,
+            accounts: configRows
+              .map((r: { account_id: string }) => r.account_id)
+              .join(', '),
+          },
+        })
         console.error(
           `Multiple configs (${configRows.length}) found for phone_number_id:`,
           phoneNumberId,

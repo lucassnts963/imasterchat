@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentAccount, PaymentRequiredError } from "@/lib/auth/account";
 import { AppShell } from "@/components/layout/app-shell";
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 
 // Server layout whose only job is to declare "do not index" metadata
 // for the authed app. robots.ts already disallows these paths at the
@@ -41,5 +42,12 @@ export default async function DashboardLayout({
     }
   }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AppShell>
+      {children}
+      {/* Fora do <main>: é um botão flutuante e não deve entrar no
+          fluxo de nenhuma tela nem no scroll delas. */}
+      <FeedbackWidget />
+    </AppShell>
+  );
 }

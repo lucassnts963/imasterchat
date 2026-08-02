@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { recordEvent } from '@/lib/observability/events'
 
 // ============================================================
 // The shop's own list of things the bot must not handle.
@@ -120,7 +121,22 @@ export async function loadGuardrails(
       keywords: rows.filter((r) => r.kind === 'keyword'),
     }
   } catch (err) {
-    console.error('[ai guardrails] load failed:', err)
+    // Fail-open é a escolha certa (uma leitura falha não pode calar o
+    // atendimento inteiro), mas é a degradação mais cara que existe
+    // aqui: sem guardrails o bot fala exatamente sobre o que a ótica
+    // proibiu — jurídico, reembolso — e responde bem, o que é pior que
+    // o silêncio porque ninguém percebe.
+    //
+    // Crítico, e nunca em silêncio.
+    void recordEvent({
+      accountId,
+      source: 'ai',
+      code: 'guardrails_unreadable',
+      severity: 'critical',
+      message: `Guardrails não puderam ser lidos — o agente está respondendo SEM eles: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    })
     return EMPTY_GUARDRAILS
   }
 }

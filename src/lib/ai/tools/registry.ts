@@ -8,6 +8,7 @@ import {
 import { requestHumanTool } from './handoff'
 import { buildSchedulingTools } from './scheduling'
 import type { AgentTool } from './types'
+import { recordEvent } from '@/lib/observability/events'
 
 // ============================================================
 // What tools an account's agent actually gets.
@@ -57,7 +58,20 @@ export async function resolveSchedulingContext(
     // Credentials exist but are unusable; the operator must reconnect.
     // Offering the tools anyway would have the bot promising times it
     // cannot verify.
-    console.error('[ai tools] scheduling disabled, calendar unusable:', err)
+    // A tela de status responde "conectado" olhando se EXISTE linha,
+    // não se o token vale. Então o operador vê "conectado", o cliente
+    // acha que o bot está agendando, e as ferramentas simplesmente não
+    // entram no catálogo — o bot nem sabe que podia agendar.
+    void recordEvent({
+      accountId,
+      source: 'google',
+      code: err instanceof Error && 'code' in err ? String((err as { code: unknown }).code) : 'calendar_unusable',
+      severity: 'error',
+      message: `Agenda do Google inutilizável — as ferramentas de agendamento saíram do catálogo do agente: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      context: { hint: 'reconectar o Google em Configurações → Agendamento' },
+    })
     return null
   }
 }

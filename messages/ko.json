@@ -2254,5 +2254,34 @@
       "unsyncedWarning": "Saved here, but Google Calendar was not updated.",
       "error": "Could not update the appointment."
     }
+  },
+  "Feedback": {
+    "open": "Feedback",
+    "close": "Close",
+    "title": "Something wrong?",
+    "subtitle": "Goes straight to whoever builds iMasterChat.",
+    "kind": {
+      "bug": "Problem",
+      "idea": "Idea",
+      "other": "Other"
+    },
+    "placeholder": {
+      "bug": "What you did, what you expected, what happened.",
+      "idea": "What would make your day here easier?",
+      "other": "Write freely."
+    },
+    "shotAdd": "Attach a picture of the screen",
+    "shotAttached": "Image attached",
+    "shotRemove": "Remove the image",
+    "shotUnsupported": "This device cannot capture the screen. Describe it in the text.",
+    "shotFailed": "Could not capture the screen.",
+    "shotWarning": "The image is optional. If you attach one, choose what to share — the screen may contain a customer's conversation.",
+    "shotWarningAttached": "Check that the image shows no customer data before sending.",
+    "back": "Back",
+    "send": "Send",
+    "sendError": "Could not send. Try again.",
+    "thanks": "Got it, thank you!",
+    "thanksHint": "If we need more detail, we'll reach you here.",
+    "sendAnother": "Send another"
   }
 }

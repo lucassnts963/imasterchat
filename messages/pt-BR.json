@@ -2254,5 +2254,34 @@
       "unsyncedWarning": "Salvo aqui, mas a Google Agenda não foi atualizada.",
       "error": "Não foi possível atualizar o agendamento."
     }
+  },
+  "Feedback": {
+    "open": "Feedback",
+    "close": "Fechar",
+    "title": "Achou algo errado?",
+    "subtitle": "Vai direto para quem desenvolve o iMasterChat.",
+    "kind": {
+      "bug": "Problema",
+      "idea": "Ideia",
+      "other": "Outro"
+    },
+    "placeholder": {
+      "bug": "O que você fez, o que esperava e o que aconteceu.",
+      "idea": "O que facilitaria o seu dia aqui?",
+      "other": "Pode escrever à vontade."
+    },
+    "shotAdd": "Anexar uma imagem da tela",
+    "shotAttached": "Imagem anexada",
+    "shotRemove": "Remover a imagem",
+    "shotUnsupported": "Este aparelho não permite capturar a tela. Descreva no texto.",
+    "shotFailed": "Não foi possível capturar a tela.",
+    "shotWarning": "A imagem é opcional. Se anexar, escolha o que compartilhar — a tela pode conter a conversa de um cliente.",
+    "shotWarningAttached": "Confira se a imagem não mostra dados de um cliente antes de enviar.",
+    "back": "Voltar",
+    "send": "Enviar",
+    "sendError": "Não foi possível enviar. Tente de novo.",
+    "thanks": "Recebido, obrigado!",
+    "thanksHint": "Se precisarmos de mais detalhes, a gente avisa por aqui.",
+    "sendAnother": "Enviar outro"
   }
 }

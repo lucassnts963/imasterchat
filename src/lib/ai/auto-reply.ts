@@ -18,9 +18,11 @@ import { buildSystemPrompt } from './defaults'
 import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
+import { AiError } from './types'
 import { handOffConversation } from '@/lib/conversations/handoff'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { recordEvent } from '@/lib/observability/events'
 
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
@@ -77,7 +79,23 @@ export async function dispatchInboundToAiReply(
       .eq('is_active', true)
       .in('trigger_type', ['new_message_received', 'keyword_match'])
       .limit(1)
-    if (autoResponders && autoResponders.length > 0) return
+    if (autoResponders && autoResponders.length > 0) {
+      // Não é falha, é a causa nº 1 de chamado: o cliente cria uma
+      // automação de boas-vindas por palavra-chave e o agente de IA
+      // para de responder no dia seguinte, sem nada em tela dizendo
+      // isso — e ele reporta como bug nosso.
+      await recordEvent({
+        accountId,
+        conversationId,
+        source: 'ai',
+        code: 'standing_down_for_automation',
+        severity: 'info',
+        message:
+          'A conta tem automação de mensagem ativa, então o agente de IA não respondeu (para não duplicar a resposta ao cliente).',
+        context: { automationId: autoResponders[0].id },
+      })
+      return
+    }
 
     // The customer just spoke, so the reply budget starts over (045).
     // It bounds a bot talking when nobody is talking to it — not a long
@@ -143,9 +161,16 @@ export async function dispatchInboundToAiReply(
       RATE_LIMITS.aiAutoReplyAccount,
     )
     if (!acctLimit.success) {
-      console.warn(
-        `[ai auto-reply] account ${accountId} hit the per-account rate limit — skipping this inbound.`,
-      )
+      await recordEvent({
+        accountId,
+        conversationId,
+        source: 'ai',
+        code: 'account_rate_limited',
+        severity: 'warning',
+        message:
+          'Limite de respostas por minuto da conta atingido — este inbound ficou sem resposta automática.',
+        context: { limit: RATE_LIMITS.aiAutoReplyAccount.limit },
+      })
       return
     }
 
@@ -266,7 +291,15 @@ export async function dispatchInboundToAiReply(
       // deploy issue — e.g. `claim_ai_reply_slot` not EXECUTE-able by the
       // service role, or the migration not applied. Log it loudly: a
       // silent return makes "auto-reply never fires" undiagnosable.
-      console.error('[ai auto-reply] claim_ai_reply_slot failed:', claimErr)
+      await recordEvent({
+        accountId,
+        conversationId,
+        source: 'ai',
+        code: 'claim_slot_failed',
+        severity: 'critical',
+        message: `claim_ai_reply_slot falhou: ${claimErr.message}`,
+        context: { hint: 'migração 029 aplicada? GRANT EXECUTE no service role?' },
+      })
       return
     }
     if (claimed !== true) return // lost the per-conversation cap race
@@ -280,6 +313,35 @@ export async function dispatchInboundToAiReply(
       aiGenerated: true,
     })
   } catch (err) {
-    console.error('[ai auto-reply] dispatch failed:', err)
+    // Este catch existe para o webhook nunca cair por causa da IA, e
+    // isso continua certo. O que estava errado era ele ser o fim da
+    // linha: chave revogada, sem crédito, timeout do provedor,
+    // ENCRYPTION_KEY rotacionada e token do Meta vencido chegavam
+    // todos aqui e viravam a mesma linha de stdout — indistinguíveis
+    // de "ninguém mandou mensagem hoje".
+    //
+    // O `code` já vem tipado de `providerHttpError`. Só precisava ser
+    // gravado em vez de descartado.
+    const code =
+      err instanceof AiError
+        ? err.code
+        : err instanceof Error && err.name === 'GoogleError'
+          ? 'google_error'
+          : 'dispatch_failed'
+
+    await recordEvent({
+      accountId,
+      conversationId,
+      source: 'ai',
+      code,
+      // Chave inválida ou sem crédito é a conta inteira muda, não uma
+      // conversa. É o modo de falha mais caro do produto.
+      severity:
+        code === 'invalid_key' || code === 'quota_exceeded'
+          ? 'critical'
+          : 'error',
+      message: err instanceof Error ? err.message : String(err),
+      context: { stage: 'dispatch' },
+    })
   }
 }
