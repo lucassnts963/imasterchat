@@ -1970,7 +1970,8 @@
       "tabs": {
         "graph": "Network",
         "drafts": "Approval",
-        "pages": "Pages"
+        "pages": "Pages",
+        "health": "Health"
       },
       "graph": {
         "hint": "Drag to move, scroll to zoom, hover to light up the connections. A hollow node is a draft — it does not count in replies yet.",
@@ -1983,6 +1984,14 @@
           "concept": "Concept",
           "state": "Right now"
         }
+      },
+      "healthy": "Nothing to fix. The wiki is consistent.",
+      "lint": {
+        "contradiction": "Contradiction",
+        "stale": "Stale",
+        "duplicate": "Duplicate",
+        "orphan": "Orphan",
+        "gap": "Gap"
       }
     }
   },

@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Check, Loader2, Network, Trash2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  Info,
+  Loader2,
+  Network,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,7 +40,15 @@ interface VaultPage {
   contacts?: { name: string | null; phone: string | null } | null;
 }
 
-type Tab = 'graph' | 'drafts' | 'pages';
+interface LintFinding {
+  kind: 'contradiction' | 'stale' | 'duplicate' | 'orphan' | 'gap';
+  severity: 'warning' | 'info';
+  pageIds: string[];
+  title: string;
+  detail: string;
+}
+
+type Tab = 'graph' | 'drafts' | 'pages' | 'health';
 
 export function AiVault() {
   const t = useTranslations('Agents.vault');
@@ -43,6 +59,10 @@ export function AiVault() {
     links: [],
   });
   const [showDraftsInGraph, setShowDraftsInGraph] = useState(false);
+  const [lint, setLint] = useState<{ findings: LintFinding[]; warnings: number }>({
+    findings: [],
+    warnings: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -50,12 +70,20 @@ export function AiVault() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [pagesRes, graphRes] = await Promise.all([
+      const [pagesRes, graphRes, lintRes] = await Promise.all([
         fetch('/api/ai/vault'),
         fetch(`/api/ai/vault/graph${showDraftsInGraph ? '?drafts=1' : ''}`),
+        fetch('/api/ai/vault/lint'),
       ]);
       const pagesData = await pagesRes.json().catch(() => null);
       const graphData = await graphRes.json().catch(() => null);
+      const lintData = await lintRes.json().catch(() => null);
+      if (lintData?.findings) {
+        setLint({
+          findings: lintData.findings as LintFinding[],
+          warnings: lintData.warnings ?? 0,
+        });
+      }
       if (pagesData?.pages) setPages(pagesData.pages as VaultPage[]);
       if (graphData?.nodes) {
         setGraph({
@@ -110,6 +138,7 @@ export function AiVault() {
     { id: 'graph', label: t('tabs.graph') },
     { id: 'drafts', label: t('tabs.drafts'), count: drafts.length },
     { id: 'pages', label: t('tabs.pages'), count: approved.length },
+    { id: 'health', label: t('tabs.health'), count: lint.warnings },
   ];
 
   return (
@@ -132,7 +161,7 @@ export function AiVault() {
                 <span
                   className={cn(
                     'rounded-full px-1.5 text-[10px] tabular-nums',
-                    entry.id === 'drafts'
+                    entry.id === 'drafts' || entry.id === 'health'
                       ? 'bg-amber-500/20 text-amber-500'
                       : 'bg-muted-foreground/15',
                   )}
@@ -245,6 +274,45 @@ export function AiVault() {
                   </Button>
                 }
               />
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === 'health' && (
+        <div className="mt-4 space-y-2">
+          {lint.findings.length === 0 ? (
+            <p className="rounded-xl border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
+              {t('healthy')}
+            </p>
+          ) : (
+            lint.findings.map((finding, i) => (
+              <div
+                key={`${finding.kind}-${i}`}
+                className={cn(
+                  'flex items-start gap-3 rounded-xl border px-4 py-3',
+                  finding.severity === 'warning'
+                    ? 'border-amber-500/40 bg-amber-500/5'
+                    : 'border-border bg-card',
+                )}
+              >
+                {finding.severity === 'warning' ? (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                ) : (
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    <span className="text-muted-foreground">
+                      {t(`lint.${finding.kind}`)}
+                    </span>{' '}
+                    · {finding.title}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {finding.detail}
+                  </p>
+                </div>
+              </div>
             ))
           )}
         </div>

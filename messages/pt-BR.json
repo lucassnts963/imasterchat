@@ -1970,7 +1970,8 @@
       "tabs": {
         "graph": "Rede",
         "drafts": "Aprovação",
-        "pages": "Páginas"
+        "pages": "Páginas",
+        "health": "Saúde"
       },
       "graph": {
         "hint": "Arraste para mover, role para aproximar, passe o mouse para destacar as conexões. Nó vazado é rascunho — ainda não vale nas respostas.",
@@ -1983,6 +1984,14 @@
           "concept": "Conceito",
           "state": "Agora"
         }
+      },
+      "healthy": "Nada a corrigir. A wiki está consistente.",
+      "lint": {
+        "contradiction": "Contradição",
+        "stale": "Desatualizada",
+        "duplicate": "Duplicada",
+        "orphan": "Sem conexão",
+        "gap": "Lacuna"
       }
     }
   },
