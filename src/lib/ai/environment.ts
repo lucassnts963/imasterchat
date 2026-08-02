@@ -79,6 +79,17 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     lines.push(`Opening hours: ${openingHours.trim()}`)
   }
 
+  if (!contactId) {
+    // The Playground has no thread. Say so, and say what production
+    // WOULD supply — otherwise the model reasons as if the customer were
+    // anonymous and starts asking for details it always has in real life,
+    // which makes the harness rehearse a conversation that never happens.
+    lines.push(
+      'This is a test run with no real customer attached. In a live conversation you are ' +
+        'given their name and WhatsApp number. Behave as if you already had them.',
+    )
+  }
+
   if (contactId) {
     const [contact, appointment] = await Promise.all([
       loadContact(db, accountId, contactId),
@@ -95,6 +106,16 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
       if (tags.length > 0) facts.push(`tags: ${tags.join(', ')}`)
       if (facts.length > 0) {
         lines.push(`You are talking to — ${facts.join('; ')}.`)
+      }
+      // The number is the one they are messaging from, so asking for it
+      // reads as not paying attention — and it costs a round-trip in a
+      // dialogue that already has several.
+      if (contact.phone?.trim()) {
+        lines.push(
+          'You already have their contact number: it is the one above, the one they are writing ' +
+            'from. Never ask for it. Only if they bring it up should you offer to use a different ' +
+            'one — "posso usar este mesmo número?" — never "qual é o seu número?".',
+        )
       }
     }
 

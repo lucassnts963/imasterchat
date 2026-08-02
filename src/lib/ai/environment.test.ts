@@ -51,6 +51,10 @@ describe('buildEnvironment', () => {
     expect(out).toContain('Saturday, 2026-08-01 11:00')
     expect(out).toContain(SP)
     expect(out).toContain('Never guess the date')
+    // Says what production would supply, so the Playground doesn't
+    // rehearse a conversation where the customer is a stranger.
+    expect(out).toContain('test run')
+    expect(out).toContain('WhatsApp number')
   })
 
   it('names the customer and lists their tags', async () => {
@@ -73,6 +77,10 @@ describe('buildEnvironment', () => {
     expect(out).toContain('Maria Souza')
     expect(out).toContain('+5511999990000')
     expect(out).toContain('cliente-vip, lentes')
+    // Asking for a number it is already being messaged from reads as not
+    // paying attention, and costs a round-trip the dialogue cannot spare.
+    expect(out).toContain('Never ask for it')
+    expect(out).not.toContain('test run')
   })
 
   it('warns about a booking the customer already has', async () => {

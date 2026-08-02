@@ -72,9 +72,25 @@ export async function dispatchInboundToAiReply(
       .limit(1)
     if (autoResponders && autoResponders.length > 0) return
 
+    // The customer just spoke, so the reply budget starts over (045).
+    // It bounds a bot talking when nobody is talking to it — not a long
+    // back-and-forth the customer is driving. Done before the read below
+    // so the cap check sees the reset value, and filtered on `gt` so a
+    // conversation already at zero costs no write.
+    //
+    // This also un-sticks a thread that hit the cap once and went mute:
+    // the next message from that customer wakes the bot up again.
+    await db
+      .from('conversations')
+      .update({ ai_reply_count: 0 })
+      .eq('id', conversationId)
+      .gt('ai_reply_count', 0)
+
     const { data: conv, error: convErr } = await db
       .from('conversations')
-      .select('assigned_agent_id, ai_autoreply_disabled, ai_reply_count')
+      .select(
+        'assigned_agent_id, ai_autoreply_disabled, ai_reply_count, ai_reply_total',
+      )
       .eq('id', conversationId)
       .maybeSingle()
     if (convErr || !conv) return
@@ -185,7 +201,10 @@ export async function dispatchInboundToAiReply(
           conversationId,
           summary: buildHandoffSummary({
             messages,
-            replyCount: conv.ai_reply_count ?? 0,
+            // The lifetime tally, not the per-turn budget: "handed off
+            // after 6 replies" tells the attendant how long the bot had
+            // been at this, which the reset counter no longer can.
+            replyCount: conv.ai_reply_total ?? 0,
           }),
           assignTo: config.handoffAgentId,
         })

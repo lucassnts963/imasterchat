@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
     autoResponders: [] as { id: string }[],
     claim: true as boolean,
     updatePayload: null as Record<string, unknown> | null,
+    updates: [] as Record<string, unknown>[],
     rpcCalls: [] as { name: string; args: unknown }[],
     inserted: [] as { table: string; rows: unknown }[],
   },
@@ -37,6 +38,12 @@ vi.mock('./admin-client', () => {
       select: () => c,
       eq: () => c,
       in: () => c,
+      // `gt` guards the per-turn budget reset (045). Missing it here made
+      // the reset throw, the dispatch abort, and every test fail at once.
+      gt: () => c,
+      gte: () => c,
+      lt: () => c,
+      order: () => c,
       limit: () => Promise.resolve(result()),
       maybeSingle: () => Promise.resolve(result()),
       then: (ok: (v: unknown) => unknown, err?: (e: unknown) => unknown) =>
@@ -60,7 +67,10 @@ vi.mock('./admin-client', () => {
         return {
           ...chain(rows),
           update: (payload: Record<string, unknown>) => {
-            h.state.updatePayload = payload
+            h.state.updates.push(payload)
+            // The per-turn budget reset fires on every inbound, so the
+            // interesting write is the one that is not it.
+            if (!('ai_reply_count' in payload)) h.state.updatePayload = payload
             return chain(() => ({ error: null }))
           },
           insert: (r: unknown) => {
@@ -110,6 +120,7 @@ beforeEach(() => {
   h.state.autoResponders = []
   h.state.claim = true
   h.state.updatePayload = null
+  h.state.updates = []
   h.state.rpcCalls = []
   h.state.inserted = []
   h.loadAiConfig.mockResolvedValue(aiConfig())
@@ -195,7 +206,7 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(h.engineSendText).not.toHaveBeenCalled()
   })
 
-  it('skips when the per-conversation cap is reached', async () => {
+  it('skips when the per-turn budget is already spent', async () => {
     h.state.conv = {
       assigned_agent_id: null,
       ai_autoreply_disabled: false,
@@ -203,6 +214,27 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     }
     await dispatchInboundToAiReply(ARGS)
     expect(h.engineSendText).not.toHaveBeenCalled()
+  })
+
+  it('resets the reply budget on every inbound — the customer just spoke', async () => {
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.updates).toContainEqual({ ai_reply_count: 0 })
+  })
+
+  it('wakes a thread that had gone mute after hitting the old lifetime cap', async () => {
+    // The reset is written before the eligibility read, so a
+    // conversation parked at the cap comes back to life the next time
+    // that customer writes — instead of staying silent until somebody
+    // notices it in the inbox.
+    h.state.conv = {
+      assigned_agent_id: null,
+      ai_autoreply_disabled: false,
+      ai_reply_count: 0, // what the read returns after the reset lands
+      ai_reply_total: 47,
+    }
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.updates[0]).toEqual({ ai_reply_count: 0 })
+    expect(h.engineSendText).toHaveBeenCalled()
   })
 
   it('skips when there is nothing to reply to', async () => {
