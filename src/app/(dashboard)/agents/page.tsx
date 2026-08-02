@@ -2,16 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Bot, Sparkles, Settings2, BarChart3, Network } from 'lucide-react';
+import {
+  Bot,
+  Sparkles,
+  Settings2,
+  BarChart3,
+  Network,
+  ShieldAlert,
+} from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AiPlayground } from '@/components/agents/ai-playground';
 import { AiUsageCard } from '@/components/agents/ai-usage';
 import { AiVault } from '@/components/agents/ai-vault';
+import { AiGuardrails } from '@/components/agents/ai-guardrails';
 import { AiConfig } from '@/components/settings/ai-config';
 import { useAuth } from '@/hooks/use-auth';
 import { canEditSettings } from '@/lib/auth/roles';
 
-type Tab = 'playground' | 'vault' | 'setup' | 'usage';
+type Tab = 'playground' | 'vault' | 'guardrails' | 'setup' | 'usage';
 
 export default function AgentsPage() {
   const t = useTranslations('Agents.page');
@@ -64,6 +72,9 @@ export default function AgentsPage() {
             <TabsTrigger value="vault">
               <Network className="mr-1.5 h-4 w-4" /> {t('vaultTab')}
             </TabsTrigger>
+            <TabsTrigger value="guardrails">
+              <ShieldAlert className="mr-1.5 h-4 w-4" /> {t('guardrailsTab')}
+            </TabsTrigger>
             <TabsTrigger value="setup">
               <Settings2 className="mr-1.5 h-4 w-4" /> {t('tabSetup')}
             </TabsTrigger>
@@ -80,6 +91,10 @@ export default function AgentsPage() {
 
           <TabsContent value="vault" className="mt-4">
             <AiVault />
+          </TabsContent>
+
+          <TabsContent value="guardrails" className="mt-4">
+            <AiGuardrails />
           </TabsContent>
 
           <TabsContent value="setup" className="mt-4">

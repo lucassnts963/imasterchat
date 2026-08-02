@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { SettingsPanelHead } from './settings-panel-head';
+import { SettingsPanelHead } from '@/components/settings/settings-panel-head';
 
 // ============================================================
 // What the bot is not allowed to handle.
@@ -46,7 +46,7 @@ interface Guardrail {
 }
 
 export function AiGuardrails() {
-  const t = useTranslations('Settings.guardrails');
+  const t = useTranslations('Agents.guardrails');
   const { canEditSettings } = useAuth();
 
   const [rules, setRules] = useState<Guardrail[]>([]);
@@ -261,7 +261,7 @@ function RuleList({
   onRemove: (rule: Guardrail) => void;
   emptyLabel: string;
 }) {
-  const t = useTranslations('Settings.guardrails');
+  const t = useTranslations('Agents.guardrails');
 
   return (
     <Card>
@@ -291,10 +291,10 @@ function RuleList({
                 className="mt-0.5"
               />
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-foreground">
-                  {rule.value}
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-foreground">
+                  <span>{rule.value}</span>
                   {rule.is_builtin && (
-                    <span className="ml-2 rounded-full bg-muted-foreground/15 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    <span className="shrink-0 rounded-full bg-muted-foreground/15 px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
                       {t('builtin')}
                     </span>
                   )}
