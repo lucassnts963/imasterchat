@@ -5,6 +5,17 @@ node_modules
 docs
 mcp-server
 supabase
+# ...menos as migrações. O `next.config.ts` lê este diretório em tempo
+# de build para gravar `EXPECTED_MIGRATION`, que é o que a verificação
+# de saúde compara com `applied_migrations`. Fora do contexto de build
+# o `readdirSync` cai no `catch`, a variável nasce vazia, e a
+# verificação responde `skipped` — passa no checklist sem ter olhado
+# para nada. Falha silenciosa é exatamente o que esta checagem existe
+# para evitar.
+#
+# O `!` re-inclui só este subdiretório; `supabase/functions`,
+# `supabase/config.toml` e o resto continuam fora da imagem.
+!supabase/migrations
 *.md
 !README.md
 .env*

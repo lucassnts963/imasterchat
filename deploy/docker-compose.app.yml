@@ -31,6 +31,9 @@ services:
         NEXT_PUBLIC_APP_LOCALE: ${NEXT_PUBLIC_APP_LOCALE:-pt-BR}
         NEXT_PUBLIC_META_APP_ID: ${NEXT_PUBLIC_META_APP_ID:-}
         NEXT_PUBLIC_META_ES_CONFIG_ID: ${NEXT_PUBLIC_META_ES_CONFIG_ID:-}
+        # Build arg, e não só runtime: o painel de notificações é
+        # `'use client'`, então a chave precisa estar inlined no bundle.
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
     environment:
       PORT: 3000
       # ANON_KEY / SERVICE_ROLE_KEY come from the Supabase stack's .env,
@@ -44,7 +47,26 @@ services:
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
       NEXT_PUBLIC_BILLING_CONTACT: ${NEXT_PUBLIC_BILLING_CONTACT:-}
       NEXT_PUBLIC_BILLING_PIX_KEY: ${NEXT_PUBLIC_BILLING_PIX_KEY:-}
+      NEXT_PUBLIC_BILLING_PIX_QR: ${NEXT_PUBLIC_BILLING_PIX_QR:-}
       AUTOMATION_CRON_SECRET: ${AUTOMATION_CRON_SECRET:-}
+
+      # --- Push / PWA (migração 051) ---
+      # A pública aparece aqui E como build arg de propósito: o
+      # `send.ts` do servidor lê a mesma variável.
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+
+      # --- Alertas ao operador (migração 052) ---
+      # Sem estas duas nada quebra: os eventos continuam gravados e a
+      # tela /admin → Eventos continua funcionando. Só não sai aviso.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ALERT_CHAT_ID: ${TELEGRAM_ALERT_CHAT_ID:-}
+
+      # --- Google Agenda (migração 043) ---
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
     ports:
       - '${HOST_PORT:-3000}:3000'
     restart: unless-stopped
