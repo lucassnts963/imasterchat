@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
+  formatDateForDisplay,
+  formatDateTimeForDisplay,
+  formatDayMonthForDisplay,
   formatInZone,
   parseWallClock,
   zoneOffsetMs,
@@ -76,11 +79,43 @@ describe('zonedTimeToUtc', () => {
   })
 })
 
-describe('formatInZone', () => {
+describe('formatInZone — for the model', () => {
   it('uses ISO order so the date cannot be misread', () => {
     expect(formatInZone(new Date('2026-08-06T17:00:00Z'), SP)).toBe(
       'Thursday, 2026-08-06 14:00',
     )
+  })
+})
+
+describe('display formatters — for people', () => {
+  const at = new Date('2026-08-06T17:00:00Z')
+
+  // These two live side by side on purpose and must NOT be unified.
+  // The prompt gets ISO because a model has met both conventions and
+  // cannot tell 06/08 from 08/06; the screen gets the reader's own
+  // convention, because they have met exactly one and ISO reads to them
+  // as a foreign date.
+  it('follows the reader’s convention, not ISO', () => {
+    expect(formatDateForDisplay(at, SP, 'pt-BR')).toBe('06/08/2026')
+    expect(formatDateForDisplay(at, SP, 'en-US')).toBe('08/06/2026')
+  })
+
+  it('drops the year in the column heading, where it is noise', () => {
+    expect(formatDayMonthForDisplay(at, SP, 'pt-BR')).toBe('06/08')
+  })
+
+  it('names the weekday in the reader’s language', () => {
+    expect(formatDateTimeForDisplay(at, SP, 'pt-BR')).toBe(
+      'quinta-feira, 06/08/2026 14:00',
+    )
+  })
+
+  it('still renders in the shop’s zone, whatever the reader’s locale', () => {
+    // 02:30Z on Aug 1 is July 31 in São Paulo. The locale changes the
+    // shape of the date, never which day it is.
+    const late = new Date('2026-08-01T02:30:00Z')
+    expect(formatDateForDisplay(late, SP, 'pt-BR')).toBe('31/07/2026')
+    expect(formatDateForDisplay(late, 'UTC', 'pt-BR')).toBe('01/08/2026')
   })
 })
 

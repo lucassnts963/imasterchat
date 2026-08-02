@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   Bot,
@@ -18,7 +18,13 @@ import {
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { formatDateInZone, formatTimeInZone, zonedParts } from '@/lib/time/zone';
+import {
+  formatDateForDisplay,
+  formatDateInZone,
+  formatDayMonthForDisplay,
+  formatTimeInZone,
+  zonedParts,
+} from '@/lib/time/zone';
 import { NewAppointmentDialog } from './new-appointment-dialog';
 import { AppointmentDetail } from './appointment-detail';
 
@@ -56,6 +62,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function AgendaBoard() {
   const t = useTranslations('Agenda');
+  // The reader's convention, not the model's. `day.key` stays ISO — it
+  // is a Map key and a sort key, and it must not change shape with the
+  // locale — but nothing ISO reaches the screen.
+  const locale = useLocale();
   const [view, setView] = useState<View>('week');
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [timezone, setTimezone] = useState('America/Sao_Paulo');
@@ -153,8 +163,14 @@ export function AgendaBoard() {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <span className="ml-2 text-sm text-muted-foreground">
-            {columns[0]?.key}
-            {range.days > 1 && ` – ${columns[columns.length - 1]?.key}`}
+            {columns[0] && formatDateForDisplay(columns[0].at, timezone, locale)}
+            {range.days > 1 &&
+              columns.length > 0 &&
+              ` – ${formatDateForDisplay(
+                columns[columns.length - 1].at,
+                timezone,
+                locale,
+              )}`}
           </span>
           {loading && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin text-muted-foreground" />}
         </div>
@@ -200,13 +216,13 @@ export function AgendaBoard() {
           >
             <div className="mb-2 flex items-baseline justify-between px-0.5">
               <span className="text-xs font-medium text-foreground">
-                {new Intl.DateTimeFormat(undefined, {
+                {new Intl.DateTimeFormat(locale, {
                   timeZone: timezone,
                   weekday: 'short',
                 }).format(day.at)}
               </span>
               <span className="text-xs text-muted-foreground">
-                {day.key.slice(8)}/{day.key.slice(5, 7)}
+                {formatDayMonthForDisplay(day.at, timezone, locale)}
               </span>
             </div>
 

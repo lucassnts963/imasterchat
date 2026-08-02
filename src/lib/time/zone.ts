@@ -125,6 +125,60 @@ export function formatInZone(date: Date, timezone: string): string {
   return `${day}, ${ymd} ${hm}`
 }
 
+// ------------------------------------------------------------
+// For people, not for the model.
+//
+// `formatInZone` above renders ISO-first ON PURPOSE — it feeds the
+// system prompt, and a model that has met both conventions cannot tell
+// 01/08/2026 apart. A person reading the agenda has met exactly one
+// convention, and ISO order reads to them as a foreign date. So the
+// screen formats by locale and the prompt does not.
+// ------------------------------------------------------------
+
+/** `06/08/2026` in pt-BR, `08/06/2026` in en-US — whatever the reader
+ *  expects. */
+export function formatDateForDisplay(
+  date: Date,
+  timezone: string,
+  locale: string,
+): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: timezone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+}
+
+/** `06/08` — the column heading, where the year is noise. */
+export function formatDayMonthForDisplay(
+  date: Date,
+  timezone: string,
+  locale: string,
+): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: timezone,
+    day: '2-digit',
+    month: '2-digit',
+  }).format(date)
+}
+
+/** `quinta-feira, 06/08/2026 14:00` — the appointment detail heading. */
+export function formatDateTimeForDisplay(
+  date: Date,
+  timezone: string,
+  locale: string,
+): string {
+  const weekday = new Intl.DateTimeFormat(locale, {
+    timeZone: timezone,
+    weekday: 'long',
+  }).format(date)
+  return `${weekday}, ${formatDateForDisplay(date, timezone, locale)} ${formatTimeInZone(
+    date,
+    timezone,
+  )}`
+}
+
 /** Just the clock, `14:30`, for listing slots compactly. */
 export function formatTimeInZone(date: Date, timezone: string): string {
   return new Intl.DateTimeFormat('en-GB', {

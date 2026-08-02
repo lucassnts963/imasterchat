@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Bot, Hand, Loader2, MessageSquare, TriangleAlert } from 'lucide-react';
 
@@ -16,7 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { formatInZone, zonedParts, zonedTimeToUtc } from '@/lib/time/zone';
+import {
+  formatDateTimeForDisplay,
+  zonedParts,
+  zonedTimeToUtc,
+} from '@/lib/time/zone';
 import type { AppointmentRow } from './agenda-board';
 
 // ============================================================
@@ -40,6 +44,7 @@ export function AppointmentDetail({
   onChanged: () => void;
 }) {
   const t = useTranslations('Agenda.detail');
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [reason, setReason] = useState('');
@@ -119,7 +124,12 @@ export function AppointmentDetail({
               t('unknownContact')}
           </DialogTitle>
           <DialogDescription>
-            {formatInZone(new Date(appointment.starts_at), timezone)} ({timezone})
+            {formatDateTimeForDisplay(
+              new Date(appointment.starts_at),
+              timezone,
+              locale,
+            )}{' '}
+            ({timezone})
           </DialogDescription>
         </DialogHeader>
 
