@@ -13,6 +13,17 @@ export interface ProviderArgs {
   /** Tools the model may call. Omitted / empty → the request goes out
    *  exactly as it did before tool calling existed. */
   tools?: ToolSpec[]
+  /**
+   * `auto` (the default) lets the model answer in prose instead of
+   * acting. `required` forbids that.
+   *
+   * It matters wherever prose is not an outcome. The vault keeper has
+   * nobody to talk to — text it writes instead of calling a tool is
+   * discarded and the wiki learns nothing — so a chatty model turns the
+   * whole run into a silent no-op. Any catalogue used with `required`
+   * needs a tool that means "done", or the loop only ends on the cap.
+   */
+  toolChoice?: 'auto' | 'required'
 }
 
 /**

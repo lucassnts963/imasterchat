@@ -122,7 +122,8 @@ function toAnthropicMessages(messages: ChatMessage[]): AnthropicMessage[] {
  * in `generateReply`).
  */
 export async function generateAnthropic(args: ProviderArgs): Promise<ProviderResult> {
-  const { apiKey, model, systemPrompt, messages, timeoutMs, tools } = args
+  const { apiKey, model, systemPrompt, messages, timeoutMs, tools, toolChoice } =
+    args
 
   let res: Response
   try {
@@ -147,6 +148,10 @@ export async function generateAnthropic(args: ProviderArgs): Promise<ProviderRes
                 description: t.description,
                 input_schema: t.parameters,
               })),
+              // Anthropic spells "you must call something" as `any`.
+              ...(toolChoice === 'required'
+                ? { tool_choice: { type: 'any' } }
+                : {}),
             }
           : {}),
       }),

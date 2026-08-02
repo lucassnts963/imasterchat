@@ -16,6 +16,7 @@ import {
 import { describeWeeklyHours } from '@/lib/scheduling/settings'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
 import { latestUserMessage } from '@/lib/ai/query'
+import { logAiUsage } from '@/lib/ai/usage'
 import { AiError, type ChatMessage } from '@/lib/ai/types'
 
 // Keep the tested transcript bounded, mirroring the live context window.
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
       scheduling,
     })
 
-    const { text, handoff, steps } = await runAgent({
+    const { text, handoff, usage, steps } = await runAgent({
       config,
       systemPrompt,
       messages,
@@ -140,6 +141,18 @@ export async function POST(request: Request) {
         dryRun: true,
       },
     })
+    // The Playground spends the account's own key like everything else,
+    // and until now spent it invisibly. Recorded under its own mode so
+    // rehearsal never inflates the cost of a real customer reply.
+    void logAiUsage(supabase, {
+      accountId,
+      conversationId: null,
+      mode: 'playground',
+      provider: config.provider,
+      model: config.model,
+      usage,
+    })
+
     return NextResponse.json({
       reply: text,
       handoff,

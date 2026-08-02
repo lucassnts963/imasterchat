@@ -34,7 +34,7 @@ export function buildKeeperTools(deps: KeeperToolDeps): AgentTool[] {
     proposePageTool(deps),
     updatePageTool(deps),
     linkPagesTool(deps),
-    skipTool(),
+    doneTool(),
   ]
 }
 
@@ -253,25 +253,33 @@ function linkPagesTool(deps: KeeperToolDeps): AgentTool {
 }
 
 /**
- * Doing nothing, on purpose.
+ * Stopping — the only way this run ends.
  *
- * Most conversations teach the wiki nothing — a customer asked when the
- * shop opens and got told. Without an explicit way to say so, a model
- * asked to extract knowledge will find some, and the review queue fills
- * with noise until a curator starts approving without reading. That
- * failure is quiet and it ruins the whole arrangement.
+ * It carries two meanings on purpose. "Nothing here was worth keeping"
+ * is the right answer most of the time: a customer asked when the shop
+ * opens and got told, and a page nobody needed fills the review queue
+ * until a curator approves without reading. "I have finished writing"
+ * is the other. Both are the same instruction to the loop.
+ *
+ * With `tool_choice: required` the model cannot end a run by talking,
+ * so a catalogue without this tool would only ever end on the step cap.
  */
-function skipTool(): AgentTool {
+function doneTool(): AgentTool {
   return {
-    name: 'skip',
+    name: 'done',
     description:
-      'Record that this conversation taught the wiki nothing worth keeping, and stop. This is ' +
-      'the RIGHT answer most of the time. A page nobody needed is worse than no page: it fills ' +
-      'the review queue until people stop reading it.',
+      'Finish. Call this when you have written everything worth writing — or, more often, when ' +
+      'this conversation taught the wiki nothing worth keeping at all. A page nobody needed is ' +
+      'worse than no page: it fills the review queue until people stop reading it. You MUST end ' +
+      'every run by calling this.',
     parameters: {
       type: 'object',
       properties: {
-        reason: { type: 'string', description: 'One short sentence.' },
+        reason: {
+          type: 'string',
+          description:
+            'One short sentence: what you wrote, or why there was nothing to write.',
+        },
       },
       required: ['reason'],
       additionalProperties: false,
@@ -281,13 +289,12 @@ function skipTool(): AgentTool {
       await ctx.db.from('ai_vault_revisions').insert({
         account_id: ctx.accountId,
         page_id: null,
-        operation: 'skipped',
+        operation: 'finished',
         note: typeof args.reason === 'string' ? args.reason.slice(0, 500) : null,
       })
       // `handoff` ends the loop. Nothing is being handed to a human here
-      // — it is simply the loop's "stop now" signal, and there is
-      // nothing left to do once the answer is "nothing".
-      return { content: 'Noted. Nothing to add.', handoff: true }
+      // — it is simply the loop's "stop now" signal.
+      return { content: 'Noted. Run finished.', handoff: true }
     },
   }
 }

@@ -34,10 +34,10 @@ interface UsageResponse {
     completion_tokens: number;
     total_tokens: number;
   };
-  by_mode: {
-    auto_reply: { calls: number; tokens: number };
-    draft: { calls: number; tokens: number };
-  };
+  /** Keyed by mode. Open on purpose — the set grows (agent, playground)
+   *  and a screen that hardcodes two of them silently stops showing
+   *  where the money went. */
+  by_mode: Record<string, { calls: number; tokens: number } | undefined>;
   by_model: {
     model: string;
     provider: string;
@@ -149,12 +149,23 @@ export function AiUsageCard() {
               <Stat label={t('statLlmCalls')} value={String(data.totals.calls)} />
               <Stat
                 label={t('statAutoReply')}
-                value={formatCompactNumber(data.by_mode.auto_reply.tokens)}
+                // The agent loop is still an auto-reply from the shop's
+                // point of view — it just cost several calls instead of
+                // one. Splitting them here would answer a question nobody
+                // asked; the modes stay separate in the data, where the
+                // per-reply cost is actually computed.
+                value={formatCompactNumber(
+                  (data.by_mode.auto_reply?.tokens ?? 0) +
+                    (data.by_mode.agent?.tokens ?? 0),
+                )}
                 icon={Bot}
               />
               <Stat
                 label={t('statDrafts')}
-                value={formatCompactNumber(data.by_mode.draft.tokens)}
+                value={formatCompactNumber(
+                  (data.by_mode.draft?.tokens ?? 0) +
+                    (data.by_mode.playground?.tokens ?? 0),
+                )}
                 icon={PencilLine}
               />
             </div>

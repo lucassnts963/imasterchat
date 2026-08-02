@@ -12,7 +12,13 @@ const DEFAULT_WINDOW_DAYS = 30
 
 interface UsageRow {
   created_at: string
-  mode: 'auto_reply' | 'draft'
+  /** Open on purpose. This used to be a two-value union that matched
+   *  the DB CHECK, and when the CHECK grew ('agent' in 042,
+   *  'playground' in 047) the aggregation below indexed a bucket that
+   *  did not exist and threw — so the whole screen went blank because
+   *  a new mode appeared. Modes are data; the code must survive one
+   *  it has not met. */
+  mode: string
   provider: string
   model: string
   prompt_tokens: number
@@ -78,10 +84,14 @@ export async function GET(request: Request) {
     let completionTokens = 0
     let totalTokens = 0
 
-    // Per-mode + per-model tallies.
-    const byMode = {
+    // Per-mode + per-model tallies. The known modes are seeded so the
+    // UI can show a zero rather than a gap; anything else is added as
+    // it turns up.
+    const byMode: Record<string, { calls: number; tokens: number }> = {
       auto_reply: { calls: 0, tokens: 0 },
       draft: { calls: 0, tokens: 0 },
+      agent: { calls: 0, tokens: 0 },
+      playground: { calls: 0, tokens: 0 },
     }
     const modelMap = new Map<
       string,
@@ -101,9 +111,9 @@ export async function GET(request: Request) {
       completionTokens += r.completion_tokens
       totalTokens += r.total_tokens
 
-      // `mode` is DB-CHECK-constrained to these two values.
-      byMode[r.mode].calls += 1
-      byMode[r.mode].tokens += r.total_tokens
+      const modeBucket = (byMode[r.mode] ??= { calls: 0, tokens: 0 })
+      modeBucket.calls += 1
+      modeBucket.tokens += r.total_tokens
 
       const mk = `${r.provider}:${r.model}`
       const m =

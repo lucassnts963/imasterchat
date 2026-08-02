@@ -82,7 +82,7 @@ export async function runVaultKeeper(
     })
 
     const before = existingPages.size
-    const { usage, steps } = await runAgent({
+    const { text, usage, steps } = await runAgent({
       config: { ...config, maxToolSteps: KEEPER_MAX_STEPS },
       systemPrompt: buildKeeperPrompt(existingPages),
       messages: [
@@ -95,6 +95,11 @@ export async function runVaultKeeper(
       ],
       tools,
       ctx: { db, accountId, conversationId, contactId, config },
+      // The keeper has nobody to talk to. Left on `auto`, a chatty model
+      // answers in prose, the text is discarded, and the whole run is a
+      // silent no-op — which is exactly what happened the first time
+      // this ran. `done` is what lets the loop still terminate.
+      toolChoice: 'required',
     })
 
     void logAiUsage(db, {
@@ -107,6 +112,21 @@ export async function runVaultKeeper(
     })
     if (steps.length > 0) {
       void recordAgentSteps(db, { accountId, conversationId, steps })
+    }
+
+    // A run that touched nothing is worth a trace. Without one, "the
+    // vault is empty" and "the keeper is broken" look identical from the
+    // outside — and the first version of this could not tell them apart.
+    if (steps.length === 0) {
+      console.warn(
+        `[ai vault keeper] conversation ${conversationId} produced no tool calls; model said: ${text.slice(0, 200)}`,
+      )
+      await db.from('ai_vault_revisions').insert({
+        account_id: accountId,
+        page_id: null,
+        operation: 'no_action',
+        note: text.slice(0, 500) || null,
+      })
     }
 
     return { ran: true, pagesProposed: Math.max(0, existingPages.size - before) }
@@ -157,9 +177,10 @@ function buildKeeperPrompt(
 ): string {
   const parts = [
     buildVaultSchemaPrompt(),
-    'You are reading a conversation that has already finished. Nobody is waiting on you. Your ' +
-      'job is to decide what this business should remember from it — and usually the answer is ' +
-      'nothing, in which case call skip and stop.',
+    'You are reading a conversation that has already finished. Nobody is waiting on you, and ' +
+      'nobody reads what you write here as prose — every decision you make is a tool call. Your ' +
+      'job is to decide what this business should remember, and usually the answer is nothing, ' +
+      'in which case call done immediately. Every run ends with done.',
     'Write about the BUSINESS, not about the conversation. "Consultations last 15 minutes" is ' +
       'worth a page; "a customer asked how long consultations last" is not.',
   ]

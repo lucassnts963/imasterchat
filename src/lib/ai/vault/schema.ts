@@ -48,8 +48,10 @@ export const VAULT_KIND_GUIDANCE: Record<VaultPageKind, string> = {
     'Anything else worth knowing that is not a rule, a customer or the business — a product, a ' +
     'procedure, a supplier, a recurring question.',
   state:
-    'What is true RIGHT NOW and will stop being true: a promotion, a closure, a shortage. ' +
-    'Always say until when. A state page that outlives its truth is worse than no page.',
+    'What is true RIGHT NOW and will STOP being true: a promotion, a holiday closure, a ' +
+    'shortage. Always say until when. If it has no end — opening hours, prices, how long an ' +
+    'appointment takes — it is a rule or a business page, never this one. A state page that ' +
+    'outlives its truth is worse than no page.',
 }
 
 /** Which kinds carry a `contact_id`. */
@@ -87,6 +89,12 @@ export function buildVaultSchemaPrompt(): string {
       'full of noise gets approved without reading, which defeats the review.',
     'Prefer updating an existing page over creating a near-duplicate. Two pages disagreeing ' +
       'about the same fact is the worst state this wiki can be in.',
+    'Write every page in the language the business speaks to its customers in — the language ' +
+      'of the conversation you were given. A wiki half in one language and half in another ' +
+      'is read by nobody.',
+    'Never write about the conversation itself. "Atendemos das 14h às 18h" is a page; ' +
+      '"isto foi informado ao cliente" is not, and a line like that on an otherwise good ' +
+      'page is noise the reviewer has to delete.',
   ].join('\n\n')
 }
 

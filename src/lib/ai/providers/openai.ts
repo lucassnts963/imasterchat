@@ -74,7 +74,8 @@ function toOpenAiMessages(messages: ChatMessage[]): Record<string, unknown>[] {
  * in `generateReply`).
  */
 export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult> {
-  const { apiKey, model, systemPrompt, messages, timeoutMs, tools } = args
+  const { apiKey, model, systemPrompt, messages, timeoutMs, tools, toolChoice } =
+    args
 
   let res: Response
   try {
@@ -103,7 +104,7 @@ export async function generateOpenAi(args: ProviderArgs): Promise<ProviderResult
                   parameters: t.parameters,
                 },
               })),
-              tool_choice: 'auto',
+              tool_choice: toolChoice ?? 'auto',
             }
           : {}),
       }),

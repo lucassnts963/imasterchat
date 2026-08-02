@@ -47,6 +47,13 @@ export interface RunAgentArgs {
   tools?: AgentTool[]
   /** Required when `tools` is non-empty — it is what they execute against. */
   ctx?: ToolContext
+  /**
+   * `required` forbids the model from answering in prose. Use it
+   * where prose is not an outcome — the vault keeper has nobody to
+   * talk to, so a chatty model turns its whole run into a silent
+   * no-op. The catalogue must then include a tool meaning "done".
+   */
+  toolChoice?: 'auto' | 'required'
 }
 
 export interface RunAgentResult {
@@ -74,6 +81,7 @@ async function callProvider(
   systemPrompt: string,
   messages: ChatMessage[],
   tools: AgentTool[],
+  toolChoice: 'auto' | 'required' | undefined,
 ): Promise<ProviderResult> {
   const providerArgs = {
     apiKey: config.apiKey,
@@ -87,6 +95,7 @@ async function callProvider(
       description,
       parameters,
     })),
+    toolChoice,
   }
 
   switch (config.provider) {
@@ -177,7 +186,7 @@ interface ToolOutcomeInternal {
  * the way. `generateReply` is this function with no tools.
  */
 export async function runAgent(args: RunAgentArgs): Promise<RunAgentResult> {
-  const { config, systemPrompt, tools = [], ctx } = args
+  const { config, systemPrompt, tools = [], ctx, toolChoice } = args
   if (tools.length > 0 && !ctx) {
     throw new AiError('runAgent was given tools but no ToolContext.', {
       code: 'agent_misconfigured',
@@ -193,7 +202,13 @@ export async function runAgent(args: RunAgentArgs): Promise<RunAgentResult> {
   let usage: AiUsage | null = null
 
   for (let step = 0; step < stepCap; step++) {
-    const result = await callProvider(config, systemPrompt, messages, tools)
+    const result = await callProvider(
+      config,
+      systemPrompt,
+      messages,
+      tools,
+      toolChoice,
+    )
     usage = addUsage(usage, result.usage)
 
     if (result.toolCalls.length === 0) {
