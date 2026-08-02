@@ -1922,7 +1922,8 @@
       "description": "Seu agente de IA com chave própria — configure-o e teste no playground antes que ele responda aos clientes na caixa de entrada.",
       "tabPlayground": "Playground",
       "tabSetup": "Configuração",
-      "tabUsage": "Uso"
+      "tabUsage": "Uso",
+      "vaultTab": "Vault"
     },
     "playground": {
       "notConfiguredError": "Nenhum agente configurado ainda — conclua a Configuração primeiro.",
@@ -1954,6 +1955,35 @@
       "byModel": "Por modelo",
       "modelStats": "{tokens} tok · {count, plural, =1 {# chamada} other {# chamadas}}",
       "truncated": "Exibindo uma janela parcial — o uso é alto o suficiente para que apenas os registros mais recentes sejam resumidos aqui."
+    },
+    "vault": {
+      "loadError": "Não foi possível carregar o vault.",
+      "actionError": "Não foi possível concluir a ação.",
+      "approved": "Página aprovada — já vale nas respostas.",
+      "rejected": "Página recusada.",
+      "approve": "Aprovar",
+      "reject": "Recusar",
+      "archive": "Arquivar",
+      "showDrafts": "Mostrar rascunhos no grafo",
+      "noDrafts": "Nada esperando aprovação. O agente propõe páginas ao fim das conversas.",
+      "noPages": "Nenhuma página aprovada ainda.",
+      "tabs": {
+        "graph": "Rede",
+        "drafts": "Aprovação",
+        "pages": "Páginas"
+      },
+      "graph": {
+        "hint": "Arraste para mover, role para aproximar, passe o mouse para destacar as conexões. Nó vazado é rascunho — ainda não vale nas respostas.",
+        "empty": "O vault está vazio. Conforme o agente atende, ele propõe páginas aqui — e a rede cresce.",
+        "connections": "{count, plural, =0 {sem conexões} =1 {1 conexão} other {# conexões}}",
+        "kind": {
+          "rule": "Regra",
+          "entity_customer": "Cliente",
+          "entity_business": "Negócio",
+          "concept": "Conceito",
+          "state": "Agora"
+        }
+      }
     }
   },
   "Notifications": {

@@ -1922,7 +1922,8 @@
       "description": "Your bring-your-own-key AI agent — set it up, then test it in the playground before it replies to customers in the inbox.",
       "tabPlayground": "Playground",
       "tabSetup": "Setup",
-      "tabUsage": "Usage"
+      "tabUsage": "Usage",
+      "vaultTab": "Network"
     },
     "playground": {
       "notConfiguredError": "No agent configured yet — finish Setup first.",
@@ -1954,6 +1955,35 @@
       "byModel": "By model",
       "modelStats": "{tokens} tok · {count, plural, =1 {# call} other {# calls}}",
       "truncated": "Showing a partial window — usage is high enough that only the most recent records are summarized here."
+    },
+    "vault": {
+      "loadError": "Could not load the vault.",
+      "actionError": "Could not complete the action.",
+      "approved": "Page approved — it counts in replies now.",
+      "rejected": "Page rejected.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "archive": "Archive",
+      "showDrafts": "Show drafts in the graph",
+      "noDrafts": "Nothing waiting for approval. The agent proposes pages when conversations end.",
+      "noPages": "No approved pages yet.",
+      "tabs": {
+        "graph": "Network",
+        "drafts": "Approval",
+        "pages": "Pages"
+      },
+      "graph": {
+        "hint": "Drag to move, scroll to zoom, hover to light up the connections. A hollow node is a draft — it does not count in replies yet.",
+        "empty": "The vault is empty. As the agent works, it proposes pages here — and the network grows.",
+        "connections": "{count, plural, =0 {no connections} =1 {1 connection} other {# connections}}",
+        "kind": {
+          "rule": "Rule",
+          "entity_customer": "Customer",
+          "entity_business": "Business",
+          "concept": "Concept",
+          "state": "Right now"
+        }
+      }
     }
   },
   "Notifications": {

@@ -4,6 +4,7 @@ import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { runAgent } from './agent'
 import { buildEnvironment } from './environment'
+import { describeVaultContext, loadVaultContext } from './vault/retrieve'
 import { buildToolCatalog, resolveSchedulingContext } from './tools/registry'
 import { describeWeeklyHours } from '@/lib/scheduling/settings'
 import { recordAgentSteps } from './steps'
@@ -142,11 +143,17 @@ export async function dispatchInboundToAiReply(
       openingHours: scheduling ? describeWeeklyHours(scheduling.settings) : null,
     })
 
+    // The wiki the account maintains: approved rules, what is true
+    // right now, and this customer's own page. Only approved pages —
+    // a draft is a proposal, not something to answer a customer with.
+    const vault = await loadVaultContext(db, accountId, contactId)
+
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
       environment,
+      vault: describeVaultContext(vault),
     })
 
     // The tools this account actually has. `request_human` is always

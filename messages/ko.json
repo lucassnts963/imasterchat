@@ -1922,7 +1922,8 @@
       "description": "자체 API 키를 사용하는 AI 에이전트입니다 — 설정한 뒤 받은 편지함에서 고객에게 답장하기 전에 플레이그라운드에서 테스트해 보세요.",
       "tabPlayground": "플레이그라운드",
       "tabSetup": "설정",
-      "tabUsage": "사용량"
+      "tabUsage": "사용량",
+      "vaultTab": "Network"
     },
     "playground": {
       "notConfiguredError": "아직 구성된 에이전트가 없습니다 — 먼저 설정을 완료하세요.",
@@ -1954,6 +1955,35 @@
       "byModel": "모델별",
       "modelStats": "{tokens} 토큰 · 호출 {count}회",
       "truncated": "일부 기간만 표시 중입니다 — 사용량이 많아 가장 최근 기록만 요약되어 있습니다."
+    },
+    "vault": {
+      "loadError": "Could not load the vault.",
+      "actionError": "Could not complete the action.",
+      "approved": "Page approved — it counts in replies now.",
+      "rejected": "Page rejected.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "archive": "Archive",
+      "showDrafts": "Show drafts in the graph",
+      "noDrafts": "Nothing waiting for approval. The agent proposes pages when conversations end.",
+      "noPages": "No approved pages yet.",
+      "tabs": {
+        "graph": "Network",
+        "drafts": "Approval",
+        "pages": "Pages"
+      },
+      "graph": {
+        "hint": "Drag to move, scroll to zoom, hover to light up the connections. A hollow node is a draft — it does not count in replies yet.",
+        "empty": "The vault is empty. As the agent works, it proposes pages here — and the network grows.",
+        "connections": "{count, plural, =0 {no connections} =1 {1 connection} other {# connections}}",
+        "kind": {
+          "rule": "Rule",
+          "entity_customer": "Customer",
+          "entity_business": "Business",
+          "concept": "Concept",
+          "state": "Right now"
+        }
+      }
     }
   },
   "Notifications": {

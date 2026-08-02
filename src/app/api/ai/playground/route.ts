@@ -6,6 +6,10 @@ import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { runAgent } from '@/lib/ai/agent'
 import { buildEnvironment } from '@/lib/ai/environment'
 import {
+  describeVaultContext,
+  loadVaultContext,
+} from '@/lib/ai/vault/retrieve'
+import {
   buildToolCatalog,
   resolveSchedulingContext,
 } from '@/lib/ai/tools/registry'
@@ -96,11 +100,16 @@ export async function POST(request: Request) {
       timezone: scheduling?.settings.timezone,
       openingHours: scheduling ? describeWeeklyHours(scheduling.settings) : null,
     })
+    // Same wiki the live bot reads, so a rehearsal exercises the
+    // approved rules too — that is where a wrong rule shows up.
+    const vault = await loadVaultContext(supabase, accountId, null)
+
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
       environment,
+      vault: describeVaultContext(vault),
     })
 
     // Same catalog the live bot gets. Tools that need a conversation

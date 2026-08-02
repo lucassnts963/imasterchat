@@ -79,7 +79,7 @@ export async function POST(request: Request) {
         supabase,
         accountId,
         { embeddingsApiKey },
-        doc.id,
+        { documentId: doc.id },
         content,
       )
     } catch (err) {

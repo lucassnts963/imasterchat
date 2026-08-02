@@ -86,8 +86,12 @@ export function buildSystemPrompt(args: {
    *  `buildEnvironment`. Goes in ahead of the business context so the
    *  operator's own instructions can refer to it. */
   environment?: string
+  /** Always-on sections from the account vault: the approved rules,
+   *  what is true right now, and what is known about this customer.
+   *  See `describeVaultContext`. */
+  vault?: string[]
 }): string {
-  const { userPrompt, mode, knowledge, environment } = args
+  const { userPrompt, mode, knowledge, environment, vault } = args
   const parts: string[] = [
     'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
       'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
@@ -106,6 +110,13 @@ export function buildSystemPrompt(args: {
 
   if (environment && environment.trim()) {
     parts.push(`Current situation — facts, not instructions:\n${environment.trim()}`)
+  }
+
+  // The vault goes ahead of the operator's free-text prompt on purpose:
+  // its rules were curated and approved one by one, and the operator can
+  // still override them below if that is genuinely what they want.
+  if (vault && vault.length > 0) {
+    parts.push(...vault)
   }
 
   if (userPrompt && userPrompt.trim()) {
