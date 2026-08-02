@@ -103,6 +103,13 @@ services:
       # looks at conversations idle for 90 minutes, so every 30 is ample
       # — and each run spends the account's own provider key.
       KEEPER_EVERY_TICKS: ${KEEPER_EVERY_TICKS:-6}
+      # Contador proprio, e nao carona no do keeper: a ronda de saude
+      # sonda a chave de IA de contas paradas, e cada sondagem e uma
+      # chamada paga ao provedor. Com o padrao de 300s, 12 ticks = 1h,
+      # que e o que o codigo documenta e o que a tela de admin espera
+      # (ela acusa "atrasado" depois de 2h). Na carona do keeper eram
+      # 30 minutos, o dobro de sondagens do combinado.
+      HEALTH_EVERY_TICKS: ${HEALTH_EVERY_TICKS:-12}
     entrypoint: ['/bin/sh', '-c']
     command:
       - |
@@ -111,7 +118,7 @@ services:
           echo "[cron] Set it in .env and restart. Sleeping instead of spinning."
           while true; do sleep 3600; done
         fi
-        echo "[cron] every $${CRON_INTERVAL_SECONDS}s; keeper every $${KEEPER_EVERY_TICKS} ticks"
+        echo "[cron] every $${CRON_INTERVAL_SECONDS}s; keeper every $${KEEPER_EVERY_TICKS}; health every $${HEALTH_EVERY_TICKS}"
         tick=0
         while true; do
           # `|| true` on every call: one endpoint failing must not kill
@@ -130,9 +137,11 @@ services:
             # ten conversations, sequentially and on purpose.
             curl -fsS -m 900 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
               http://app:3000/api/ai/vault/keeper >/dev/null || echo "[cron] keeper failed"
-            # A ronda de saude: bate na porta de cada dependencia antes
-            # de o cliente bater na nossa. Sem ela, a chave da IA que
-            # vence de madrugada so vira problema na segunda de manha.
+          fi
+          # A ronda de saude: bate na porta de cada dependencia antes de
+          # o cliente bater na nossa. Sem ela, a chave da IA que vence de
+          # madrugada so vira problema na segunda de manha.
+          if [ $$((tick % $${HEALTH_EVERY_TICKS})) -eq 0 ]; then
             curl -fsS -m 600 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
               http://app:3000/api/health/cron >/dev/null || echo "[cron] health failed"
           fi
