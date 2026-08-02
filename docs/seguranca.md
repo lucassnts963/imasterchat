@@ -91,9 +91,14 @@ recorrente na comunidade, e o pior detalhe: **não dá para contornar com
 regra WAF de Skip nem com Page Rule** no plano grátis.
 
 Se ele bloquear a Meta, **todas as mensagens dos clientes param de
-chegar** — e param em silêncio, porque a requisição nunca alcança o app,
-então nenhum evento é gravado e a faixa de saúde continua verde. O
-sintoma vira "hoje ninguém mandou mensagem".
+chegar**. Isso costumava ser invisível: a requisição nunca alcança o
+app, nenhum evento é gravado, e o token do WhatsApp continua válido —
+só ninguém está usando ele.
+
+A verificação `inbound_silence` foi criada por causa disto. Ela compara
+o silêncio atual com o maior silêncio que a PRÓPRIA conta já teve em 14
+dias, então noite, domingo e feriado já estão embutidos no parâmetro e
+não geram falso alarme. Passou disso com folga, vira alerta.
 
 Se for usar Cloudflare: **deixe Bot Fight Mode desligado**, ou coloque
 `/api/whatsapp/webhook` num subdomínio em modo DNS-only (nuvem cinza).

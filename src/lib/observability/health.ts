@@ -65,6 +65,7 @@ export async function checkAccount(
     ['ai_credentials', () => checkAi(db, accountId)],
     ['whatsapp_token', () => checkWhatsApp(db, accountId)],
     ['google_calendar', () => checkGoogle(db, accountId)],
+    ['inbound_silence', () => checkInboundSilence(db, accountId)],
   ] as const) {
     let result: CheckResult
     try {
@@ -341,6 +342,9 @@ function sourceOf(checkName: string) {
   // tivesse falhado — mandando quem fosse investigar para o lugar
   // errado.
   if (checkName === 'migrations') return 'app' as const
+  // Silêncio no inbound é problema do caminho da Meta até aqui, mesmo
+  // quando a causa está na borda.
+  if (checkName === 'inbound_silence') return 'whatsapp' as const
   return 'cron' as const
 }
 
@@ -406,6 +410,125 @@ async function checkMigrations(db: SupabaseClient): Promise<CheckResult> {
     status: 'failing',
     code: 'migration_missing',
     detail: `O banco está em ${applied} e este build espera ${expected}. Rode deploy/apply-migrations.sh.`,
+  }
+}
+
+
+/**
+ * As mensagens dos clientes ainda estão chegando?
+ *
+ * Este é o ponto cego que todas as outras verificações deixam passar,
+ * e o mais caro de todos. Se algo bloqueia a Meta ANTES do app — um
+ * Bot Fight Mode da vida, DNS, TLS, o `phone_number_id` trocado no
+ * painel da Meta — a requisição nunca chega aqui. Nenhum evento é
+ * gravado, e as outras verificações continuam verdes: o token do
+ * WhatsApp está válido, ele só não está sendo usado por ninguém.
+ *
+ * O sintoma vira "hoje ninguém mandou mensagem", que é
+ * indistinguível de um dia parado. É a falha que fica em pé por dias.
+ *
+ * A REGRA SE CALIBRA SOZINHA
+ *
+ * "Sem mensagem há 6 horas" seria falso alarme toda madrugada e todo
+ * domingo. Em vez de tentar adivinhar o horário da ótica, feriado
+ * nacional e ponte, olhamos o que ESTA conta já fez: o maior silêncio
+ * que ela teve nos últimos 14 dias já contém as noites, os fins de
+ * semana e o feriado que passou. Silêncio maior que isso com folga é
+ * anormal para ela, mesmo que fosse normal para outra.
+ *
+ * Uma conta nova, ou de movimento raro, cai em 'skipped' — não dá para
+ * calibrar sem histórico, e chutar seria pior que não olhar.
+ */
+async function checkInboundSilence(
+  db: SupabaseClient,
+  accountId: string,
+): Promise<CheckResult> {
+  const desde = new Date(Date.now() - 14 * 86_400_000).toISOString()
+
+  // `messages` não carrega `account_id` — a conta vem da conversa. O
+  // resto do app resolve isso por RLS, mas esta ronda roda sob service
+  // role, que passa por cima da RLS: aqui o vínculo precisa ser
+  // explícito, senão a consulta traria as mensagens de TODAS as contas
+  // e o silêncio de uma sumiria no movimento das outras.
+  const { data, error } = await db
+    .from('messages')
+    .select('created_at, conversations!inner(account_id)')
+    .eq('conversations.account_id', accountId)
+    .eq('sender_type', 'customer')
+    .gte('created_at', desde)
+    .order('created_at', { ascending: true })
+    .limit(5000)
+
+  if (error) {
+    return {
+      status: 'skipped',
+      code: 'query_failed',
+      detail: `Não foi possível ler o histórico: ${error.message}`,
+    }
+  }
+
+  return evaluateSilence(
+    (data ?? []).map((m) =>
+      new Date((m as { created_at: string }).created_at).getTime(),
+    ),
+    Date.now(),
+  )
+}
+
+/** Mínimo de mensagens em 14 dias para haver padrão do que se afastar.
+ *  Vinte é pouco mais de uma por dia — o piso do que dá para chamar de
+ *  rotina. */
+const MIN_HISTORICO = 20
+
+/** Quanto o silêncio atual precisa superar o pior silêncio já visto. */
+const FOLGA = 1.5
+
+/** Piso, para uma conta de movimento muito constante não disparar por
+ *  causa de um almoço mais demorado. */
+const SILENCIO_MINIMO_MS = 3 * 3_600_000
+
+/**
+ * A decisão, separada da consulta para poder ser testada.
+ *
+ * `marcos` são os instantes das mensagens de cliente, em ordem
+ * crescente. `agora` entra como argumento em vez de `Date.now()` para
+ * o teste conseguir posicionar o relógio.
+ */
+export function evaluateSilence(
+  marcos: number[],
+  agora: number,
+): CheckResult {
+  if (marcos.length < MIN_HISTORICO) {
+    return {
+      status: 'skipped',
+      detail: `Só ${marcos.length} mensagem(ns) de cliente em 14 dias — sem histórico para calibrar.`,
+    }
+  }
+
+  let maiorSilencio = 0
+  for (let i = 1; i < marcos.length; i += 1) {
+    const gap = marcos[i] - marcos[i - 1]
+    if (gap > maiorSilencio) maiorSilencio = gap
+  }
+
+  const silencioAtual = agora - marcos[marcos.length - 1]
+  const limite = Math.max(maiorSilencio * FOLGA, SILENCIO_MINIMO_MS)
+  const h = (ms: number) => Math.round(ms / 3_600_000)
+
+  if (silencioAtual > limite) {
+    return {
+      status: 'failing',
+      code: 'inbound_silence',
+      detail:
+        `Nenhuma mensagem de cliente há ${h(silencioAtual)}h. ` +
+        `Nos últimos 14 dias esta conta nunca passou de ${h(maiorSilencio)}h sem receber. ` +
+        `Verifique o webhook na Meta, o DNS e qualquer proxy na frente do app.`,
+    }
+  }
+
+  return {
+    status: 'ok',
+    detail: `Última mensagem há ${h(silencioAtual)}h (maior silêncio recente: ${h(maiorSilencio)}h).`,
   }
 }
 

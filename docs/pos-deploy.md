@@ -54,6 +54,11 @@ os logs acima só sugerem.
 - [ ] **Não** diz "A ronda de verificação nunca rodou"
 - [ ] **Não** diz "A última ronda foi há N minutos" (limite: 2h)
 - [ ] `Migrações do banco` não aparece em vermelho
+- [ ] `Mensagens chegando` não aparece em vermelho — é a verificação
+      que pega webhook bloqueado na borda, `phone_number_id` trocado no
+      painel da Meta, DNS e TLS. Ela se calibra pelo histórico da
+      própria conta, então numa instalação nova aparece como "sem
+      histórico para calibrar" até acumular 20 mensagens em 14 dias
 - [ ] Se `Token do WhatsApp` ou `Chave da IA` aparecerem em vermelho,
       é problema real — não ruído de primeira execução
 
@@ -121,12 +126,6 @@ funcionarem. iOS 16.4 ou mais novo.
 ## O que ainda não tem verificação automática
 
 Registrado para não virar surpresa:
-
-**Webhook que para de chegar.** Se algo na borda bloquear a Meta, o app
-nunca vê a requisição — então nenhum evento é gravado e a faixa de saúde
-continua verde (o token do WhatsApp está válido; ninguém está usando
-ele). O sintoma é "nenhuma mensagem hoje", indistinguível de um dia
-parado. Hoje só o item 6 pega isso, e só quando alguém testa.
 
 **O grafo do vault** e **o ciclo de aprendizado** (aprovar uma página e
 a resposta do bot mudar) nunca foram observados funcionando.

@@ -39,6 +39,7 @@ const LABEL: Record<string, string> = {
   whatsapp_token: 'Token do WhatsApp',
   google_calendar: 'Google Agenda',
   migrations: 'Migrações do banco',
+  inbound_silence: 'Mensagens chegando',
 };
 
 function since(iso: string | null): string {
