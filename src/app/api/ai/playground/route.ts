@@ -124,6 +124,11 @@ export async function POST(request: Request) {
         conversationId: null,
         contactId: null,
         config,
+        // Validate everything, write nothing. A rehearsal that booked
+        // for real would leave rehearsal events in the shop's own Google
+        // Calendar; one that could not book at all would stop short of
+        // the step most worth rehearsing.
+        dryRun: true,
       },
     })
     return NextResponse.json({

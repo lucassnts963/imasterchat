@@ -1,7 +1,7 @@
 import { GoogleError } from '@/lib/google/oauth'
 import type { GoogleConnection } from '@/lib/google/connection'
 import { parseSlot, SLOT_ERROR_MESSAGE } from '@/lib/api/v1/appointments'
-import { zonedParts, zonedTimeToUtc } from '@/lib/time/zone'
+import { formatInZone, zonedParts, zonedTimeToUtc } from '@/lib/time/zone'
 import {
   computeAvailableSlots,
   describeSlots,
@@ -141,7 +141,7 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
     },
 
     async execute(args, ctx) {
-      if (!ctx.contactId) {
+      if (!ctx.dryRun && !ctx.contactId) {
         return {
           content: 'No customer is attached to this conversation, so nothing can be booked.',
           isError: true,
@@ -158,10 +158,23 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
       const stillFree = await isSlotStillFree(ctx, deps, slot.slot.startsAt, slot.slot.endsAt)
       if (stillFree !== true) return stillFree
 
+      // Everything above ran for real — the slot rules, the shop hours,
+      // the collision check against Google and our own bookings. Only
+      // the write is withheld, so a rehearsal proves the dialogue books
+      // the RIGHT time without putting a rehearsal in the shop's diary.
+      if (ctx.dryRun) {
+        return {
+          content:
+            `Test run: this would book ${formatInZone(slot.slot.startsAt, settings.timezone)} ` +
+            `(${settings.timezone}) and the slot is genuinely free. Nothing was written. ` +
+            'Confirm to the customer as you normally would.',
+        }
+      }
+
       const result = await bookAppointment({
         db: ctx.db,
         accountId: ctx.accountId,
-        contactId: ctx.contactId,
+        contactId: ctx.contactId!,
         conversationId: ctx.conversationId,
         startsAt: slot.slot.startsAt,
         endsAt: slot.slot.endsAt,
@@ -217,6 +230,14 @@ function rescheduleAppointmentTool(deps: SchedulingToolDeps): AgentTool {
 
     async execute(args, ctx) {
       const existing = await liveAppointmentFor(ctx)
+      if (!existing && ctx.dryRun) {
+        return {
+          content:
+            'Test run: there is no customer attached, so there is no existing appointment to work ' +
+            'from. Rehearse booking instead.',
+          isError: true,
+        }
+      }
       if (!existing) {
         return {
           content:
@@ -290,6 +311,14 @@ function cancelAppointmentTool(deps: SchedulingToolDeps): AgentTool {
 
     async execute(args, ctx) {
       const existing = await liveAppointmentFor(ctx)
+      if (!existing && ctx.dryRun) {
+        return {
+          content:
+            'Test run: there is no customer attached, so there is no existing appointment to work ' +
+            'from. Rehearse booking instead.',
+          isError: true,
+        }
+      }
       if (!existing) {
         return {
           content: 'This customer has no appointment booked — nothing to cancel.',

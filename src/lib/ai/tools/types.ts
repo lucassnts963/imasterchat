@@ -21,6 +21,17 @@ export interface ToolContext {
   conversationId: string | null
   contactId: string | null
   config: AiConfig
+  /**
+   * Playground. Tools validate everything they normally would — the
+   * rules, the availability, the collision — and then report what they
+   * WOULD have done instead of doing it.
+   *
+   * The alternative was letting the Playground book for real, which
+   * would put rehearsal events in the shop's own Google Calendar and
+   * rehearsal rows in its history. The point of the harness is to run
+   * the production code path, not to write production data.
+   */
+  dryRun?: boolean
 }
 
 /** What a tool hands back. */
