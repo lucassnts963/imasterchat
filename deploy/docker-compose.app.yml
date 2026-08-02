@@ -66,3 +66,64 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  # ============================================================
+  # The scheduler.
+  #
+  # Three endpoints need calling on a schedule, and two of them are not
+  # optional:
+  #
+  #   /api/automations/cron   automations with a wait never resume
+  #   /api/flows/cron         an abandoned run holds
+  #                           idx_one_active_run_per_contact forever and
+  #                           blocks every future trigger for that contact
+  #   /api/ai/vault/keeper    the vault stops learning
+  #
+  # It ships here rather than as a host crontab so a deploy is one
+  # `docker compose up` and not a set of instructions somebody follows
+  # differently on each machine. It reaches the app by service name, so
+  # nothing has to be publicly routable and the secret never crosses the
+  # internet.
+  #
+  # A sleep loop, not crond: one file, no crontab syntax inside YAML,
+  # and a schedule this coarse gains nothing from cron's precision.
+  # ============================================================
+  cron:
+    image: curlimages/curl:8.11.1
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      AUTOMATION_CRON_SECRET: ${AUTOMATION_CRON_SECRET:-}
+      # Seconds between sweeps of the two time-critical endpoints.
+      CRON_INTERVAL_SECONDS: ${CRON_INTERVAL_SECONDS:-300}
+      # How many of those ticks pass between keeper runs. The keeper only
+      # looks at conversations idle for 90 minutes, so every 30 is ample
+      # — and each run spends the account's own provider key.
+      KEEPER_EVERY_TICKS: ${KEEPER_EVERY_TICKS:-6}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        if [ -z "$$AUTOMATION_CRON_SECRET" ]; then
+          echo "[cron] AUTOMATION_CRON_SECRET is empty — the endpoints would answer 503."
+          echo "[cron] Set it in .env and restart. Sleeping instead of spinning."
+          while true; do sleep 3600; done
+        fi
+        echo "[cron] every $${CRON_INTERVAL_SECONDS}s; keeper every $${KEEPER_EVERY_TICKS} ticks"
+        tick=0
+        while true; do
+          # `|| true` on every call: one endpoint failing must not kill
+          # the loop and take the other two down with it.
+          curl -fsS -m 120 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
+            http://app:3000/api/automations/cron >/dev/null || echo "[cron] automations failed"
+          curl -fsS -m 120 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
+            http://app:3000/api/flows/cron >/dev/null || echo "[cron] flows failed"
+          tick=$$((tick + 1))
+          if [ $$((tick % $${KEEPER_EVERY_TICKS})) -eq 0 ]; then
+            # Longer timeout: the keeper makes provider calls for up to
+            # ten conversations, sequentially and on purpose.
+            curl -fsS -m 900 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
+              http://app:3000/api/ai/vault/keeper >/dev/null || echo "[cron] keeper failed"
+          fi
+          sleep $${CRON_INTERVAL_SECONDS}
+        done
