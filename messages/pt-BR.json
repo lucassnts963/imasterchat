@@ -2029,6 +2029,34 @@
       "notePlaceholder": "Ex.: verificar a nota fiscal antes de responder",
       "noteHint": "Aparece na nota que a atendente lê antes de abrir a conversa.",
       "add": "Adicionar"
+    },
+    "costProjection": {
+      "title": "Projeção de custo por mensagem",
+      "description": "Montada com as mesmas peças que o agente carrega de verdade — muda sozinha quando o vault cresce ou uma regra é criada.",
+      "loading": "Calculando…",
+      "notConfigured": "Configure o agente para ver a projeção.",
+      "perReply": "Por resposta",
+      "perMonth": "Por mês",
+      "basedOn": "{count} mensagens recebidas em 30 dias",
+      "promptTokens": "Tokens enviados",
+      "steps": "Chamadas por resposta",
+      "stepsHint": "Com ferramentas, o prompt é reenviado a cada passo",
+      "breakdown": "Onde está o custo",
+      "everyMessage": "Tudo isso é reenviado a cada mensagem, em toda conversa. É por isso que cortar o que é sempre carregado vale mais que cortar o que é buscado.",
+      "estimateWarning": "Estimativa. Os tokens são calculados por caracteres (~3,5 por token em português), não por um tokenizador real.",
+      "measured": "Medido de verdade: {calls} chamadas, média de {tokens} tokens enviados — a estimativa está {drift}% distante.",
+      "noMeasurement": "Ainda não há chamadas registradas para comparar. Assim que o agente responder clientes, o valor medido aparece aqui.",
+      "priceFallback": "O preço deste modelo não está na tabela — usamos a faixa equivalente, então o valor é mais grosseiro ainda.",
+      "sections": {
+        "scaffold": "Base fixa",
+        "system_prompt": "Seu prompt",
+        "environment": "Contexto atual",
+        "vault": "Vault",
+        "guardrails": "Limites",
+        "knowledge": "Base de conhecimento",
+        "tools": "Ferramentas",
+        "transcript": "Histórico da conversa"
+      }
     }
   },
   "Notifications": {

@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AiPlayground } from '@/components/agents/ai-playground';
 import { AiUsageCard } from '@/components/agents/ai-usage';
+import { AiCostProjection } from '@/components/agents/ai-cost-projection';
 import { AiVault } from '@/components/agents/ai-vault';
 import { AiGuardrails } from '@/components/agents/ai-guardrails';
 import { AiConfig } from '@/components/settings/ai-config';
@@ -102,8 +103,9 @@ export default function AgentsPage() {
           </TabsContent>
 
           {canViewUsage && (
-            <TabsContent value="usage" className="mt-4">
+            <TabsContent value="usage" className="mt-4 space-y-4">
               <AiUsageCard />
+              <AiCostProjection />
             </TabsContent>
           )}
         </Tabs>

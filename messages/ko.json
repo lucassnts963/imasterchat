@@ -2029,6 +2029,34 @@
       "notePlaceholder": "e.g. check the invoice before replying",
       "noteHint": "Shows in the note the attendant reads before opening the thread.",
       "add": "Add"
+    },
+    "costProjection": {
+      "title": "Projected cost per message",
+      "description": "Assembled from the same pieces the agent actually loads — it moves on its own when the vault grows or a rule is added.",
+      "loading": "Calculating…",
+      "notConfigured": "Configure the agent to see the projection.",
+      "perReply": "Per reply",
+      "perMonth": "Per month",
+      "basedOn": "{count} inbound messages in 30 days",
+      "promptTokens": "Tokens sent",
+      "steps": "Calls per reply",
+      "stepsHint": "With tools, the prompt is re-sent on every step",
+      "breakdown": "Where the cost is",
+      "everyMessage": "All of this is re-sent on every message, in every conversation. That is why cutting what is always loaded is worth more than cutting what is retrieved.",
+      "estimateWarning": "An estimate. Tokens are counted by characters (~3.5 per token in Portuguese), not by a real tokenizer.",
+      "measured": "Actually measured: {calls} calls, {tokens} tokens sent on average — the estimate is {drift}% off.",
+      "noMeasurement": "No calls recorded yet to compare against. Once the agent answers customers, the measured figure appears here.",
+      "priceFallback": "This model is not in the price table — we used its class, so the figure is rougher still.",
+      "sections": {
+        "scaffold": "Fixed base",
+        "system_prompt": "Your prompt",
+        "environment": "Current context",
+        "vault": "Vault",
+        "guardrails": "Limits",
+        "knowledge": "Knowledge base",
+        "tools": "Tools",
+        "transcript": "Conversation history"
+      }
     }
   },
   "Notifications": {
