@@ -78,6 +78,7 @@ services:
   #                           idx_one_active_run_per_contact forever and
   #                           blocks every future trigger for that contact
   #   /api/ai/vault/keeper    the vault stops learning
+  #   /api/exchange/cron      the BRL figure ages silently
   #
   # It ships here rather than as a host crontab so a deploy is one
   # `docker compose up` and not a set of instructions somebody follows
@@ -120,6 +121,10 @@ services:
             http://app:3000/api/flows/cron >/dev/null || echo "[cron] flows failed"
           tick=$$((tick + 1))
           if [ $$((tick % $${KEEPER_EVERY_TICKS})) -eq 0 ]; then
+            # The dollar moves daily; refreshing beside the keeper is far
+            # more often than needed and costs one request.
+            curl -fsS -m 30 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
+              http://app:3000/api/exchange/cron >/dev/null || echo "[cron] exchange failed"
             # Longer timeout: the keeper makes provider calls for up to
             # ten conversations, sequentially and on purpose.
             curl -fsS -m 900 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \

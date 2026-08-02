@@ -58,7 +58,11 @@
     "defaultAvatar": "아바타",
     "menuProfile": "프로필",
     "menuSettings": "설정",
-    "menuSignOut": "로그아웃"
+    "menuSignOut": "로그아웃",
+    "agenda": "일정",
+    "platformAdmin": "Administration",
+    "flows": "Flows",
+    "aiAgents": "AI Agents"
   },
   "ModeToggle": {
     "switchMode": "{mode} 모드로 전환"
@@ -2087,6 +2091,13 @@
         "scheduling_off": "Unavailable: switch on “let the agent book on its own” in Settings → Scheduling.",
         "google_disconnected": "Unavailable: connect Google Calendar in Settings → Scheduling.",
         "calendar_unusable": "Unavailable: the Google Calendar connection must be reconnected."
+      },
+      "names": {
+        "request_human": "Call a person",
+        "check_availability": "Check free slots",
+        "book_appointment": "Book an appointment",
+        "reschedule_appointment": "Reschedule an appointment",
+        "cancel_appointment": "Cancel an appointment"
       }
     }
   },

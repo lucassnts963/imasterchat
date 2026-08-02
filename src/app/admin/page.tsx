@@ -6,6 +6,7 @@ import {
   PaymentRequiredError,
 } from "@/lib/auth/account";
 import { AdminAccountsPanel } from "./admin-panel";
+import { PricingPanel } from "./pricing-panel";
 
 // Platform-admin surface. Lives OUTSIDE the (dashboard) route group so
 // it does not inherit that group's manual-billing gate — a platform
@@ -26,5 +27,13 @@ export default async function AdminPage() {
     throw err;
   }
 
-  return <AdminAccountsPanel />;
+  return (
+    <div className="space-y-6">
+      <AdminAccountsPanel />
+      {/* Prices and the dollar are platform facts, not account
+          settings — one shop's typo must not become another's
+          budget. This is the only screen gated on is_platform_admin. */}
+      <PricingPanel />
+    </div>
+  );
 }

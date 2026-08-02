@@ -58,7 +58,11 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
-    "menuSignOut": "Sair"
+    "menuSignOut": "Sair",
+    "agenda": "Agenda",
+    "platformAdmin": "Administração",
+    "flows": "Fluxos",
+    "aiAgents": "Agentes de IA"
   },
   "ModeToggle": {
     "switchMode": "Mudar para o modo {mode}"
@@ -2087,6 +2091,13 @@
         "scheduling_off": "Indisponível: ligue “deixar o agente marcar sozinho” em Configurações → Agendamento.",
         "google_disconnected": "Indisponível: conecte a Google Agenda em Configurações → Agendamento.",
         "calendar_unusable": "Indisponível: a conexão com a Google Agenda precisa ser refeita."
+      },
+      "names": {
+        "request_human": "Chamar uma pessoa",
+        "check_availability": "Consultar horários livres",
+        "book_appointment": "Marcar consulta",
+        "reschedule_appointment": "Remarcar consulta",
+        "cancel_appointment": "Cancelar consulta"
       }
     }
   },

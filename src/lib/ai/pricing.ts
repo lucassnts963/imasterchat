@@ -69,12 +69,15 @@ const FALLBACK_STANDARD: ModelPrice = { input: 3, output: 15 }
  * and a forker must be able to type one this table has never heard
  * of.
  */
-export function knownModels(provider: 'openai' | 'anthropic'): {
+export function knownModels(
+  provider: 'openai' | 'anthropic',
+  overrides?: PriceOverrides,
+): {
   id: string
   price: ModelPrice
 }[] {
   const isAnthropic = (id: string) => id.startsWith('claude')
-  return Object.entries(PRICES)
+  return Object.entries(overrides ? { ...PRICES, ...overrides } : PRICES)
     .filter(([id]) => (provider === 'anthropic') === isAnthropic(id))
     .map(([id, price]) => ({ id, price }))
     .sort((a, b) => a.price.input - b.price.input)
@@ -90,16 +93,33 @@ export interface CostEstimate {
   fallback: boolean
 }
 
+/**
+ * Prices as they stand right now: the code table with any
+ * platform-admin overrides laid on top.
+ *
+ * The code table remains the seed AND the fallback, so a deployment
+ * that never edits a price behaves exactly as it did before this
+ * existed — which is what makes the override safe to ship.
+ */
+export type PriceOverrides = Record<string, ModelPrice>
+
 /** Estimate the USD cost of one logged call. */
 export function estimateCostUsd(
   model: string,
   promptTokens: number,
   completionTokens: number,
+  overrides?: PriceOverrides,
 ): CostEstimate {
   const normalized = model.trim().toLowerCase()
-  const prefix = PREFIXES.find((p) => normalized.startsWith(p))
+  const table = overrides ? { ...PRICES, ...overrides } : PRICES
+  // Re-sort only when overrides added a prefix the constant list
+  // does not carry; otherwise reuse the precomputed order.
+  const prefixes = overrides
+    ? Object.keys(table).sort((a, b) => b.length - a.length)
+    : PREFIXES
+  const prefix = prefixes.find((p) => normalized.startsWith(p))
   const price = prefix
-    ? PRICES[prefix]
+    ? table[prefix]
     : /mini|nano|haiku|lite|flash/.test(normalized)
       ? FALLBACK_SMALL
       : FALLBACK_STANDARD
@@ -108,4 +128,16 @@ export function estimateCostUsd(
       Math.max(0, completionTokens) * price.output) /
     1_000_000
   return { usd, fallback: !prefix }
+}
+
+/** The built-in table, for seeding the editable one. */
+export function defaultPrices(): { model_prefix: string; provider: 'openai' | 'anthropic'; input_usd: number; output_usd: number }[] {
+  return Object.entries(PRICES).map(([model_prefix, price]) => ({
+    model_prefix,
+    provider: model_prefix.startsWith('claude')
+      ? ('anthropic' as const)
+      : ('openai' as const),
+    input_usd: price.input,
+    output_usd: price.output,
+  }))
 }

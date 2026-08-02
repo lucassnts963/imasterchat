@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { daysAgoStart, lastNDayKeys, localDayKey } from '@/lib/dashboard/date-utils'
 import { estimateCostUsd } from '@/lib/ai/pricing'
+import { loadExchangeRate, loadPriceOverrides } from '@/lib/ai/price-store'
 
 // Rows are aggregated in-process over a bounded window. An active
 // account writes a handful of rows per conversation, so 30 days sits
@@ -76,6 +77,11 @@ export async function GET(request: Request) {
       )
     }
 
+    const [overrides, exchangeRate] = await Promise.all([
+      loadPriceOverrides(supabase),
+      loadExchangeRate(supabase, 'BRL'),
+    ])
+
     const all = (data ?? []) as UsageRow[]
     const truncated = all.length > MAX_ROWS
     const rows = truncated ? all.slice(0, MAX_ROWS) : all
@@ -133,7 +139,12 @@ export async function GET(request: Request) {
       m.tokens += r.total_tokens
       modelMap.set(mk, m)
 
-      const rowCost = estimateCostUsd(r.model, r.prompt_tokens, r.completion_tokens)
+      const rowCost = estimateCostUsd(
+        r.model,
+        r.prompt_tokens,
+        r.completion_tokens,
+        overrides,
+      )
       costUsd += rowCost.usd
       if (rowCost.fallback) priceFallback = true
 
@@ -152,6 +163,7 @@ export async function GET(request: Request) {
       truncated,
       cost_usd: costUsd,
       price_fallback: priceFallback,
+      exchange_rate: exchangeRate,
       totals: {
         calls: rows.length,
         prompt_tokens: promptTokens,

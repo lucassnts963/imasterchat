@@ -128,8 +128,18 @@ export function AiTools() {
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-sm text-foreground">{tool.name}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              {/* The name the operator thinks in, with the identifier the
+                  model actually sees kept underneath — smaller, but not
+                  removed: it is what appears in the Playground's tool
+                  cards and in ai_agent_steps, so hiding it would break
+                  the trail between this screen and the audit log. */}
+              <p className="text-sm font-medium text-foreground">
+                {t(`names.${tool.name}`)}
+              </p>
+              <p className="font-mono text-[11px] text-muted-foreground/70">
+                {tool.name}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
                 {t(`descriptions.${tool.name}`)}
               </p>
 

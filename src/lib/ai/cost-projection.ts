@@ -7,6 +7,7 @@ import { describeGuardrails, loadGuardrails } from './guardrails'
 import { buildToolCatalog, resolveSchedulingContext } from './tools/registry'
 import { describeWeeklyHours } from '@/lib/scheduling/settings'
 import { estimateCostUsd } from './pricing'
+import { loadExchangeRate, loadPriceOverrides, type ExchangeRate } from './price-store'
 
 // ============================================================
 // What one reply costs, and where the cost is.
@@ -80,6 +81,10 @@ export interface CostProjection {
   /** True when any price came from the class fallback rather than a
    *  known model family. */
   priceEstimated: boolean
+  /** USD→BRL as the platform has it, with its age. Null when nobody
+   *  has set one — the screens then show dollars only, rather than
+   *  inventing a rate. */
+  exchangeRate: ExchangeRate | null
   /** Measured average from `ai_usage_log`, when there is any. This is
    *  what tells the operator whether to believe the estimate. */
   measured: {
@@ -190,10 +195,16 @@ export async function projectReplyCost(
   // costs a fraction of one with it on.
   const steps = tools.length > 1 ? Math.min(maxToolSteps(config), 3) : 1
 
+  const [overrides, exchangeRate] = await Promise.all([
+    loadPriceOverrides(db),
+    loadExchangeRate(db, 'BRL'),
+  ])
+
   const cost = estimateCostUsd(
     config.model,
     promptTokens * steps,
     completionTokens * steps,
+    overrides,
   )
 
   return {
@@ -207,6 +218,7 @@ export async function projectReplyCost(
     messagesLast30Days,
     projectedMonthlyUsd: cost.usd * messagesLast30Days,
     priceEstimated: cost.fallback,
+    exchangeRate,
     measured,
   }
 }
