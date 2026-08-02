@@ -19,6 +19,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { SettingsPanelHead } from '@/components/settings/settings-panel-head';
+import { AiTools } from './ai-tools';
 
 // ============================================================
 // What the bot is not allowed to handle.
@@ -152,6 +153,13 @@ export function AiGuardrails() {
   return (
     <div>
       <SettingsPanelHead title={t('title')} description={t('description')} />
+
+      {/* What it CAN do sits above what it must not say: an operator
+          reading this tab is asking about the agent's boundaries, and
+          the capabilities are the half they can see working. */}
+      <div className="mb-4">
+        <AiTools />
+      </div>
 
       <RuleList
         title={t('topicsTitle')}

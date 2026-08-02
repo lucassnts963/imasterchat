@@ -2066,6 +2066,28 @@
       },
       "calibrated": "Corrigido com {calls} chamadas reais: a estimativa por caracteres dava {raw} tokens e ficou {drift}% abaixo do medido. O valor acima já está ajustado.",
       "calibratedMatch": "Conferido com {calls} chamadas reais — a estimativa bateu."
+    },
+    "tools": {
+      "title": "O que o agente pode fazer",
+      "description": "As ferramentas que ele consegue usar. Uma ferramenta desligada não fica “indisponível” — ela deixa de existir para o modelo, que nem chega a oferecer.",
+      "loading": "Carregando…",
+      "loadError": "Não foi possível carregar as ferramentas.",
+      "saveError": "Não foi possível salvar.",
+      "alwaysOn": "Sempre ligada",
+      "alwaysOnWhy": "Não pode ser desligada: é a única forma do agente parar e chamar uma pessoa.",
+      "absentNote": "Ferramenta desligada também sai do prompt — deixa de custar tokens em toda mensagem.",
+      "descriptions": {
+        "request_human": "Para a conversa e entrega para uma pessoa, com o motivo.",
+        "check_availability": "Consulta os horários realmente livres, cruzando a Google Agenda com o que já está marcado aqui.",
+        "book_appointment": "Marca a consulta no horário que o cliente escolheu.",
+        "reschedule_appointment": "Move a consulta do cliente para outro horário livre.",
+        "cancel_appointment": "Cancela a consulta do cliente e libera o horário."
+      },
+      "requirements": {
+        "scheduling_off": "Indisponível: ligue “deixar o agente marcar sozinho” em Configurações → Agendamento.",
+        "google_disconnected": "Indisponível: conecte a Google Agenda em Configurações → Agendamento.",
+        "calendar_unusable": "Indisponível: a conexão com a Google Agenda precisa ser refeita."
+      }
     }
   },
   "Notifications": {

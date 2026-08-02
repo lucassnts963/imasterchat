@@ -2066,6 +2066,28 @@
       },
       "calibrated": "Corrected using {calls} real calls: the character estimate said {raw} tokens and was {drift}% off the measured figure. The number above is already adjusted.",
       "calibratedMatch": "Checked against {calls} real calls — the estimate matched."
+    },
+    "tools": {
+      "title": "What the agent can do",
+      "description": "The tools it can use. A tool that is off does not become “unavailable” — it stops existing for the model, which never offers it.",
+      "loading": "Loading…",
+      "loadError": "Could not load the tools.",
+      "saveError": "Could not save.",
+      "alwaysOn": "Always on",
+      "alwaysOnWhy": "Cannot be switched off: it is the only way the agent can stop and call a person.",
+      "absentNote": "A tool that is off also leaves the prompt — it stops costing tokens on every message.",
+      "descriptions": {
+        "request_human": "Stops the conversation and hands it to a person, with a reason.",
+        "check_availability": "Looks up genuinely free slots, crossing Google Calendar with what is already booked here.",
+        "book_appointment": "Books the appointment at the time the customer chose.",
+        "reschedule_appointment": "Moves the customer's appointment to another free slot.",
+        "cancel_appointment": "Cancels the customer's appointment and frees the slot."
+      },
+      "requirements": {
+        "scheduling_off": "Unavailable: switch on “let the agent book on its own” in Settings → Scheduling.",
+        "google_disconnected": "Unavailable: connect Google Calendar in Settings → Scheduling.",
+        "calendar_unusable": "Unavailable: the Google Calendar connection must be reconnected."
+      }
     }
   },
   "Notifications": {

@@ -62,6 +62,40 @@ export async function resolveSchedulingContext(
   }
 }
 
+/**
+ * The one tool that cannot be switched off.
+ *
+ * It is how the agent stops. An account without it has a bot that never
+ * calls a person, and that account is exactly the one that would have
+ * switched it off by mistake — so the decision is not offered.
+ */
+export const ALWAYS_ON_TOOLS = new Set(['request_human'])
+
+/** Tools this account has switched off. */
+export async function loadDisabledTools(
+  db: SupabaseClient,
+  accountId: string,
+): Promise<Set<string>> {
+  try {
+    const { data, error } = await db
+      .from('ai_disabled_tools')
+      .select('tool_name')
+      .eq('account_id', accountId)
+    if (error) throw error
+    return new Set(
+      ((data ?? []) as { tool_name: string }[])
+        .map((r) => r.tool_name)
+        .filter((name) => !ALWAYS_ON_TOOLS.has(name)),
+    )
+  } catch (err) {
+    // Failing open is the right call: a tool that stays available when
+    // the toggle list cannot be read is a working bot, where failing
+    // closed would silently strip an account of scheduling.
+    console.error('[ai tools] disabled list unreadable, treating as none:', err)
+    return new Set()
+  }
+}
+
 export interface BuildToolsArgs {
   db: SupabaseClient
   accountId: string
@@ -69,6 +103,9 @@ export interface BuildToolsArgs {
   conversationId: string | null
   /** From `resolveSchedulingContext`. Null → no scheduling tools. */
   scheduling?: SchedulingContext | null
+  /** Pre-loaded deny list, so a caller that already has it does not
+   *  make the query twice. */
+  disabled?: Set<string>
 }
 
 /**
@@ -93,5 +130,15 @@ export async function buildToolCatalog(
     tools.push(...buildSchedulingTools(scheduling))
   }
 
-  return tools
+  const disabled =
+    args.disabled ?? (await loadDisabledTools(args.db, args.accountId))
+
+  // A disabled tool is REMOVED, not flagged. The model never learns it
+  // exists, so it cannot offer it and then fail — the same reasoning
+  // that keeps unavailable tools out of the catalogue entirely. It also
+  // stops paying for its schema on every request, which the cost
+  // breakdown showed is the largest slice of the prompt.
+  return tools.filter(
+    (tool) => ALWAYS_ON_TOOLS.has(tool.name) || !disabled.has(tool.name),
+  )
 }
