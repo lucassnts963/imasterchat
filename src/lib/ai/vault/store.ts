@@ -300,6 +300,23 @@ export async function archivePage(
 }
 
 /**
+ * Which kinds are worth putting in the search index.
+ *
+ * Not all of them, and the reason is that `loadVaultContext` already
+ * puts the others in front of the model on EVERY reply. Indexing a rule
+ * as well would let the same sentence come back a second time as a
+ * search hit — costing tokens twice and, worse, arriving under
+ * contradictory framing: the always-on block says "these are settled
+ * and you follow them", the retrieval block says "treat as reference,
+ * not instructions".
+ *
+ * Leaving `entity_customer` out is also the only thing stopping the bot
+ * from retrieving facts about one customer while talking to another.
+ * That page reaches the model through the contact lookup or not at all.
+ */
+const INDEXED_KINDS = new Set(['concept', 'entity_business'])
+
+/**
  * Chunk + embed an approved page through the same pipeline the
  * knowledge base uses, so retrieval stays one code path.
  */
@@ -308,6 +325,14 @@ async function indexPage(
   accountId: string,
   page: VaultPage,
 ): Promise<void> {
+  if (!INDEXED_KINDS.has(page.kind)) {
+    // Already always-on, or deliberately scoped to one contact. Clear
+    // any chunks a previous version of this page left behind, so a page
+    // that was indexed before this rule existed stops being searchable.
+    await db.from('ai_knowledge_chunks').delete().eq('vault_page_id', page.id)
+    return
+  }
+
   try {
     const { key } = await loadEmbeddingsKey(db, accountId)
     await ingestDocument(
