@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatInZone } from '@/lib/time/zone'
 import { describeAppointmentLabel } from '@/lib/scheduling/label'
+import { TRANSCRIPT_STAMP_NOTE } from './transcript-stamp'
 
 // ============================================================
 // What the model is allowed to know before it starts talking.
@@ -42,6 +43,11 @@ export interface EnvironmentArgs {
    * respondeu na tela de Agendamento. Null usa o termo genérico.
    */
   appointmentLabel?: string | null
+  /**
+   * O transcript vai marcado com [YYYY-MM-DD HH:MM]? Então o modelo
+   * precisa saber que aquilo é metadado, e não texto para imitar.
+   */
+  transcriptStamps?: boolean
   /** Injectable for tests. */
   now?: Date
 }
@@ -76,6 +82,7 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     timezone = DEFAULT_TIMEZONE,
     openingHours = null,
     appointmentLabel = null,
+    transcriptStamps = false,
     now = new Date(),
   } = args
 
@@ -93,6 +100,10 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
   // resposta inteira, não só para o trecho de agendamento.
   const labelLine = describeAppointmentLabel(appointmentLabel)
   if (labelLine) lines.push(labelLine)
+
+  // Antes das linhas do cliente: é regra de como LER a conversa, e a
+  // conversa vem toda depois disto.
+  if (transcriptStamps) lines.push(TRANSCRIPT_STAMP_NOTE)
 
   if (!contactId) {
     // The Playground has no thread. Say so, and say what production

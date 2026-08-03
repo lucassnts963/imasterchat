@@ -125,7 +125,17 @@ export async function dispatchInboundToAiReply(
     // below (this read can race a concurrent inbound).
     if (conv.ai_reply_count >= config.autoReplyMaxPerConversation) return
 
-    const messages = await buildConversationContext(db, conversationId)
+    // Resolvido AQUI e não mais abaixo: o catálogo de ferramentas e o
+    // bloco de ambiente sempre precisaram dele, e agora a marcação do
+    // transcript também — as marcas saem no relógio do negócio, e um
+    // fuso errado num transcript com datas é pior do que transcript sem
+    // data nenhuma.
+    const scheduling = await resolveSchedulingContext(db, accountId)
+
+    const messages = await buildConversationContext(db, conversationId, {
+      timestamps: config.contextTimestamps !== false,
+      timezone: scheduling?.settings.timezone,
+    })
     if (messages.length === 0) return
 
     // The shop's own list of what the bot must not touch. Loaded before
@@ -182,11 +192,6 @@ export async function dispatchInboundToAiReply(
       latestUserMessage(messages),
     )
 
-    // Resolved once and shared: the tool catalog needs it to decide
-    // whether booking exists, and the environment block needs the shop's
-    // timezone and hours.
-    const scheduling = await resolveSchedulingContext(db, accountId)
-
     // Who we're talking to and what day it is. Cheap, and it removes a
     // whole class of confidently-wrong answers about dates.
     const environment = await buildEnvironment({
@@ -196,6 +201,9 @@ export async function dispatchInboundToAiReply(
       timezone: scheduling?.settings.timezone,
       openingHours: scheduling ? describeWeeklyHours(scheduling.settings) : null,
       appointmentLabel: scheduling?.settings.appointmentLabel ?? null,
+      // Sem esta nota o modelo imita o formato que acabou de ver e o
+      // cliente recebe "[2026-08-03 08:12] Claro, posso ajudar".
+      transcriptStamps: config.contextTimestamps !== false,
     })
 
     // The wiki the account maintains: approved rules, what is true

@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { VaultGraph, type GraphLink, type GraphNode } from './vault-graph';
+import { VaultKeeperPanel } from './vault-keeper-panel';
+import { VaultNewPage } from './vault-new-page';
 
 // ============================================================
 // The vault, curated.
@@ -50,7 +52,7 @@ interface LintFinding {
   detail: string;
 }
 
-type Tab = 'graph' | 'drafts' | 'pages' | 'health';
+type Tab = 'graph' | 'drafts' | 'pages' | 'health' | 'keeper';
 
 export function AiVault() {
   const t = useTranslations('Agents.vault');
@@ -170,6 +172,7 @@ export function AiVault() {
     { id: 'drafts', label: t('tabs.drafts'), count: drafts.length },
     { id: 'pages', label: t('tabs.pages'), count: approved.length },
     { id: 'health', label: t('tabs.health'), count: lint.warnings },
+    { id: 'keeper', label: t('tabs.keeper') },
   ];
 
   return (
@@ -204,6 +207,8 @@ export function AiVault() {
           ))}
         </div>
 
+        <div className="flex items-center gap-3">
+          <VaultNewPage onCreated={load} />
         {tab === 'graph' && (
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <input
@@ -216,7 +221,10 @@ export function AiVault() {
           </label>
         )}
 
-        {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          {loading && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
       </div>
 
       {tab === 'graph' && (
@@ -309,6 +317,12 @@ export function AiVault() {
               />
             ))
           )}
+        </div>
+      )}
+
+      {tab === 'keeper' && (
+        <div className="mt-4">
+          <VaultKeeperPanel onPagesProposed={load} />
         </div>
       )}
 

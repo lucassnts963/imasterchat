@@ -1,39 +1,29 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/ai/admin-client'
-import { runVaultKeeper } from '@/lib/ai/vault/keeper'
+import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import { sweepVault } from '@/lib/ai/vault/sweep'
 
 // ============================================================
-// GET /api/ai/vault/keeper  (cron)
+// GET  /api/ai/vault/keeper   (cron, todas as contas)
+// POST /api/ai/vault/keeper   (a conta logada, sob demanda)
 //
-// Sweeps conversations that have gone quiet and lets the keeper decide
-// what the wiki should learn from each.
+// Varre conversas que ficaram caladas e deixa o keeper decidir o que o
+// wiki aprende de cada uma.
 //
-// A sweep rather than a hook on "conversation closed", because most
-// conversations never get closed — they just stop. Waiting for an
-// explicit close would mean learning from the tidy minority and missing
-// the rest, which is most of them.
+// Uma varredura, e não um gancho em "conversa encerrada", porque a
+// maioria das conversas nunca é encerrada — elas só param. Esperar o
+// encerramento explícito seria aprender com a minoria organizada e
+// perder o resto, que é quase tudo.
 //
-// Shares AUTOMATION_CRON_SECRET with the other scheduled endpoints so
-// operators keep one secret rather than collecting them.
+// O GET compartilha o AUTOMATION_CRON_SECRET com as outras rotas
+// agendadas, para o operador guardar um segredo e não uma coleção.
+//
+// O POST existe porque "não gerou nenhuma página" e "está quebrado" são
+// indistinguíveis de fora quando a única execução é de madrugada. Ele
+// roda na hora, só na conta de quem clicou, e devolve por que o número
+// deu no que deu.
 // ============================================================
-
-/** A thread is "over" once it has been quiet this long. Short enough to
- *  learn the same day, long enough that a customer who steps away for
- *  lunch does not get their conversation ingested mid-sentence. */
-const IDLE_MINUTES = 90
-
-/** Bounded per sweep: each conversation costs provider calls on the
- *  account's own key, and a backlog is better drained over several runs
- *  than in one surprise bill. */
-const MAX_PER_SWEEP = 10
-
-interface ConversationRow {
-  id: string
-  account_id: string
-  contact_id: string | null
-  updated_at: string
-}
 
 export async function GET(request: Request) {
   const expected = process.env.AUTOMATION_CRON_SECRET
@@ -50,64 +40,39 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const db = supabaseAdmin()
-  const idleBefore = new Date(Date.now() - IDLE_MINUTES * 60_000).toISOString()
-  // Do not walk the whole history on the first ever run: a shop with
-  // years of conversations would ingest all of them at once.
-  const lookbackFrom = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString()
-
-  const { data, error } = await db
-    .from('conversations')
-    .select('id, account_id, contact_id, updated_at')
-    .lt('updated_at', idleBefore)
-    .gt('updated_at', lookbackFrom)
-    .order('updated_at', { ascending: false })
-    .limit(MAX_PER_SWEEP * 6)
-
-  if (error) {
-    console.error('[vault keeper cron] conversation query failed:', error)
+  try {
+    const result = await sweepVault(supabaseAdmin())
+    return NextResponse.json({
+      considered: result.considered,
+      ran: result.ran,
+      pages_proposed: result.pagesProposed,
+      skipped: result.skipped,
+    })
+  } catch {
     return NextResponse.json({ error: 'query failed' }, { status: 500 })
   }
+}
 
-  const candidates = (data ?? []) as ConversationRow[]
+export async function POST() {
+  try {
+    // `admin`: a varredura gasta a chave de provedor da conta, e quem
+    // paga a conta é quem decide quando gastá-la.
+    const { accountId } = await requireRole('admin')
 
-  // Which of these the vault has already read. One query rather than one
-  // per conversation — and `ref_id` is what makes ingestion idempotent
-  // even if a sweep is retried mid-flight.
-  const { data: seenRows } = await db
-    .from('ai_vault_sources')
-    .select('ref_id')
-    .eq('kind', 'conversation')
-    .in(
-      'ref_id',
-      candidates.map((c) => c.id),
-    )
-  const seen = new Set(
-    ((seenRows ?? []) as { ref_id: string | null }[])
-      .map((r) => r.ref_id)
-      .filter(Boolean),
-  )
+    // Cliente de serviço, não o do usuário: o keeper escreve em
+    // `ai_vault_sources` e `ai_vault_revisions` por conta própria, e
+    // amarrá-lo às políticas de quem clicou faria o resultado depender
+    // do papel do clicador. O `accountId` acima é o que limita o
+    // alcance — a varredura nunca sai desta conta.
+    const result = await sweepVault(supabaseAdmin(), { accountId })
 
-  const pending = candidates.filter((c) => !seen.has(c.id)).slice(0, MAX_PER_SWEEP)
-
-  let ran = 0
-  let proposed = 0
-  for (const conversation of pending) {
-    // Sequential on purpose. These share one provider key per account,
-    // and a burst is exactly what trips a rate limit — this job has all
-    // the time in the world.
-    const result = await runVaultKeeper(db, {
-      accountId: conversation.account_id,
-      conversationId: conversation.id,
-      contactId: conversation.contact_id,
+    return NextResponse.json({
+      considered: result.considered,
+      ran: result.ran,
+      pages_proposed: result.pagesProposed,
+      skipped: result.skipped,
     })
-    if (result.ran) ran += 1
-    proposed += result.pagesProposed
+  } catch (err) {
+    return toErrorResponse(err)
   }
-
-  return NextResponse.json({
-    considered: pending.length,
-    ran,
-    pages_proposed: proposed,
-  })
 }

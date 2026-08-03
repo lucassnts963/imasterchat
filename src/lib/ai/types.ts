@@ -35,6 +35,9 @@ export interface AiConfig {
    *  "test key" route, the config preview) need not care. Unset falls
    *  back to `AI_MAX_TOOL_STEPS`, then the built-in default. */
   maxToolSteps?: number | null
+  /** Marcar cada mensagem do transcript com quando foi dita. Ver
+   *  `./transcript-stamp.ts` — é o que separa ontem de hoje. */
+  contextTimestamps?: boolean
 }
 
 /**

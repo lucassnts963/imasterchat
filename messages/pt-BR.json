@@ -1740,7 +1740,9 @@
       "modelCustom": "Usar «{model}»",
       "modelPrice": "US$ {input} / {output} por 1M",
       "modelUnknown": "Modelo fora da nossa tabela de preços — a projeção de custo vai usar a faixa equivalente, então será mais grosseira.",
-      "loading": "Carregando a configuração de IA…"
+      "loading": "Carregando a configuração de IA…",
+      "contextTimestamps": "Datas nas mensagens do contexto",
+      "contextTimestampsDesc": "Marca cada mensagem com quando foi dita, para o agente distinguir ontem de hoje. Sem isso ele lê um \"amanhã\" dito ontem como ainda sendo amanhã. Custa ~100–160 tokens por resposta — desligue se você não usa agendamento."
     },
     "aiKnowledge": {
       "loadFailed": "Falha ao carregar a base de conhecimento",
@@ -2012,7 +2014,8 @@
         "graph": "Rede",
         "drafts": "Aprovação",
         "pages": "Páginas",
-        "health": "Saúde"
+        "health": "Saúde",
+        "keeper": "Keeper"
       },
       "graph": {
         "hint": "Arraste para mover, role para aproximar, passe o mouse para destacar as conexões. Nó vazado é rascunho — ainda não vale nas respostas.",
@@ -2040,7 +2043,54 @@
       "cancelEdit": "Descartar",
       "saveEdit": "Salvar",
       "saveAndApprove": "Salvar e aprovar",
-      "saved": "Página salva e aprovada."
+      "saved": "Página salva e aprovada.",
+      "keeper": {
+        "description": "O keeper lê conversas que ficaram paradas há mais de 90 minutos e propõe páginas para a wiki. Roda sozinho de madrugada; aqui você vê o que ele decidiu — inclusive quando a decisão foi não guardar nada.",
+        "runNow": "Rodar agora",
+        "running": "Rodando…",
+        "loading": "Carregando…",
+        "empty": "O keeper ainda não rodou nesta conta.",
+        "runError": "Não foi possível rodar o keeper.",
+        "runProposed": "{count} página(s) proposta(s) — veja na aba de aprovação.",
+        "runNothingDurable": "Leu {count} conversa(s) e não achou nada durável para guardar.",
+        "runTooRecent": "Nenhuma conversa pronta: {count} ainda estão ativas. Ele só lê depois de 90 minutos de silêncio.",
+        "runAlreadyRead": "Nada novo — as {count} conversas da janela já foram lidas antes.",
+        "runNoConversations": "Nenhuma conversa nos últimos 7 dias para ler.",
+        "operation": {
+          "proposed": "Propôs uma página",
+          "no_action": "Rodou e não chamou nenhuma ferramenta",
+          "finished": "Decidiu não guardar nada"
+        }
+      },
+      "newPage": {
+        "button": "Nova página",
+        "title": "Escrever uma página",
+        "description": "O que o negócio sabe e nunca foi dito numa conversa. Entra aprovada e passa a valer nas respostas.",
+        "kind": "Tipo",
+        "pageTitle": "Título",
+        "pageTitlePlaceholder": "Política de troca",
+        "content": "Conteúdo",
+        "contentPlaceholder": "Trocas em até 30 dias, com nota fiscal.",
+        "contentHint": "Curto e certo. Regras entram em TODA resposta — o que estiver errado aqui o agente vai repetir.",
+        "cancel": "Cancelar",
+        "save": "Criar página",
+        "created": "Página criada e aprovada.",
+        "error": "Não foi possível criar a página.",
+        "kinds": {
+          "rule": "Regra",
+          "entity_customer": "Sobre um cliente",
+          "entity_business": "Sobre o negócio",
+          "concept": "Conceito",
+          "state": "Estado atual"
+        },
+        "kindHints": {
+          "rule": "Vale para todo mundo e não muda toda semana. Entra em TODA resposta, então seja curto.",
+          "entity_customer": "Fato sobre uma pessoa: preferência, restrição, o que comprou.",
+          "entity_business": "O que vocês vendem, cobram, fazem e não fazem.",
+          "concept": "Um termo do ramo que o agente precisa entender do seu jeito.",
+          "state": "O que é verdade agora e vai mudar: promoção do mês, equipe reduzida."
+        }
+      }
     },
     "guardrails": {
       "title": "Quando chamar uma pessoa",

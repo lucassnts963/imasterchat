@@ -30,7 +30,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key',
+        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -90,6 +90,9 @@ export async function POST(request: Request) {
         : null
     const isActive = body.is_active === true
     const autoReplyEnabled = body.auto_reply_enabled === true
+    // `!== false` e não `=== true`: a coluna nasce ligada, e um PUT
+    // parcial que não mande o campo não pode desligá-la por omissão.
+    const contextTimestamps = body.context_timestamps !== false
 
     let maxPer = Number(body.auto_reply_max_per_conversation)
     if (!Number.isFinite(maxPer)) maxPer = 3
@@ -218,6 +221,7 @@ export async function POST(request: Request) {
       system_prompt: systemPrompt,
       is_active: isActive,
       auto_reply_enabled: autoReplyEnabled,
+      context_timestamps: contextTimestamps,
       auto_reply_max_per_conversation: maxPer,
     }
     // Only touch the handoff target when the form actually sent the field,

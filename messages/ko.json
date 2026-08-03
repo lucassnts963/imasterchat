@@ -1740,7 +1740,9 @@
       "modelCustom": "Use “{model}”",
       "modelPrice": "US$ {input} / {output} per 1M",
       "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher.",
-      "loading": "Loading the AI configuration…"
+      "loading": "Loading the AI configuration…",
+      "contextTimestamps": "대화 컨텍스트에 시각 표시",
+      "contextTimestampsDesc": "각 메시지에 발화 시각을 표시해 상담원이 어제와 오늘을 구분할 수 있게 합니다. 없으면 어제 말한 \"내일\"을 여전히 내일로 읽습니다. 응답당 약 100~160토큰이 듭니다 — 예약 기능을 쓰지 않으면 끄세요."
     },
     "aiKnowledge": {
       "loadFailed": "지식베이스를 불러오지 못했습니다",
@@ -2012,7 +2014,8 @@
         "graph": "Network",
         "drafts": "Approval",
         "pages": "Pages",
-        "health": "Health"
+        "health": "Health",
+        "keeper": "키퍼"
       },
       "graph": {
         "hint": "Drag to move, scroll to zoom, hover to light up the connections. A hollow node is a draft — it does not count in replies yet.",
@@ -2040,7 +2043,54 @@
       "cancelEdit": "Discard",
       "saveEdit": "Save",
       "saveAndApprove": "Save and approve",
-      "saved": "Page saved and approved."
+      "saved": "Page saved and approved.",
+      "keeper": {
+        "description": "키퍼는 90분 이상 조용한 대화를 읽고 위키 페이지를 제안합니다. 밤에 자동으로 실행되며, 여기서 그 결정을 볼 수 있습니다 — 아무것도 저장하지 않기로 한 경우도 포함해서요.",
+        "runNow": "지금 실행",
+        "running": "실행 중…",
+        "loading": "불러오는 중…",
+        "empty": "이 계정에서 키퍼가 아직 실행되지 않았습니다.",
+        "runError": "키퍼를 실행할 수 없습니다.",
+        "runProposed": "{count}개 페이지가 제안되었습니다 — 승인 탭을 확인하세요.",
+        "runNothingDurable": "대화 {count}건을 읽었지만 저장할 만한 내용이 없었습니다.",
+        "runTooRecent": "준비된 대화가 없습니다: {count}건이 아직 진행 중입니다. 90분간 조용해야 읽습니다.",
+        "runAlreadyRead": "새로운 것이 없습니다 — 해당 기간의 대화 {count}건은 이미 읽었습니다.",
+        "runNoConversations": "지난 7일간 읽을 대화가 없습니다.",
+        "operation": {
+          "proposed": "페이지를 제안함",
+          "no_action": "실행했지만 도구를 호출하지 않음",
+          "finished": "저장하지 않기로 결정함"
+        }
+      },
+      "newPage": {
+        "button": "새 페이지",
+        "title": "페이지 작성",
+        "description": "대화에서 언급된 적 없는, 비즈니스가 아는 내용입니다. 승인된 상태로 추가되어 답변에 반영됩니다.",
+        "kind": "종류",
+        "pageTitle": "제목",
+        "pageTitlePlaceholder": "반품 정책",
+        "content": "내용",
+        "contentPlaceholder": "영수증 지참 시 30일 이내 반품 가능.",
+        "contentHint": "짧고 정확하게. 규칙은 모든 답변에 들어갑니다 — 여기가 틀리면 상담원이 그대로 반복합니다.",
+        "cancel": "취소",
+        "save": "페이지 만들기",
+        "created": "페이지가 생성되고 승인되었습니다.",
+        "error": "페이지를 만들 수 없습니다.",
+        "kinds": {
+          "rule": "규칙",
+          "entity_customer": "고객 정보",
+          "entity_business": "비즈니스 정보",
+          "concept": "개념",
+          "state": "현재 상태"
+        },
+        "kindHints": {
+          "rule": "모두에게 적용되며 자주 바뀌지 않습니다. 모든 답변에 들어가니 짧게 쓰세요.",
+          "entity_customer": "한 사람에 대한 사실: 선호, 제약, 구매 이력.",
+          "entity_business": "무엇을 팔고, 얼마를 받고, 무엇을 하고 안 하는지.",
+          "concept": "상담원이 여러분 방식대로 이해해야 하는 업계 용어.",
+          "state": "지금은 사실이지만 바뀔 내용: 이달 프로모션, 인력 부족."
+        }
+      }
     },
     "guardrails": {
       "title": "When to call a person",

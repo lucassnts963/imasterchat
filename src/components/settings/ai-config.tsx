@@ -72,6 +72,10 @@ export function AiConfig() {
   const [systemPrompt, setSystemPrompt] = useState('');
   const [isActive, setIsActive] = useState(false);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
+  // Nasce ligado, como a coluna: quem tem agendamento é quem mais sofre
+  // sem as marcas, e ninguém liga uma chave para um bug que não sabe
+  // que tem.
+  const [contextTimestamps, setContextTimestamps] = useState(true);
   const [maxPerConversation, setMaxPerConversation] = useState(3);
   // Empty string = leave unassigned (shared queue).
   const [handoffAgentId, setHandoffAgentId] = useState('');
@@ -101,6 +105,7 @@ export function AiConfig() {
         setSystemPrompt(data.system_prompt ?? '');
         setIsActive(data.is_active);
         setAutoReplyEnabled(data.auto_reply_enabled);
+        setContextTimestamps(data.context_timestamps !== false);
         setMaxPerConversation(data.auto_reply_max_per_conversation ?? 3);
         setHandoffAgentId(data.handoff_agent_id ?? '');
         setMonthlyBudget(
@@ -155,6 +160,7 @@ export function AiConfig() {
     system_prompt: systemPrompt.trim() || null,
     is_active: isActive,
     auto_reply_enabled: autoReplyEnabled,
+    context_timestamps: contextTimestamps,
     auto_reply_max_per_conversation: maxPerConversation,
     handoff_agent_id: handoffAgentId || null,
     monthly_budget_usd: monthlyBudget.trim()
@@ -455,6 +461,22 @@ export function AiConfig() {
               <Switch
                 checked={autoReplyEnabled}
                 onCheckedChange={setAutoReplyEnabled}
+                disabled={disabled || !isActive}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {t('contextTimestamps')}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t('contextTimestampsDesc')}
+                </p>
+              </div>
+              <Switch
+                checked={contextTimestamps}
+                onCheckedChange={setContextTimestamps}
                 disabled={disabled || !isActive}
               />
             </div>

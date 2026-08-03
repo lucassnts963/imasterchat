@@ -1740,7 +1740,9 @@
       "modelCustom": "Use “{model}”",
       "modelPrice": "US$ {input} / {output} per 1M",
       "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher.",
-      "loading": "Loading the AI configuration…"
+      "loading": "Loading the AI configuration…",
+      "contextTimestamps": "Timestamps in the conversation context",
+      "contextTimestampsDesc": "Marks each message with when it was said, so the agent can tell yesterday from today. Without it, a \"tomorrow\" said yesterday still reads as tomorrow. Costs ~100–160 tokens per reply — turn it off if you do not use scheduling."
     },
     "aiKnowledge": {
       "loadFailed": "Failed to load knowledge base",
@@ -2012,7 +2014,8 @@
         "graph": "Network",
         "drafts": "Approval",
         "pages": "Pages",
-        "health": "Health"
+        "health": "Health",
+        "keeper": "Keeper"
       },
       "graph": {
         "hint": "Drag to move, scroll to zoom, hover to light up the connections. A hollow node is a draft — it does not count in replies yet.",
@@ -2040,7 +2043,54 @@
       "cancelEdit": "Discard",
       "saveEdit": "Save",
       "saveAndApprove": "Save and approve",
-      "saved": "Page saved and approved."
+      "saved": "Page saved and approved.",
+      "keeper": {
+        "description": "The keeper reads conversations idle for over 90 minutes and proposes wiki pages. It runs on its own overnight; here you see what it decided — including when the decision was to keep nothing.",
+        "runNow": "Run now",
+        "running": "Running…",
+        "loading": "Loading…",
+        "empty": "The keeper has not run for this account yet.",
+        "runError": "Could not run the keeper.",
+        "runProposed": "{count} page(s) proposed — see the approval tab.",
+        "runNothingDurable": "Read {count} conversation(s) and found nothing durable to keep.",
+        "runTooRecent": "No conversation ready: {count} are still active. It only reads after 90 minutes of silence.",
+        "runAlreadyRead": "Nothing new — the {count} conversations in the window were already read.",
+        "runNoConversations": "No conversations in the last 7 days to read.",
+        "operation": {
+          "proposed": "Proposed a page",
+          "no_action": "Ran and called no tool",
+          "finished": "Decided to keep nothing"
+        }
+      },
+      "newPage": {
+        "button": "New page",
+        "title": "Write a page",
+        "description": "What the business knows that no conversation ever said. It goes in approved and starts affecting replies.",
+        "kind": "Kind",
+        "pageTitle": "Title",
+        "pageTitlePlaceholder": "Return policy",
+        "content": "Content",
+        "contentPlaceholder": "Returns within 30 days, with the receipt.",
+        "contentHint": "Short and correct. Rules go into EVERY reply — whatever is wrong here, the agent will repeat.",
+        "cancel": "Cancel",
+        "save": "Create page",
+        "created": "Page created and approved.",
+        "error": "Could not create the page.",
+        "kinds": {
+          "rule": "Rule",
+          "entity_customer": "About a customer",
+          "entity_business": "About the business",
+          "concept": "Concept",
+          "state": "Current state"
+        },
+        "kindHints": {
+          "rule": "True for everyone and stable over months. Goes into EVERY reply, so keep it short.",
+          "entity_customer": "A fact about one person: preference, constraint, what they bought.",
+          "entity_business": "What you sell, charge, will and will not do.",
+          "concept": "A term from your trade the agent must understand your way.",
+          "state": "True right now and will change: this month promo, short-staffed."
+        }
+      }
     },
     "guardrails": {
       "title": "When to call a person",
