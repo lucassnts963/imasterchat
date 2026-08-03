@@ -196,7 +196,24 @@ export function EmbeddedSignupButton({
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
-        extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
+        // Estes `extras` precisam BATER com a configuração de Embedded
+        // Signup criada no painel da Meta — o `config_id` sozinho não
+        // basta. Os valores abaixo são os que a Meta gera no link de
+        // onboarding da nossa configuração; se você recriar a
+        // configuração lá, confira o link de novo antes de mexer aqui.
+        //
+        // `featureType: 'whatsapp_business_app_onboarding'` é o fluxo de
+        // COEXISTÊNCIA: o cliente continua usando o WhatsApp Business no
+        // celular, mantém o histórico, e a Meta sincroniza as duas
+        // pontas. Vazio seria a migração pura para a Cloud API, em que o
+        // app do celular deixa de funcionar — inaceitável para uma loja
+        // que atende pelo aparelho do balcão.
+        extras: {
+          setup: {},
+          featureType: 'whatsapp_business_app_onboarding',
+          sessionInfoVersion: '3',
+          version: 'v4',
+        },
       },
     );
   }, [configId, finish]);
