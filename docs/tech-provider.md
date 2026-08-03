@@ -39,10 +39,16 @@ No app da Meta (o seu, de Tech Provider):
 1. Use case **"Connect through WhatsApp"**.
 2. Permissões `whatsapp_business_management` e `whatsapp_business_messaging`.
 3. Crie uma **configuração de Embedded Signup** e anote o `config_id`.
-4. Webhook apontando para `https://app.imasterchat.com.br/api/whatsapp/webhook`,
+4. Webhook apontando para `<NEXT_PUBLIC_SITE_URL>/api/whatsapp/webhook`,
    inscrito no campo `messages`.
-5. Em Facebook Login for Business, autorize o domínio
-   `https://app.imasterchat.com.br`.
+5. Em Facebook Login for Business, autorize **exatamente** a origem de
+   `NEXT_PUBLIC_SITE_URL`.
+
+> ⚠ Os passos 4 e 5 usam a origem REAL do deploy, não um `app.` de exemplo.
+> Na instalação de referência ela é o ápice, `https://imasterchat.com.br` —
+> este documento já mandou autorizar `app.imasterchat.com.br` e o popup
+> falharia sem dizer por quê. A Meta compara a origem byte a byte; um
+> subdomínio a mais é um domínio diferente.
 
 Variáveis de ambiente:
 
