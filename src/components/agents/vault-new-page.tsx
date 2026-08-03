@@ -101,7 +101,12 @@ export function VaultNewPage({ onCreated }: { onCreated: () => void }) {
             <Label htmlFor="vault-kind">{t('kind')}</Label>
             <Select value={kind} onValueChange={(v) => setKind(String(v))}>
               <SelectTrigger id="vault-kind">
-                <SelectValue />
+                {/* Com `<SelectValue />` vazio o Base UI imprime o VALOR
+                    ("rule"), não o rótulo — só a função de formatação
+                    resolve. Ver SelectValueProps.children na tipagem. */}
+                <SelectValue>
+                  {(value) => t(`kinds.${String(value)}`)}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {VAULT_PAGE_KINDS.map((k) => (

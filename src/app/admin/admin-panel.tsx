@@ -140,7 +140,13 @@ export function AdminAccountsPanel() {
                       <SelectTrigger
                         className={`w-44 ${STATUS_CLASS[row.billingStatus]}`}
                       >
-                        <SelectValue />
+                        <SelectValue>
+                          {(v) =>
+                            STATUS_LABEL_KEY[v as BillingStatus]
+                              ? t(STATUS_LABEL_KEY[v as BillingStatus])
+                              : String(v ?? '')
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {BILLING_STATUSES.map((s) => (

@@ -296,7 +296,9 @@ export function AiConfig() {
                   disabled={disabled}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {(v) => PROVIDER_LABEL[v as AiProvider] ?? String(v ?? '')}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="openai">{PROVIDER_LABEL.openai}</SelectItem>
@@ -517,7 +519,16 @@ export function AiConfig() {
                 disabled={disabled || !autoReplyEnabled}
               >
                 <SelectTrigger id="ai-handoff">
-                  <SelectValue />
+                  {/* Sem a função, aqui aparecia o UUID do atendente. */}
+                  <SelectValue>
+                    {(v) =>
+                      !v || v === HANDOFF_QUEUE
+                        ? t('handoffQueue')
+                        : (members.find((m) => m.user_id === v)
+                            ? memberLabel(members.find((m) => m.user_id === v)!)
+                            : t('handoffQueue'))
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={HANDOFF_QUEUE}>
