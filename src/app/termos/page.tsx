@@ -62,6 +62,12 @@ export default function TermsPage() {
               com estes termos.
             </p>
             <p className="mt-2">
+              O iMasterChat é uma marca de{" "}
+              <strong className="text-foreground">LUCAS DE OLIVEIRA S</strong>,
+              inscrita no CNPJ 42.659.473/0001-45, doravante denominada
+              &ldquo;nós&rdquo; ou &ldquo;plataforma&rdquo;.
+            </p>
+            <p className="mt-2">
               Estes termos convivem com a{" "}
               <Link
                 href="/privacidade"

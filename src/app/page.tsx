@@ -25,6 +25,12 @@ import { buttonVariants } from "@/components/ui/button";
 // Dados exibidos no rodapé. A verificação de negócio da Meta confere o
 // site contra o cadastro da empresa — preencha com sua razão social e
 // CNPJ para os dois baterem. Deixar vazio omite a linha.
+//
+// O rodapé diz "iMasterChat é uma marca de <razão social>" e não apenas
+// os dois nomes juntos. Quando o registro é pessoa física, a marca não
+// se parece em nada com a entidade, e a análise do nome de exibição do
+// WhatsApp cai justamente aí: a Meta recusa o que não consegue ligar ao
+// negócio registrado. A frase é a ligação, escrita onde ela olha.
 const LEGAL_NAME = "LUCAS DE OLIVEIRA S";
 const CNPJ = "42.659.473/0001-45";
 
@@ -215,8 +221,14 @@ export default function LandingPage() {
             </span>
           </div>
           {LEGAL_NAME ? (
+            /* A frase AFIRMA a relação entre marca e entidade, em vez de
+               pôr as duas lado a lado e deixar o leitor deduzir. Quem
+               precisa deduzir aqui é o revisor da Meta: o nome de
+               exibição do WhatsApp é recusado quando ele não consegue
+               ligar a marca pedida ao negócio registrado — e o registro,
+               sendo pessoa física, não se parece com a marca. */
             <p>
-              {LEGAL_NAME}
+              iMasterChat é uma marca de {LEGAL_NAME}
               {CNPJ ? ` — CNPJ ${CNPJ}` : ""}
             </p>
           ) : null}
