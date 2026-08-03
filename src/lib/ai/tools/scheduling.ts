@@ -7,6 +7,7 @@ import {
   describeSlots,
 } from '@/lib/scheduling/availability'
 import type { SchedulingSettings } from '@/lib/scheduling/settings'
+import { classifyRefusal, describeRefusal } from '@/lib/scheduling/refusal'
 import {
   bookAppointment,
   cancelAppointment,
@@ -99,7 +100,7 @@ function checkAvailabilityTool(deps: SchedulingToolDeps): AgentTool {
           to,
         )
         const slots = computeAvailableSlots({ settings, busy, from, to, now })
-        return { content: describeSlots(slots, settings.timezone) }
+        return { content: describeSlots(slots, settings.timezone, settings) }
       } catch (err) {
         return calendarFailure(err, 'read the calendar')
       }
@@ -450,10 +451,15 @@ async function isSlotStillFree(
     )
     if (match) return true
 
+    // O servidor sabe QUAL regra derrubou o horário. Devolver as quatro
+    // possibilidades numa frase só fazia o modelo dizer "não está
+    // disponível" — e um dono que olha a agenda vazia naquele horário
+    // conclui, com razão, que o bot está quebrado.
     return {
-      content:
-        'That slot is not available — it is outside the business hours, too soon, too far ahead, ' +
-        'or has just been taken. Call check_availability again and offer what is actually free.',
+      content: describeRefusal(
+        classifyRefusal({ settings, startsAt, endsAt, busy: filtered }),
+        settings,
+      ),
       isError: true,
     }
   } catch (err) {

@@ -144,7 +144,16 @@ export function overlapsAny(
  * unreadable — the model paraphrases it badly and the customer gets
  * "2026-08-06T17:00:00Z". Give it the shape it should speak in.
  */
-export function describeSlots(slots: Slot[], timezone: string): string {
+export function describeSlots(
+  slots: Slot[],
+  timezone: string,
+  /** Passe as regras para a lista poder explicar o que ela mesma
+   *  cortou. Sem isto o modelo só vê a ausência de 09:00 e 10:00, e
+   *  "ausente" ele traduz como "ocupado" — que é mentira quando quem
+   *  tirou foi a antecedência mínima. */
+  settings?: { leadTimeMinutes: number },
+  now: Date = new Date(),
+): string {
   if (slots.length === 0) return 'No free slots in that range.'
 
   const byDay = new Map<string, string[]>()
@@ -158,9 +167,26 @@ export function describeSlots(slots: Slot[], timezone: string): string {
   const lines = [...byDay.entries()].map(
     ([day, times]) => `${day}: ${times.join(', ')}`,
   )
+  const notes: string[] = []
+  if (settings && settings.leadTimeMinutes > 0) {
+    const earliest = new Date(now.getTime() + settings.leadTimeMinutes * 60_000)
+    // Só quando o corte realmente mordeu hoje: dizer "a antecedência é
+    // de 2h" numa consulta sobre semana que vem é ruído que o modelo
+    // repassaria ao cliente sem motivo.
+    if (formatDateInZone(earliest, timezone) === formatDateInZone(now, timezone)) {
+      notes.push(
+        `Note: this business needs ${settings.leadTimeMinutes} minutes of notice, so anything ` +
+          `before ${formatTimeInZone(earliest, timezone)} today is unavailable even if the ` +
+          'calendar is empty. If the customer asks for an earlier time, explain the notice rule ' +
+          'rather than saying it is taken.',
+      )
+    }
+  }
+
   return [
     `Free slots (times are local to ${timezone}):`,
     ...lines,
+    ...notes,
     'To book one, call book_appointment with the exact ISO start and end.',
   ].join('\n')
 }
