@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { BarChart3, Bot, PencilLine } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/dashboard/skeleton';
 import { BarChart } from '@/components/tremor/bar-chart';
 import { formatCompactNumber } from '@/lib/currency';
 import { format, parseISO } from 'date-fns';
+import { formatDayMonth } from '@/lib/time/format';
 
 interface UsageResponse {
   window_days: number;
@@ -78,6 +79,7 @@ function formatMoney(value: number, inBrl: boolean): string {
 
 export function AiUsageCard() {
   const t = useTranslations('Agents.usage');
+  const locale = useLocale();
   const { accountId, accountRole, profileLoading } = useAuth();
   const canView = accountRole ? canEditSettings(accountRole) : false;
 
@@ -127,7 +129,7 @@ export function AiUsageCard() {
   const label = unit === 'cost' ? costLabel : tokensLabel;
   const chartData =
     data?.daily.map((d) => ({
-      day: format(parseISO(d.date), 'MMM d'),
+      day: formatDayMonth(parseISO(d.date), locale),
       [label]:
         unit === 'cost'
           ? Number((d.cost_usd * (data?.exchange_rate?.rate ?? 1)).toFixed(4))

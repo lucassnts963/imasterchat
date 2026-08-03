@@ -815,7 +815,8 @@
         "updateError": "업데이트하지 못했습니다",
         "duplicateError": "복제하지 못했습니다",
         "deleteError": "삭제하지 못했습니다"
-      }
+      },
+      "never": "없음"
     },
     "edit": {
       "loading": "불러오는 중...",

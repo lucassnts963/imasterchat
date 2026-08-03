@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
 import { Search, ChevronDown, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useTranslations } from "next-intl";
+import { dateFnsLocale } from "@/lib/time/format";
+import { useLocale, useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -436,6 +437,7 @@ function ConversationItem({
   onSelect,
   t,
 }: ConversationItemProps) {
+  const locale = useLocale();
   const contact = conversation.contact;
   const displayName = contact?.name || contact?.phone || t("unknown");
   const initials = displayName.charAt(0).toUpperCase();
@@ -444,9 +446,12 @@ function ConversationItem({
     onSelect(conversation);
   }, [onSelect, conversation]);
 
+  // Sem `locale`, o date-fns responde "about 2 hours" — em inglês, na
+  // lista que a atendente olha o dia inteiro.
   const timeAgo = conversation.last_message_at
     ? formatDistanceToNow(new Date(conversation.last_message_at), {
         addSuffix: false,
+        locale: dateFnsLocale(locale),
       })
     : "";
 

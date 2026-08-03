@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +31,7 @@ import {
   AccordionContent,
 } from '@/components/ui/accordion';
 import type { WhatsAppConfig as WhatsAppConfigType } from '@/types';
+import { formatDateTime } from '@/lib/time/format';
 
 const MASKED_TOKEN = '••••••••••••••••';
 
@@ -39,6 +40,7 @@ type ResetReason = 'token_corrupted' | 'meta_api_error' | null;
 
 export function WhatsAppConfig() {
   const t = useTranslations('Settings.whatsapp');
+  const locale = useLocale();
   // Tech Provider credentials. Read from NEXT_PUBLIC_* (inlined at
   // build time) rather than fetched, because the Embedded Signup popup
   // is launched entirely client-side — the app id and config id are
@@ -512,7 +514,7 @@ export function WhatsAppConfig() {
                   dangerouslySetInnerHTML={{
                     __html: t('subscribedSince', {
                       date: config.registered_at
-                        ? new Date(config.registered_at).toLocaleString()
+                        ? formatDateTime(config.registered_at, locale)
                         : t('unknownDate'),
                     }),
                   }}

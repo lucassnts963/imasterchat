@@ -3,6 +3,7 @@
 import type { Deal, PipelineStage } from "@/types";
 import { Calendar, Check, X } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
+import { formatDateLong } from "@/lib/time/format";
 import { useLocale, useTranslations } from "next-intl";
 
 interface DealCardProps {
@@ -12,13 +13,9 @@ interface DealCardProps {
   isOverlay?: boolean;
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+// `useLocale` e não uma constante: o formato tem que seguir o idioma do
+// app, e era isto que faltava — o funil escrevia "Aug 3, 2026" num app
+// em português.
 
 function initials(name?: string, fallback?: string) {
   const source = (name || fallback || "?").trim();
@@ -88,7 +85,7 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
         {deal.expected_close_date && (
           <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
             <Calendar className="h-3 w-3" />
-            {formatDate(deal.expected_close_date)}
+            {formatDateLong(deal.expected_close_date, locale)}
           </span>
         )}
       </div>

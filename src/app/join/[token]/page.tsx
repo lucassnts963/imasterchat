@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
@@ -85,6 +85,7 @@ export default function JoinPage() {
   const params = useParams<{ token: string }>();
   const token = params?.token;
   const t = useTranslations('JoinPage');
+  const locale = useLocale();
 
   const [peek, setPeek] = useState<PeekResult | null>(null);
   // Local auth probe — the AuthProvider lives inside the (dashboard)
@@ -296,11 +297,11 @@ export default function JoinPage() {
       <CardDescription className="text-muted-foreground">
         {t.rich('invitedDesc', {
           roleName: t(ROLE_KEY[peek.role]),
-          date: new Date(peek.expires_at).toLocaleDateString(undefined, {
+          date: new Intl.DateTimeFormat(locale, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
-          }),
+          }).format(new Date(peek.expires_at)),
           role: (chunks) => (
             <span className="inline-flex items-center gap-1 text-foreground">
               <ShieldCheck className="size-3.5 text-primary" />

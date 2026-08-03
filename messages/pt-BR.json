@@ -1054,7 +1054,8 @@
         "updateError": "Falha ao atualizar",
         "duplicateError": "Falha ao duplicar",
         "deleteError": "Falha ao excluir"
-      }
+      },
+      "never": "nunca"
     },
     "edit": {
       "loading": "Carregando...",

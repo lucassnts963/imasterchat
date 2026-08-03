@@ -815,7 +815,8 @@
         "updateError": "Failed to update",
         "duplicateError": "Failed to duplicate",
         "deleteError": "Failed to delete"
-      }
+      },
+      "never": "never"
     },
     "edit": {
       "loading": "Loading...",

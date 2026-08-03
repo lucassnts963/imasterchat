@@ -20,7 +20,7 @@ import {
 
 import { createClient } from "@/lib/supabase/client"
 import { useCan } from "@/hooks/use-can"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import type { Automation } from "@/types"
 import { Button } from "@/components/ui/button"
 import { GatedButton } from "@/components/ui/gated-button"
@@ -278,6 +278,7 @@ function AutomationCard({
   onDelete: () => void
   t: ReturnType<typeof useTranslations>
 }) {
+  const locale = useLocale()
   const meta = triggerMeta(automation.trigger_type)
   return (
     <li className="rounded-xl border border-border bg-card transition-colors hover:border-border">
@@ -323,7 +324,7 @@ function AutomationCard({
                 : t("runsPlural", { count: automation.execution_count })}
             </span>
             <span aria-hidden>·</span>
-            <span>{t("lastRun", { time: formatRelative(automation.last_executed_at) })}</span>
+            <span>{t("lastRun", { time: formatRelative(automation.last_executed_at, locale) ?? t("never") })}</span>
           </div>
         </button>
 
