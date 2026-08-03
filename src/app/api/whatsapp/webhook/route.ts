@@ -8,6 +8,7 @@ import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import { isReopening, reopenPatch } from '@/lib/conversations/reopen'
 import { previewText, sendPushToAccount } from '@/lib/push/send'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
 import { accountAllowsSideEffects } from '@/lib/billing/side-effects'
@@ -716,6 +717,13 @@ async function processMessage(
   }
 
   // Update conversation
+  //
+  // O `reopenPatch` entra no MESMO update, e não num segundo: o
+  // auto-reply roda depois, no `after()`, e relê a conversa do banco.
+  // Em dois updates haveria uma janela em que ele leria o dono antigo e
+  // desistiria de responder — a thread reabriria calada, que é
+  // exatamente o sintoma que isto conserta.
+  const reopening = isReopening(conversation.status)
   const { error: convError } = await supabaseAdmin()
     .from('conversations')
     .update({
@@ -723,11 +731,19 @@ async function processMessage(
       last_message_at: new Date().toISOString(),
       unread_count: (conversation.unread_count || 0) + 1,
       updated_at: new Date().toISOString(),
+      ...reopenPatch(conversation.status),
     })
     .eq('id', conversation.id)
 
   if (convError) {
     console.error('Error updating conversation:', convError)
+  } else if (reopening) {
+    // Um assinante externo que só ouvia `conversation.created` nunca
+    // ficava sabendo que uma thread adormecida voltou à vida.
+    await dispatchWebhookEvent(supabaseAdmin(), accountId, 'conversation.reopened', {
+      conversation_id: conversation.id,
+      contact_id: contactRecord.id,
+    })
   }
 
   // If this contact was a recent broadcast recipient, flag the reply
