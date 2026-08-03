@@ -2283,5 +2283,18 @@
     "thanks": "Recebido, obrigado!",
     "thanksHint": "Se precisarmos de mais detalhes, a gente avisa por aqui.",
     "sendAnother": "Enviar outro"
+  },
+  "Pwa": {
+    "install": {
+      "title": "Instale o iMasterChat no seu aparelho",
+      "description": "Vira ícone na tela de início, abre sem a barra do navegador e é o que permite receber aviso de mensagem com o app fechado.",
+      "action": "Instalar",
+      "installing": "Abrindo…",
+      "stepsIos": "No Safari: Compartilhar → Adicionar à Tela de Início.",
+      "stepsAndroid": "No menu do navegador (⋮): Instalar aplicativo.",
+      "stepsDesktop": "Clique no ícone de instalar na barra de endereço do navegador.",
+      "never": "Não exibir novamente",
+      "close": "Fechar"
+    }
   }
 }

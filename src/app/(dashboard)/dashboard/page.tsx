@@ -34,6 +34,7 @@ import { ConversationsChart } from '@/components/dashboard/conversations-chart'
 import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
+import { PwaInstallCard } from '@/components/pwa/install-card'
 
 import { useLocale, useTranslations } from 'next-intl'
 
@@ -132,6 +133,10 @@ export default function DashboardPage() {
           {t('description')}
         </p>
       </div>
+
+      {/* Some sozinho quando já está instalado, quando o aparelho não
+          tem caminho de instalação, ou quando já foi dispensado. */}
+      <PwaInstallCard />
 
       {/* Metric cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

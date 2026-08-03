@@ -2283,5 +2283,18 @@
     "thanks": "Got it, thank you!",
     "thanksHint": "If we need more detail, we'll reach you here.",
     "sendAnother": "Send another"
+  },
+  "Pwa": {
+    "install": {
+      "title": "Install iMasterChat on your device",
+      "description": "It becomes an icon on your home screen, opens without browser chrome, and it is what lets you be notified of a message while the app is closed.",
+      "action": "Install",
+      "installing": "Opening…",
+      "stepsIos": "In Safari: Share → Add to Home Screen.",
+      "stepsAndroid": "In the browser menu (⋮): Install app.",
+      "stepsDesktop": "Click the install icon in your browser's address bar.",
+      "never": "Don't show this again",
+      "close": "Close"
+    }
   }
 }

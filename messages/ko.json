@@ -2283,5 +2283,18 @@
     "thanks": "Got it, thank you!",
     "thanksHint": "If we need more detail, we'll reach you here.",
     "sendAnother": "Send another"
+  },
+  "Pwa": {
+    "install": {
+      "title": "기기에 iMasterChat 설치하기",
+      "description": "홈 화면에 아이콘으로 추가되고, 브라우저 표시줄 없이 열리며, 앱이 닫혀 있을 때도 메시지 알림을 받을 수 있게 해줍니다.",
+      "action": "설치",
+      "installing": "여는 중…",
+      "stepsIos": "Safari에서: 공유 → 홈 화면에 추가.",
+      "stepsAndroid": "브라우저 메뉴(⋮)에서: 앱 설치.",
+      "stepsDesktop": "브라우저 주소 표시줄의 설치 아이콘을 클릭하세요.",
+      "never": "다시 표시하지 않기",
+      "close": "닫기"
+    }
   }
 }
