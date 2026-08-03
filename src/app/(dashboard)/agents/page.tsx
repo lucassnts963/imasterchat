@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Bot,
@@ -22,12 +22,42 @@ import { canEditSettings } from '@/lib/auth/roles';
 
 type Tab = 'playground' | 'vault' | 'guardrails' | 'setup' | 'usage';
 
+// A ordem da fita numa lista só, como o rail de Configurações faz com
+// SETTINGS_SECTIONS: acrescentar uma aba passa a ser uma linha aqui e um
+// <TabsContent> lá embaixo, sem repetir a marcação do chip cinco vezes.
+const TABS = [
+  { value: 'playground', icon: Sparkles, labelKey: 'tabPlayground' },
+  { value: 'vault', icon: Network, labelKey: 'vaultTab' },
+  { value: 'guardrails', icon: ShieldAlert, labelKey: 'guardrailsTab' },
+  { value: 'setup', icon: Settings2, labelKey: 'tabSetup' },
+  { value: 'usage', icon: BarChart3, labelKey: 'tabUsage' },
+] as const satisfies ReadonlyArray<{
+  value: Tab;
+  icon: typeof Bot;
+  labelKey: string;
+}>;
+
 export default function AgentsPage() {
   const t = useTranslations('Agents.page');
   const { accountRole } = useAuth();
   const canViewUsage = accountRole ? canEditSettings(accountRole) : false;
   const [tab, setTab] = useState<Tab>('playground');
   const [decided, setDecided] = useState(false);
+  const activeRef = useRef<HTMLButtonElement>(null);
+
+  // A fita rola, então a aba ativa pode nascer fora da vista — é o caso
+  // de quem cai em "Configurar" na primeira visita, que é o último chip
+  // visível. Mesmo gesto do rail de Configurações. `block: 'nearest'`
+  // porque `scrollIntoView` também mexeria no scroll vertical do
+  // `<main>`, e a página não deve pular por causa de uma aba.
+  useEffect(() => {
+    if (!decided) return;
+    activeRef.current?.scrollIntoView({
+      inline: 'center',
+      block: 'nearest',
+      behavior: 'smooth',
+    });
+  }, [tab, decided]);
 
   // Land first-time users on Setup, returning users on the Playground.
   useEffect(() => {
@@ -66,23 +96,18 @@ export default function AgentsPage() {
           onValueChange={(v) => setTab(v as Tab)}
           className="mt-6"
         >
-          <TabsList>
-            <TabsTrigger value="playground">
-              <Sparkles className="mr-1.5 h-4 w-4" /> {t('tabPlayground')}
-            </TabsTrigger>
-            <TabsTrigger value="vault">
-              <Network className="mr-1.5 h-4 w-4" /> {t('vaultTab')}
-            </TabsTrigger>
-            <TabsTrigger value="guardrails">
-              <ShieldAlert className="mr-1.5 h-4 w-4" /> {t('guardrailsTab')}
-            </TabsTrigger>
-            <TabsTrigger value="setup">
-              <Settings2 className="mr-1.5 h-4 w-4" /> {t('tabSetup')}
-            </TabsTrigger>
-            {canViewUsage && (
-              <TabsTrigger value="usage">
-                <BarChart3 className="mr-1.5 h-4 w-4" /> {t('tabUsage')}
-              </TabsTrigger>
+          <TabsList variant="rail" aria-label={t('title')}>
+            {TABS.filter((item) => item.value !== 'usage' || canViewUsage).map(
+              ({ value, icon: Icon, labelKey }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  ref={value === tab ? activeRef : undefined}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span>{t(labelKey)}</span>
+                </TabsTrigger>
+              ),
             )}
           </TabsList>
 

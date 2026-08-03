@@ -31,7 +31,6 @@ export async function GET(request: Request) {
 
   // Inside the safe zone for maskable, edge to edge otherwise.
   const glyph = Math.round(size * (maskable ? 0.44 : 0.62))
-  const stroke = Math.max(2, Math.round(glyph * 0.125))
 
   return new ImageResponse(
     (
@@ -49,15 +48,24 @@ export async function GET(request: Request) {
           borderRadius: maskable ? 0 : Math.round(size * 0.18),
         }}
       >
+        {/* A espessura do traço é em UNIDADES DO viewBox, não em pixels.
+            `width`/`height` escalam o desenho inteiro; o `24` do viewBox
+            continua sendo a régua interna. Calcular a espessura a partir
+            do tamanho em pixels dava ~40 unidades num espaço de 24 — o
+            chevron engordava até virar um quadrado branco, e como o
+            ícone do app vem do `icon.tsx` (que acerta), só a splash
+            aparecia errada. Valor igual ao do `logo.tsx`: aqui o glifo é
+            rasterizado grande e não precisa do reforço que o favicon de
+            32px leva. */}
         <svg width={glyph} height={glyph} viewBox="0 0 24 24" fill="none">
           <path
             d="M6 7.5 L11 12 L6 16.5"
             stroke="#ffffff"
-            strokeWidth={stroke}
+            strokeWidth="2.6"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          <rect x="12.6" y="14.4" width="6.4" height="3" rx="1.5" fill="#ffffff" />
+          <rect x="12.6" y="14.6" width="6.4" height="2.6" rx="1.3" fill="#ffffff" />
         </svg>
       </div>
     ),
