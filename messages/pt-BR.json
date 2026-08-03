@@ -1962,7 +1962,8 @@
       "tabSetup": "Configuração",
       "tabUsage": "Uso",
       "vaultTab": "Vault",
-      "guardrailsTab": "Limites"
+      "guardrailsTab": "Limites",
+      "tabContext": "Contexto"
     },
     "playground": {
       "notConfiguredError": "Nenhum agente configurado ainda — conclua a Configuração primeiro.",
@@ -2179,6 +2180,34 @@
         "book_appointment": "Marcar horário",
         "reschedule_appointment": "Remarcar horário",
         "cancel_appointment": "Cancelar horário"
+      }
+    },
+    "context": {
+      "loading": "Montando o contexto…",
+      "notConfigured": "Configure a IA primeiro — sem chave e modelo não há contexto para montar.",
+      "description": "Exatamente o que o agente lê antes de escrever, montado com o mesmo código do caminho real. Se algo aqui estiver errado, é isso que o cliente vai ouvir.",
+      "totalTokens": "tokens por resposta",
+      "sectionEmpty": "vazia",
+      "emptyDetail": "Nada nesta seção. Se você esperava algo aqui, é onde configurar que está faltando.",
+      "editAt": "Onde muda isso",
+      "knowledgeNote": "A base de conhecimento não aparece aqui porque o que ela contribui depende da pergunta do cliente — são até 5 trechos escolhidos na hora. Some ao total quando houver.",
+      "sections": {
+        "scaffold": "Andaime fixo",
+        "environment": "Situação atual",
+        "vault": "Vault (páginas sempre ativas)",
+        "business_prompt": "Instruções do seu negócio",
+        "guardrails": "Guardrails",
+        "tools": "Ferramentas disponíveis",
+        "transcript": "A conversa"
+      },
+      "hints": {
+        "scaffold": "As regras que valem para toda conta. Não se configura.",
+        "environment": "Data e hora de agora, fuso, horário de atendimento, o cliente e o agendamento dele.",
+        "vault": "As páginas aprovadas que entram em toda resposta.",
+        "business_prompt": "O texto livre que você escreveu sobre o negócio.",
+        "guardrails": "Os assuntos que o bot não pode tratar.",
+        "tools": "O que ele pode fazer além de responder.",
+        "transcript": "As últimas mensagens. Vazia aqui porque nenhuma conversa foi escolhida."
       }
     }
   },

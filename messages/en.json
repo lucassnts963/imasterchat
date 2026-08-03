@@ -1962,7 +1962,8 @@
       "tabSetup": "Setup",
       "tabUsage": "Usage",
       "vaultTab": "Network",
-      "guardrailsTab": "Limits"
+      "guardrailsTab": "Limits",
+      "tabContext": "Context"
     },
     "playground": {
       "notConfiguredError": "No agent configured yet — finish Setup first.",
@@ -2179,6 +2180,34 @@
         "book_appointment": "Book an appointment",
         "reschedule_appointment": "Reschedule an appointment",
         "cancel_appointment": "Cancel an appointment"
+      }
+    },
+    "context": {
+      "loading": "Assembling the context…",
+      "notConfigured": "Set up the AI first — without a key and model there is no context to assemble.",
+      "description": "Exactly what the agent reads before writing, assembled with the same code as the live path. If something here is wrong, that is what the customer will hear.",
+      "totalTokens": "tokens per reply",
+      "sectionEmpty": "empty",
+      "emptyDetail": "Nothing in this section. If you expected something, what is missing is the configuration.",
+      "editAt": "Where to change this",
+      "knowledgeNote": "The knowledge base is not shown here because what it contributes depends on the question — up to 5 chunks picked at reply time. It adds to the total when present.",
+      "sections": {
+        "scaffold": "Fixed scaffold",
+        "environment": "Current situation",
+        "vault": "Vault (always-on pages)",
+        "business_prompt": "Your business instructions",
+        "guardrails": "Guardrails",
+        "tools": "Available tools",
+        "transcript": "The conversation"
+      },
+      "hints": {
+        "scaffold": "The rules that apply to every account. Not configurable.",
+        "environment": "Current date and time, timezone, opening hours, the customer and their booking.",
+        "vault": "Approved pages that go into every reply.",
+        "business_prompt": "The free text you wrote about the business.",
+        "guardrails": "Subjects the bot must not handle.",
+        "tools": "What it can do beyond replying.",
+        "transcript": "The last messages. Empty here because no conversation was picked."
       }
     }
   },
