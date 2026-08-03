@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/components/brand/logo";
+import { TERMS_PUBLISHED_LABEL } from "@/lib/legal/terms";
 
 // Public terms-of-service page. Meta requires a reachable Terms of
 // Service URL (App Settings → Basic) before a use case can be reviewed,
@@ -47,8 +48,11 @@ export default function TermsPage() {
             </span>
           </div>
           <h1 className="text-3xl font-bold text-foreground">Termos de Uso</h1>
+          {/* Da mesma constante que o registro de aceite grava. Se a
+              página dissesse uma data e o banco guardasse outra, o
+              registro provaria o aceite de um texto que ninguém viu. */}
           <p className="mt-2 text-sm text-muted-foreground">
-            Última atualização: 3 de agosto de 2026
+            Última atualização: {TERMS_PUBLISHED_LABEL}
           </p>
         </header>
 

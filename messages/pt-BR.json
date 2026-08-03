@@ -1894,7 +1894,8 @@
     "creatingAccount": "Criando conta...",
     "createAccount": "Criar conta",
     "haveAccount": "Já tem uma conta?",
-    "signIn": "Entrar"
+    "signIn": "Entrar",
+    "acceptTerms": "Li e concordo com os <terms>Termos de Uso</terms> e a <privacy>Política de Privacidade</privacy>."
   },
   "ForgotPasswordPage": {
     "title": "Redefinir senha",

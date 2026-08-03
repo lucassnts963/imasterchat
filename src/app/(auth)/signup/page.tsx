@@ -41,6 +41,10 @@ function SignupPageInner() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Caixa explícita, e não "ao criar conta você concorda" no rodapé.
+  // A diferença é o que sobra como prova: um gesto do usuário, e não
+  // uma afirmação nossa sobre o que ele deveria ter lido.
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,6 +105,12 @@ function SignupPageInner() {
     // the middleware on a top-level request (issue #365). The billing
     // gate routes a pending account to /blocked by itself.
     if (data.session) {
+      // Gravado no servidor, que é quem observa o instante e a origem —
+      // os dois dados que fazem do aceite uma prova e que não podem vir
+      // de quem está sendo registrado. Não bloqueia a entrada: falhar
+      // aqui é uma lacuna a recuperar depois, não motivo para travar
+      // alguém na porta com a conta já criada.
+      await fetch("/api/terms/accept", { method: "POST" }).catch(() => {});
       window.location.href = inviteToken
         ? `/join/${encodeURIComponent(inviteToken)}`
         : "/dashboard";
@@ -249,9 +259,40 @@ function SignupPageInner() {
               />
             </div>
 
+            <label className="flex items-start gap-2.5 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+              />
+              <span>
+                {t.rich("acceptTerms", {
+                  terms: (chunks) => (
+                    <Link
+                      href="/termos"
+                      target="_blank"
+                      className="text-primary hover:text-primary/80"
+                    >
+                      {chunks}
+                    </Link>
+                  ),
+                  privacy: (chunks) => (
+                    <Link
+                      href="/privacidade"
+                      target="_blank"
+                      className="text-primary hover:text-primary/80"
+                    >
+                      {chunks}
+                    </Link>
+                  ),
+                })}
+              </span>
+            </label>
+
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !acceptedTerms}
               className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {loading ? t("creatingAccount") : t("createAccount")}

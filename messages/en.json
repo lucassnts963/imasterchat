@@ -1894,7 +1894,8 @@
     "creatingAccount": "Creating account...",
     "createAccount": "Create account",
     "haveAccount": "Already have an account?",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "acceptTerms": "I have read and agree to the <terms>Terms of Use</terms> and the <privacy>Privacy Policy</privacy>."
   },
   "ForgotPasswordPage": {
     "title": "Reset password",
