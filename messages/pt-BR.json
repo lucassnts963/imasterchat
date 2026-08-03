@@ -1813,19 +1813,19 @@
       "rulesDesc": "O servidor valida cada marcação contra estas regras. O modelo escolhe o horário; ele não escolhe se o horário vale.",
       "activeLabel": "Deixar o agente marcar sozinho",
       "activeHint": "Desligado, as ferramentas de agendamento nem aparecem para o modelo.",
-      "activeWithoutCalendar": "Sem a Google Agenda conectada, os dias que a loja bloquear direto no Google ficam invisíveis para o bot.",
+      "activeWithoutCalendar": "Sem a Google Agenda conectada, os dias bloqueados direto no Google ficam invisíveis para o bot.",
       "connectedButInactive": "A Google Agenda está conectada e as regras estão salvas, mas o agente não vai marcar nada: a chave acima está desligada, e com ela desligada as ferramentas de agendamento nem aparecem para o modelo.",
       "timezone": "Fuso horário",
-      "timezoneHint": "Define o relógio da loja: horários oferecidos, agendados e exibidos seguem este fuso.",
+      "timezoneHint": "Define o relógio do negócio: horários oferecidos, agendados e exibidos seguem este fuso.",
       "timezonePlaceholder": "Escolher fuso horário…",
       "timezoneSearch": "Buscar cidade ou fuso…",
       "timezoneEmpty": "Nenhum fuso encontrado.",
-      "slotMinutes": "Duração da consulta (minutos)",
+      "slotMinutes": "Duração (minutos)",
       "leadTime": "Antecedência mínima (minutos)",
       "leadTimeHint": "Nada é oferecido dentro desta janela.",
       "maxAdvance": "Agendar até quantos dias à frente",
       "hours": "Horário de funcionamento",
-      "hoursHint": "Janelas no relógio da loja. Um dia sem janela é um dia fechado.",
+      "hoursHint": "Janelas no relógio do negócio. Um dia sem janela é um dia fechado.",
       "closed": "Fechado",
       "addWindow": "Adicionar janela",
       "removeWindow": "Remover janela",
@@ -1840,7 +1840,10 @@
         "Quinta",
         "Sexta",
         "Sábado"
-      ]
+      ],
+      "labelTitle": "Como vocês chamam isso?",
+      "labelDesc": "O termo que o agente usa ao falar com o cliente — e que aparece nas telas. Deixe vazio para \"agendamento\".",
+      "labelPlaceholder": "demonstração, visita técnica, consulta…"
     },
     "push": {
       "title": "Avisos no celular",
@@ -1861,7 +1864,7 @@
       "modeHuman": "Só o que precisa de gente",
       "modeHumanHint": "Avisa quando o agente para e chama uma pessoa — reclamação, assunto bloqueado, erro no agendamento. É a opção da maioria.",
       "modeAll": "Toda mensagem",
-      "modeAllHint": "Avisa a cada mensagem de cliente. Numa loja movimentada, isso é o dia inteiro.",
+      "modeAllHint": "Avisa a cada mensagem de cliente. Num dia movimentado, isso é o dia inteiro.",
       "iosNote": "No iPhone, é preciso instalar o app na tela de início antes de as notificações funcionarem (iOS 16.4 ou mais novo)."
     }
   },
@@ -2058,7 +2061,7 @@
       "kindTopic": "Assunto",
       "kindKeyword": "Palavra",
       "valueTopicLabel": "Assunto que exige uma pessoa",
-      "valueTopicPlaceholder": "Ex.: troca de lente fora do prazo de garantia",
+      "valueTopicPlaceholder": "Ex.: garantia fora do prazo, troca de peça",
       "valueKeywordLabel": "Palavra ou expressão",
       "valueKeywordPlaceholder": "Ex.: reclamação",
       "noteLabel": "Aviso para a atendente (opcional)",
@@ -2110,9 +2113,9 @@
       "descriptions": {
         "request_human": "Para a conversa e entrega para uma pessoa, com o motivo.",
         "check_availability": "Consulta os horários realmente livres, cruzando a Google Agenda com o que já está marcado aqui.",
-        "book_appointment": "Marca a consulta no horário que o cliente escolheu.",
-        "reschedule_appointment": "Move a consulta do cliente para outro horário livre.",
-        "cancel_appointment": "Cancela a consulta do cliente e libera o horário."
+        "book_appointment": "Marca o horário que o cliente escolheu.",
+        "reschedule_appointment": "Move o horário do cliente para outro livre.",
+        "cancel_appointment": "Cancela o horário do cliente e o libera."
       },
       "requirements": {
         "scheduling_off": "Indisponível: ligue “deixar o agente marcar sozinho” em Configurações → Agendamento.",
@@ -2122,9 +2125,9 @@
       "names": {
         "request_human": "Chamar uma pessoa",
         "check_availability": "Consultar horários livres",
-        "book_appointment": "Marcar consulta",
-        "reschedule_appointment": "Remarcar consulta",
-        "cancel_appointment": "Cancelar consulta"
+        "book_appointment": "Marcar horário",
+        "reschedule_appointment": "Remarcar horário",
+        "cancel_appointment": "Cancelar horário"
       }
     }
   },
@@ -2137,7 +2140,13 @@
     "markAllRead": "Marcar todas como lidas",
     "emptyTitle": "Nenhuma notificação ainda",
     "emptyHint": "Você verá um alerta aqui quando alguém atribuir uma conversa a você.",
-    "unread": "Não lida"
+    "unread": "Não lida",
+    "someContact": "um contato",
+    "assigned": {
+      "title": "Nova conversa atribuída",
+      "byPerson": "{actor} atribuiu a você uma conversa com {contact}",
+      "bySystem": "Uma conversa com {contact} foi atribuída a você"
+    }
   },
   "Billing": {
     "pendingTitle": "Conta aguardando aprovação",
@@ -2197,7 +2206,7 @@
   },
   "Agenda": {
     "title": "Agenda",
-    "description": "Consultas marcadas — pelo agente ou por você. A disponibilidade vem da Google Agenda.",
+    "description": "O que está marcado — pelo agente ou por você. A disponibilidade vem da Google Agenda.",
     "week": "Semana",
     "day": "Dia",
     "today": "Hoje",
@@ -2213,7 +2222,7 @@
     "openConversation": "Abrir conversa",
     "newDialog": {
       "title": "Novo agendamento",
-      "description": "Data e hora no fuso da loja ({timezone}).",
+      "description": "Data e hora no fuso do negócio ({timezone}).",
       "contact": "Cliente",
       "contactSearch": "Buscar por nome ou telefone…",
       "noContacts": "Nenhum contato encontrado.",
@@ -2221,7 +2230,7 @@
       "time": "Hora",
       "duration": "Duração (minutos)",
       "subject": "Assunto",
-      "subjectPlaceholder": "Exame de vista, ajuste de armação…",
+      "subjectPlaceholder": "Demonstração, orçamento, visita técnica…",
       "cancel": "Cancelar",
       "save": "Agendar",
       "created": "Agendamento criado.",
@@ -2238,7 +2247,7 @@
         "no_show": "Não compareceu",
         "cancelled": "Cancelado"
       },
-      "notOnCalendar": "Este agendamento não chegou à Google Agenda. A loja não vai vê-lo — resolva antes do horário.",
+      "notOnCalendar": "Este agendamento não chegou à Google Agenda. A equipe não vai vê-lo — resolva antes do horário.",
       "cancelledBecause": "Cancelado: {reason}",
       "openConversation": "Abrir conversa",
       "reschedule": "Remarcar",

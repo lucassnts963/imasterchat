@@ -92,6 +92,9 @@ interface AuthContextValue {
    *  while loading or when no account is resolved, so callers can use
    *  it unconditionally. */
   defaultCurrency: string;
+  /** Como este negócio chama um agendamento — "demonstração", "visita
+   *  técnica". Null usa o termo genérico das traduções. */
+  appointmentLabel: string | null;
   /** True if `accountRole === 'owner'`. */
   isOwner: boolean;
   /** True if `accountRole === 'admin'` (does NOT include owner — use canManageMembers for "admin or above"). */
@@ -122,6 +125,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [account, setAccount] = useState<AccountSummary | null>(null);
+  // O termo que este negócio usa para um agendamento. Carregado junto
+  // com a conta, uma vez por sessão, porque a alternativa era cada tela
+  // que mostra a palavra buscar as configurações de agendamento só para
+  // saber como escrevê-la.
+  const [appointmentLabel, setAppointmentLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // Tracked separately from `loading`. The session settles fast (one
   // local cookie read); the profile fetch crosses the network and
@@ -195,6 +203,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               default_currency: account.default_currency ?? DEFAULT_CURRENCY,
             };
           }
+        }
+
+        // Best-effort, e depois da conta: a tabela pode nem existir
+        // (conta que nunca abriu a tela de Agendamento) e isso não é
+        // erro nenhum — é só "sem termo próprio". Falhar aqui nunca
+        // pode custar o contexto de conta, que é o que a issue #294
+        // ensinou sobre este bloco.
+        if (data.account_id) {
+          const { data: sched } = await supabase
+            .from("ai_scheduling_settings")
+            .select("appointment_label")
+            .eq("account_id", data.account_id)
+            .maybeSingle();
+          setAppointmentLabel(sched?.appointment_label?.trim() || null);
         }
 
         // Narrow the DB enum into our AccountRole union. The DB
@@ -355,6 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshProfile,
         account,
         defaultCurrency: account?.default_currency ?? DEFAULT_CURRENCY,
+        appointmentLabel,
         ...derived,
       }}
     >
@@ -385,6 +408,7 @@ export function useAuth(): AuthContextValue {
       refreshProfile: async () => {},
       account: null,
       defaultCurrency: DEFAULT_CURRENCY,
+      appointmentLabel: null,
       accountId: null,
       accountRole: null,
       isOwner: false,

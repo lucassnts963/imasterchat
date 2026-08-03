@@ -76,6 +76,7 @@ export async function GET() {
           leadTimeMinutes: 120,
           maxAdvanceDays: 30,
           weeklyHours: [[], [], [], [], [], [], []],
+          appointmentLabel: null,
           isActive: false,
         },
         connection: null,

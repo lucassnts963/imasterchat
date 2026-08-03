@@ -49,6 +49,8 @@ interface Settings {
   max_advance_days: number;
   weekly_hours: WeeklyHours;
   is_active: boolean;
+  /** Como este negócio chama um agendamento. Null usa o genérico. */
+  appointment_label: string | null;
 }
 
 interface ConnectionStatus {
@@ -295,6 +297,24 @@ export function SchedulingSettings() {
                 emptyLabel={t('timezoneEmpty')}
               />
               <p className="text-xs text-muted-foreground">{t('timezoneHint')}</p>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="appointment-label">{t('labelTitle')}</Label>
+              <Input
+                id="appointment-label"
+                maxLength={40}
+                value={settings.appointment_label ?? ''}
+                onChange={(e) =>
+                  // Vazio grava null, e não '': é assim que a coluna
+                  // representa "sem termo próprio", e duas grafias para
+                  // o mesmo estado só rendem um `if` a mais em cada
+                  // lugar que lê isto.
+                  patch({ appointment_label: e.target.value || null })
+                }
+                disabled={readOnly}
+                placeholder={t('labelPlaceholder')}
+              />
+              <p className="text-xs text-muted-foreground">{t('labelDesc')}</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="slot">{t('slotMinutes')}</Label>

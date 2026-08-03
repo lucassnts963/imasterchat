@@ -11,6 +11,7 @@ function settings(overrides: Partial<SchedulingSettings> = {}): SchedulingSettin
     slotMinutes: 60,
     leadTimeMinutes: 120,
     maxAdvanceDays: 30,
+    appointmentLabel: null,
     weeklyHours: parseWeeklyHours({
       '1': [['09:00', '12:00'], ['14:00', '18:00']],
       '2': [['09:00', '12:00'], ['14:00', '18:00']],

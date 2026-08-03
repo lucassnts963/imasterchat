@@ -7,6 +7,7 @@ import {
   queryFreeBusy,
 } from '@/lib/google/calendar'
 import type { GoogleConnection } from '@/lib/google/connection'
+import { buildEventDescription, buildEventSummary } from './event-text'
 import { formatInZone } from '@/lib/time/zone'
 import type { BusyInterval } from './availability'
 
@@ -126,6 +127,9 @@ export interface BookArgs {
   timezone: string
   /** Shown on the calendar event so the shop knows who is coming. */
   contactName?: string | null
+  /** Como o negócio chama isso — entra no título do evento quando o
+   *  cliente não deu um assunto. */
+  appointmentLabel?: string | null
 }
 
 export async function bookAppointment(args: BookArgs): Promise<SchedulingResult> {
@@ -158,9 +162,26 @@ export async function bookAppointment(args: BookArgs): Promise<SchedulingResult>
   if (!connection) return { ok: true, appointment, calendarSynced: false }
 
   try {
+    // O contato é buscado aqui, e não exigido de quem chama, porque os
+    // dois caminhos de marcação (o agente e a tela de agenda) sempre
+    // esqueceriam um campo diferente — e o resultado seria um evento
+    // rico quando marcado de um jeito e vazio quando marcado do outro.
+    const contact = await loadContactForEvent(db, accountId, contactId)
+    const eventText = {
+      title: args.title,
+      notes: args.notes,
+      contactName: args.contactName ?? contact?.name ?? null,
+      contactPhone: contact?.phone ?? null,
+      contactEmail: contact?.email ?? null,
+      contactCompany: contact?.company ?? null,
+      conversationId: args.conversationId ?? null,
+      createdVia: args.createdVia,
+      appointmentLabel: args.appointmentLabel ?? null,
+      siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
+    }
     const event = await insertEvent(connection, {
-      summary: args.title?.trim() || `Atendimento — ${args.contactName ?? 'cliente'}`,
-      description: args.notes ?? undefined,
+      summary: buildEventSummary(eventText),
+      description: buildEventDescription(eventText),
       startsAt,
       endsAt,
       timezone,
@@ -228,8 +249,10 @@ export async function rescheduleAppointment(
   }
 
   try {
+    // Só o horário. Mandar `summary` aqui apagava o nome do cliente que
+    // a marcação original pôs no título — o remarcador não tem os dados
+    // do contato em mãos, então reescrever era sempre uma perda.
     await patchEvent(connection, appointment.googleEventId, {
-      summary: appointment.title?.trim() || 'Atendimento',
       startsAt,
       endsAt,
       timezone,
@@ -367,4 +390,41 @@ export function describeAppointment(
     new Date(appointment.startsAt),
     timezone,
   )} (${timezone})`
+}
+
+/**
+ * Os dados do contato que o evento da agenda mostra.
+ *
+ * Best-effort de propósito: uma consulta que falha custa detalhe no
+ * evento, e detalhe no evento nunca vale a marcação em si. Devolve null
+ * e o texto sai com o que tiver.
+ */
+async function loadContactForEvent(
+  db: SupabaseClient,
+  accountId: string,
+  contactId: string,
+): Promise<{
+  name: string | null
+  phone: string | null
+  email: string | null
+  company: string | null
+} | null> {
+  try {
+    const { data, error } = await db
+      .from('contacts')
+      .select('name, phone, email, company')
+      .eq('id', contactId)
+      .eq('account_id', accountId)
+      .maybeSingle<{
+        name: string | null
+        phone: string | null
+        email: string | null
+        company: string | null
+      }>()
+    if (error) throw error
+    return data ?? null
+  } catch (err) {
+    console.error('[scheduling] contact lookup for the calendar event failed:', err)
+    return null
+  }
 }

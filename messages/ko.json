@@ -1820,7 +1820,7 @@
       "timezonePlaceholder": "Choose a timezone…",
       "timezoneSearch": "Search city or zone…",
       "timezoneEmpty": "No timezone found.",
-      "slotMinutes": "Appointment length (minutes)",
+      "slotMinutes": "소요 시간(분)",
       "leadTime": "Minimum notice (minutes)",
       "leadTimeHint": "Nothing inside this window is offered.",
       "maxAdvance": "Book up to this many days ahead",
@@ -1840,7 +1840,10 @@
         "Thursday",
         "Friday",
         "Saturday"
-      ]
+      ],
+      "labelTitle": "무엇이라고 부르시나요?",
+      "labelDesc": "상담원이 고객과 대화할 때 사용하는 단어이며, 화면에도 표시됩니다. 비워두면 \"예약\"이 됩니다.",
+      "labelPlaceholder": "시연, 현장 방문, 상담…"
     },
     "push": {
       "title": "Device alerts",
@@ -2137,7 +2140,13 @@
     "markAllRead": "모두 읽음으로 표시",
     "emptyTitle": "아직 알림이 없습니다",
     "emptyHint": "누군가 회원님에게 대화를 배정하면 여기에 알림이 표시됩니다.",
-    "unread": "읽지 않음"
+    "unread": "읽지 않음",
+    "someContact": "연락처",
+    "assigned": {
+      "title": "새 대화가 배정되었습니다",
+      "byPerson": "{actor}님이 {contact}님과의 대화를 배정했습니다",
+      "bySystem": "{contact}님과의 대화가 배정되었습니다"
+    }
   },
   "Billing": {
     "pendingTitle": "승인 대기 중인 계정",
@@ -2221,7 +2230,7 @@
       "time": "Time",
       "duration": "Duration (minutes)",
       "subject": "Subject",
-      "subjectPlaceholder": "Eye exam, frame fitting...",
+      "subjectPlaceholder": "시연, 견적, 현장 방문…",
       "cancel": "Cancel",
       "save": "Book",
       "created": "Appointment created.",

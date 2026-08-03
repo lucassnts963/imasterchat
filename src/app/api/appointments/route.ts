@@ -120,6 +120,7 @@ export async function POST(request: Request) {
       createdVia: 'manual',
       connection,
       timezone,
+      appointmentLabel: settings?.appointmentLabel ?? null,
     })
 
     if (!result.ok) {

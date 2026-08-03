@@ -199,8 +199,17 @@ export interface Notification {
   contact_id?: string;
   /** Who triggered it. Null when an automation/system assigned it. */
   actor_user_id?: string;
-  title: string;
-  body?: string;
+  /** Nome de quem atribuiu, congelado no momento do fato (055). Null
+   *  quando não foi uma pessoa. */
+  actor_name?: string | null;
+  /** Nome do contato, congelado no momento do fato (055). */
+  contact_name?: string | null;
+  /**
+   * LEGADO: frase pronta em inglês, escrita pelo gatilho até a 055.
+   * Linhas novas nascem nulas e a tela monta o texto traduzido.
+   */
+  title?: string | null;
+  body?: string | null;
   read_at?: string;
   created_at: string;
 }

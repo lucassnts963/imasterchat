@@ -120,7 +120,7 @@ export interface CalendarEventInput {
   startsAt: Date
   endsAt: Date
   /** IANA zone. Google stores the instant either way, but sending the
-   *  zone makes the event render correctly in the shop's own calendar. */
+   *  zone makes the event render correctly in the business calendar. */
   timezone: string
 }
 
@@ -160,15 +160,34 @@ export async function insertEvent(
   return { id: data.id, htmlLink: data.htmlLink ?? null }
 }
 
+/**
+ * Mexe só no que foi passado.
+ *
+ * `Partial` e não `CalendarEventInput` de propósito: remarcar é mudar
+ * horário, e mandar `summary` junto reescrevia o título do evento com o
+ * pouco que o remarcador tinha em mãos — apagando o nome do cliente e a
+ * descrição que a marcação original montou. PATCH no Google já ignora o
+ * que não vem no corpo; era o nosso corpo que vinha cheio demais.
+ */
 export async function patchEvent(
   connection: GoogleConnection,
   eventId: string,
-  input: CalendarEventInput,
+  input: Partial<CalendarEventInput> & Pick<CalendarEventInput, 'timezone'>,
 ): Promise<void> {
+  const body: Record<string, unknown> = {}
+  if (input.summary !== undefined) body.summary = input.summary
+  if (input.description !== undefined) body.description = input.description
+  if (input.startsAt) {
+    body.start = { dateTime: input.startsAt.toISOString(), timeZone: input.timezone }
+  }
+  if (input.endsAt) {
+    body.end = { dateTime: input.endsAt.toISOString(), timeZone: input.timezone }
+  }
+
   await callGoogle<GoogleEvent>(
     connection,
     `/calendars/${encodeURIComponent(connection.calendarId)}/events/${encodeURIComponent(eventId)}`,
-    { method: 'PATCH', body: JSON.stringify(toEventBody(input)) },
+    { method: 'PATCH', body: JSON.stringify(body) },
   )
 }
 

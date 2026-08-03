@@ -100,6 +100,7 @@ export async function POST(request: Request) {
       contactId: null,
       timezone: scheduling?.settings.timezone,
       openingHours: scheduling ? describeWeeklyHours(scheduling.settings) : null,
+      appointmentLabel: scheduling?.settings.appointmentLabel ?? null,
     })
     // Same wiki the live bot reads, so a rehearsal exercises the
     // approved rules too — that is where a wrong rule shows up.

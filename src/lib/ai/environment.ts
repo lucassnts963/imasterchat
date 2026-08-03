@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatInZone } from '@/lib/time/zone'
+import { describeAppointmentLabel } from '@/lib/scheduling/label'
 
 // ============================================================
 // What the model is allowed to know before it starts talking.
@@ -34,6 +35,13 @@ export interface EnvironmentArgs {
    * a bot that knows the rule negotiates; one that doesn't argues.
    */
   openingHours?: string | null
+  /**
+   * Como o negócio chama um agendamento — "demonstração", "visita
+   * técnica". Entra aqui, e não no prompt do operador, porque o
+   * operador não deveria precisar lembrar de escrever isso: ele já
+   * respondeu na tela de Agendamento. Null usa o termo genérico.
+   */
+  appointmentLabel?: string | null
   /** Injectable for tests. */
   now?: Date
 }
@@ -67,6 +75,7 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     contactId,
     timezone = DEFAULT_TIMEZONE,
     openingHours = null,
+    appointmentLabel = null,
     now = new Date(),
   } = args
 
@@ -78,6 +87,12 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
   if (openingHours?.trim()) {
     lines.push(`Opening hours: ${openingHours.trim()}`)
   }
+
+  // O vocabulário do negócio vem cedo, antes dos fatos do cliente: é
+  // uma regra de como falar, e regra de como falar serve para a
+  // resposta inteira, não só para o trecho de agendamento.
+  const labelLine = describeAppointmentLabel(appointmentLabel)
+  if (labelLine) lines.push(labelLine)
 
   if (!contactId) {
     // The Playground has no thread. Say so, and say what production
@@ -120,7 +135,9 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     }
 
     if (appointment) {
-      const what = appointment.title?.trim() || 'an appointment'
+      const what =
+        appointment.title?.trim() ||
+        (appointmentLabel ? `a "${appointmentLabel}"` : 'an appointment')
       lines.push(
         `This customer already has ${what} booked for ${formatInZone(
           new Date(appointment.starts_at),

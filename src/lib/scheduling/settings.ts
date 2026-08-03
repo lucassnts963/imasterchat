@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { parseWallClock } from '@/lib/time/zone'
+import { sanitizeAppointmentLabel } from './label'
 
 // ============================================================
 // The account's scheduling rules, loaded and sanitised.
@@ -10,7 +11,7 @@ import { parseWallClock } from '@/lib/time/zone'
 // `weekly_hours` will not.
 // ============================================================
 
-/** A `[start, end)` window on the shop's own clock. */
+/** A `[start, end)` window on the business clock. */
 export interface DayWindow {
   startHour: number
   startMinute: number
@@ -26,6 +27,9 @@ export interface SchedulingSettings {
   /** Indexed 0-6, Sunday first. An empty array is a closed day. */
   weeklyHours: DayWindow[][]
   isActive: boolean
+  /** Como esta conta chama um agendamento — "demonstração", "visita
+   *  técnica". Null usa o termo genérico. Ver `./label.ts`. */
+  appointmentLabel: string | null
 }
 
 export const DEFAULT_TIMEZONE = 'America/Sao_Paulo'
@@ -37,10 +41,11 @@ interface SettingsRow {
   max_advance_days: number
   weekly_hours: unknown
   is_active: boolean
+  appointment_label: string | null
 }
 
 const SETTINGS_COLUMNS =
-  'timezone, slot_minutes, lead_time_minutes, max_advance_days, weekly_hours, is_active'
+  'timezone, slot_minutes, lead_time_minutes, max_advance_days, weekly_hours, is_active, appointment_label'
 
 /**
  * Load the rules. Returns null when the account has none — which means
@@ -69,6 +74,7 @@ export async function loadSchedulingSettings(
     maxAdvanceDays: data.max_advance_days,
     weeklyHours: parseWeeklyHours(data.weekly_hours),
     isActive: data.is_active,
+    appointmentLabel: sanitizeAppointmentLabel(data.appointment_label),
   }
 }
 

@@ -20,6 +20,33 @@ const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
 
 export default function NotificationsPage() {
   const t = useTranslations("Notifications");
+
+  // O texto é montado AQUI, e não no banco.
+  //
+  // Até a migração 055 o gatilho do Postgres gravava a frase pronta em
+  // inglês, e por isso nenhuma tradução a alcançava: ela não passava
+  // pelo front. Agora a linha traz só os fatos (`type`, `actor_name`,
+  // `contact_name`) e a frase nasce na língua de quem está lendo.
+  //
+  // O `n.title` continua sendo respeitado quando existe: são as linhas
+  // antigas, e reescrever histórico seria inventar tradução para um
+  // aviso que já foi lido daquele jeito.
+  const describe = (n: Notification): { title: string; body?: string } => {
+    if (n.title) return { title: n.title, body: n.body ?? undefined };
+    if (n.type === "conversation_assigned") {
+      const contact = n.contact_name?.trim() || t("someContact");
+      return {
+        title: t("assigned.title"),
+        // Sem `actor_name` não foi uma pessoa: foi automação ou regra.
+        // Dizer "alguém" nesse caso manda procurar um colega que não
+        // existe.
+        body: n.actor_name?.trim()
+          ? t("assigned.byPerson", { actor: n.actor_name.trim(), contact })
+          : t("assigned.bySystem", { contact }),
+      };
+    }
+    return { title: t("title") };
+  };
   const router = useRouter();
   const { accountId } = useAuth();
   const [notifications, setNotifications] = useState<Notification[] | null>(
@@ -238,7 +265,7 @@ export default function NotificationsPage() {
                           isUnread ? "text-foreground" : "text-muted-foreground",
                         )}
                       >
-                        {n.title}
+                        {describe(n).title}
                       </span>
                       {isUnread && (
                         <span
@@ -247,9 +274,9 @@ export default function NotificationsPage() {
                         />
                       )}
                     </div>
-                    {n.body && (
+                    {describe(n).body && (
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {n.body}
+                        {describe(n).body}
                       </p>
                     )}
                     <p className="mt-1 text-[11px] text-muted-foreground/70">

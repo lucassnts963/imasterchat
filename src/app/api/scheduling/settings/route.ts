@@ -10,6 +10,7 @@ import {
   serializeWeeklyHours,
   DEFAULT_TIMEZONE,
 } from '@/lib/scheduling/settings'
+import { sanitizeAppointmentLabel } from '@/lib/scheduling/label'
 
 // ============================================================
 // GET /api/scheduling/settings   (any member)
@@ -35,6 +36,7 @@ const DEFAULTS = {
     '5': [['09:00', '12:00'], ['14:00', '18:00']],
   },
   is_active: false,
+  appointment_label: null as string | null,
 }
 
 export async function GET() {
@@ -52,6 +54,7 @@ export async function GET() {
         max_advance_days: settings.maxAdvanceDays,
         weekly_hours: serializeWeeklyHours(settings.weeklyHours),
         is_active: settings.isActive,
+        appointment_label: settings.appointmentLabel,
       },
       configured: true,
     })
@@ -120,6 +123,10 @@ export async function PUT(request: Request) {
       }),
       weekly_hours: weeklyHours,
       is_active: Boolean(body.is_active),
+      // Saneado aqui, e não só no banco: o CHECK da 054 limita o
+      // tamanho, mas quebra de linha e caractere de controle passariam
+      // por ele — e este texto vai para o contexto do agente.
+      appointment_label: sanitizeAppointmentLabel(body.appointment_label),
     }
 
     const { error } = await supabase

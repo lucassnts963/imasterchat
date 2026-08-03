@@ -61,7 +61,7 @@ function checkAvailabilityTool(deps: SchedulingToolDeps): AgentTool {
     name: 'check_availability',
     description:
       'List appointment slots that are actually free. Call this BEFORE offering any time — ' +
-      'never invent or guess availability. Returns times already filtered by the shop hours, ' +
+      'never invent or guess availability. Returns times already filtered by the business hours, ' +
       'the minimum notice and everything already booked.',
     parameters: {
       type: 'object',
@@ -69,7 +69,7 @@ function checkAvailabilityTool(deps: SchedulingToolDeps): AgentTool {
         date_from: {
           type: 'string',
           description:
-            'First day to look at, as YYYY-MM-DD in the shop timezone. Defaults to today.',
+            'First day to look at, as YYYY-MM-DD in the business timezone. Defaults to today.',
         },
         date_to: {
           type: 'string',
@@ -158,7 +158,7 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
       const stillFree = await isSlotStillFree(ctx, deps, slot.slot.startsAt, slot.slot.endsAt)
       if (stillFree !== true) return stillFree
 
-      // Everything above ran for real — the slot rules, the shop hours,
+      // Everything above ran for real — the slot rules, the business hours,
       // the collision check against Google and our own bookings. Only
       // the write is withheld, so a rehearsal proves the dialogue books
       // the RIGHT time without putting a rehearsal in the shop's diary.
@@ -182,6 +182,7 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
         createdVia: 'native',
         connection,
         timezone: settings.timezone,
+        appointmentLabel: settings.appointmentLabel,
       })
 
       if (!result.ok) {
@@ -193,7 +194,7 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
         // confirmed; get a person.
         return {
           content:
-            'The appointment was recorded but could NOT be written to the shop calendar. ' +
+            'The appointment was recorded but could NOT be written to the business calendar. ' +
             'Do not confirm it to the customer — a human must check.',
           isError: true,
           handoff: true,
@@ -274,7 +275,7 @@ function rescheduleAppointmentTool(deps: SchedulingToolDeps): AgentTool {
       if (!result.calendarSynced) {
         return {
           content:
-            'The appointment was moved in the system but the shop calendar was not updated. ' +
+            'The appointment was moved in the system but the business calendar was not updated. ' +
             'Do not confirm it to the customer — a human must check.',
           isError: true,
           handoff: true,
@@ -338,7 +339,7 @@ function cancelAppointmentTool(deps: SchedulingToolDeps): AgentTool {
       if (!result.calendarSynced) {
         return {
           content:
-            'Cancelled in the system, but the event is still on the shop calendar. A human must remove it.',
+            'Cancelled in the system, but the event is still on the business calendar. A human must remove it.',
           isError: true,
           handoff: true,
         }
@@ -451,7 +452,7 @@ async function isSlotStillFree(
 
     return {
       content:
-        'That slot is not available — it is outside the shop hours, too soon, too far ahead, ' +
+        'That slot is not available — it is outside the business hours, too soon, too far ahead, ' +
         'or has just been taken. Call check_availability again and offer what is actually free.',
       isError: true,
     }
@@ -494,7 +495,7 @@ function calendarFailure(err: unknown, what: string): ToolOutcome {
   console.error(`[ai tools] could not ${what}:`, err)
   return {
     content: reconnect
-      ? 'The shop calendar is no longer connected. Do not offer or confirm any time.'
+      ? 'The business calendar is no longer connected. Do not offer or confirm any time.'
       : `Could not ${what} right now. Do not offer or confirm any time.`,
     isError: true,
     handoff: true,

@@ -195,6 +195,7 @@ export async function dispatchInboundToAiReply(
       contactId,
       timezone: scheduling?.settings.timezone,
       openingHours: scheduling ? describeWeeklyHours(scheduling.settings) : null,
+      appointmentLabel: scheduling?.settings.appointmentLabel ?? null,
     })
 
     // The wiki the account maintains: approved rules, what is true
