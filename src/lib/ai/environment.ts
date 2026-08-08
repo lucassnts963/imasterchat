@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatInZone } from '@/lib/time/zone'
 import { describeAppointmentLabel } from '@/lib/scheduling/label'
 import { TRANSCRIPT_STAMP_NOTE } from './transcript-stamp'
+import { describeConversationGap } from './conversation-gap'
 
 // ============================================================
 // What the model is allowed to know before it starts talking.
@@ -48,6 +49,12 @@ export interface EnvironmentArgs {
    * precisa saber que aquilo é metadado, e não texto para imitar.
    */
   transcriptStamps?: boolean
+  /**
+   * A conversa, para medir há quanto tempo ela estava parada. Sem isto
+   * o modelo lê a última fala pendente como se fosse de agora — foi o
+   * que transformou um "Oi" em transferência para humano.
+   */
+  conversationId?: string | null
   /** Injectable for tests. */
   now?: Date
 }
@@ -83,6 +90,7 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     openingHours = null,
     appointmentLabel = null,
     transcriptStamps = false,
+    conversationId = null,
     now = new Date(),
   } = args
 
@@ -104,6 +112,16 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
   // Antes das linhas do cliente: é regra de como LER a conversa, e a
   // conversa vem toda depois disto.
   if (transcriptStamps) lines.push(TRANSCRIPT_STAMP_NOTE)
+
+  // Vem antes dos fatos do cliente: é uma regra sobre COMO ler tudo que
+  // vem depois, inclusive o transcript.
+  if (conversationId) {
+    const gap = describeConversationGap({
+      current: now,
+      previous: await loadPreviousMessageAt(db, conversationId, now),
+    })
+    if (gap) lines.push(gap)
+  }
 
   if (!contactId) {
     // The Playground has no thread. Say so, and say what production
@@ -208,6 +226,38 @@ async function loadNextAppointment(
     // Expected on an account whose DB predates migration 041 — degrade
     // to "no appointment known" rather than losing the whole block.
     console.error('[ai environment] appointment lookup failed:', err)
+    return null
+  }
+}
+
+/**
+ * Quando foi a mensagem ANTERIOR à que acabou de chegar.
+ *
+ * Pula a primeira linha porque a mensagem atual já está gravada quando
+ * o auto-reply roda — comparar ela consigo mesma daria zero, sempre.
+ *
+ * Best-effort como o resto do bloco: falhar aqui custa uma instrução, e
+ * uma instrução a menos nunca vale a resposta do cliente.
+ */
+async function loadPreviousMessageAt(
+  db: SupabaseClient,
+  conversationId: string,
+  now: Date,
+): Promise<Date | null> {
+  try {
+    const { data } = await db
+      .from('messages')
+      .select('created_at')
+      .eq('conversation_id', conversationId)
+      .lt('created_at', now.toISOString())
+      .order('created_at', { ascending: false })
+      .range(1, 1)
+      .maybeSingle<{ created_at: string }>()
+    if (!data?.created_at) return null
+    const at = new Date(data.created_at)
+    return Number.isNaN(at.getTime()) ? null : at
+  } catch (err) {
+    console.error('[ai environment] previous message lookup failed:', err)
     return null
   }
 }

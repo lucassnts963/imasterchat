@@ -6,6 +6,7 @@ import {
   checkPlatform,
   persistCheck,
 } from '@/lib/observability/health'
+import { settlePastAppointments } from '@/lib/scheduling/settle'
 
 // ============================================================
 // GET /api/health/cron — a ronda
@@ -47,6 +48,12 @@ export async function GET(request: Request) {
   const db = supabaseAdmin()
 
   try {
+    // Antes das verificações: um compromisso que já passou e continua
+    // `scheduled` trava o índice de "um vivo por cliente" e impede
+    // aquele contato de agendar de novo — para sempre. Aposentar é
+    // barato e a ronda já roda de hora em hora.
+    const settled = await settlePastAppointments(db)
+
     const platform = await checkPlatform(db)
 
     // Ordem de rodízio: a conta verificada há mais tempo vai primeiro.
@@ -106,6 +113,7 @@ export async function GET(request: Request) {
       pending: Math.max(0, (accounts?.length ?? 0) - queue.length),
       failing,
       platform,
+      appointments_settled: settled.settled,
     })
   } catch (err) {
     console.error('[health cron] varredura falhou:', err)

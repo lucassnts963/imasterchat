@@ -204,6 +204,7 @@ export async function dispatchInboundToAiReply(
       // Sem esta nota o modelo imita o formato que acabou de ver e o
       // cliente recebe "[2026-08-03 08:12] Claro, posso ajudar".
       transcriptStamps: config.contextTimestamps !== false,
+      conversationId,
     })
 
     // The wiki the account maintains: approved rules, what is true
