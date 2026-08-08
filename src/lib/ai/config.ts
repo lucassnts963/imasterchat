@@ -14,10 +14,12 @@ interface AiConfigRow {
   embeddings_api_key: string | null
   max_tool_steps: number | null
   context_timestamps: boolean
+  handoff_notice_enabled: boolean
+  handoff_notice_text: string | null
 }
 
 const CONFIG_COLUMNS =
-  'provider, model, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, max_tool_steps, context_timestamps'
+  'provider, model, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, max_tool_steps, context_timestamps, handoff_notice_enabled, handoff_notice_text'
 
 /**
  * Load and decrypt the account's AI config for *use* (draft or
@@ -83,6 +85,8 @@ export async function loadAiConfig(
     embeddingsApiKey,
     maxToolSteps: row.max_tool_steps,
     contextTimestamps: row.context_timestamps,
+    handoffNoticeEnabled: row.handoff_notice_enabled,
+    handoffNoticeText: row.handoff_notice_text,
   }
 }
 

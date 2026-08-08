@@ -1742,7 +1742,12 @@
       "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher.",
       "loading": "Loading the AI configuration…",
       "contextTimestamps": "대화 컨텍스트에 시각 표시",
-      "contextTimestampsDesc": "각 메시지에 발화 시각을 표시해 상담원이 어제와 오늘을 구분할 수 있게 합니다. 없으면 어제 말한 \"내일\"을 여전히 내일로 읽습니다. 응답당 약 100~160토큰이 듭니다 — 예약 기능을 쓰지 않으면 끄세요."
+      "contextTimestampsDesc": "각 메시지에 발화 시각을 표시해 상담원이 어제와 오늘을 구분할 수 있게 합니다. 없으면 어제 말한 \"내일\"을 여전히 내일로 읽습니다. 응답당 약 100~160토큰이 듭니다 — 예약 기능을 쓰지 않으면 끄세요.",
+      "handoffNotice": "전환 시 고객에게 안내",
+      "handoffNoticeDesc": "대화가 담당자에게 넘어갈 때 봇이 조용해지기 전에 메시지를 보냅니다. 끄면 지금까지처럼 그냥 응답을 멈춥니다.",
+      "handoffNoticeTextLabel": "안내 메시지",
+      "handoffNoticePlaceholder": "담당 부서로 전달하겠습니다. 곧 이곳으로 연락드리겠습니다.",
+      "handoffNoticeTextHint": "비워두면 위 문구를 사용합니다. \"사람을 연결해 드릴게요\"라는 표현은 피하세요 — 고객이 상대를 알 필요는 없고, 즉시 연결을 약속하면 대기열이 감당하지 못합니다."
     },
     "aiKnowledge": {
       "loadFailed": "지식베이스를 불러오지 못했습니다",

@@ -1742,7 +1742,12 @@
       "modelUnknown": "Modelo fora da nossa tabela de preços — a projeção de custo vai usar a faixa equivalente, então será mais grosseira.",
       "loading": "Carregando a configuração de IA…",
       "contextTimestamps": "Datas nas mensagens do contexto",
-      "contextTimestampsDesc": "Marca cada mensagem com quando foi dita, para o agente distinguir ontem de hoje. Sem isso ele lê um \"amanhã\" dito ontem como ainda sendo amanhã. Custa ~100–160 tokens por resposta — desligue se você não usa agendamento."
+      "contextTimestampsDesc": "Marca cada mensagem com quando foi dita, para o agente distinguir ontem de hoje. Sem isso ele lê um \"amanhã\" dito ontem como ainda sendo amanhã. Custa ~100–160 tokens por resposta — desligue se você não usa agendamento.",
+      "handoffNotice": "Avisar o cliente ao transferir",
+      "handoffNoticeDesc": "Quando a conversa for passada para uma pessoa, o bot manda uma mensagem antes de silenciar. Desligado, ele apenas para de responder — que é como funcionava até agora.",
+      "handoffNoticeTextLabel": "Mensagem do aviso",
+      "handoffNoticePlaceholder": "Vou encaminhar seu atendimento para o setor responsável. Em breve alguém entra em contato por aqui.",
+      "handoffNoticeTextHint": "Vazio usa o texto acima. Evite dizer \"vou chamar um humano\": o cliente não precisa saber com quem falava, e prometer alguém \"agora\" cria uma expectativa que a fila não sustenta."
     },
     "aiKnowledge": {
       "loadFailed": "Falha ao carregar a base de conhecimento",

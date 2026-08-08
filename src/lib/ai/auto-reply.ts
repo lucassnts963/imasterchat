@@ -19,7 +19,7 @@ import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { AiError } from './types'
-import { handOffConversation } from '@/lib/conversations/handoff'
+import { handOffConversation, DEFAULT_HANDOFF_NOTICE } from '@/lib/conversations/handoff'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { recordEvent } from '@/lib/observability/events'
@@ -280,6 +280,33 @@ export async function dispatchInboundToAiReply(
           }),
           assignTo: config.handoffAgentId,
         })
+      }
+
+      // O aviso vai DEPOIS de a transferência estar gravada. Se a ordem
+      // fosse a inversa e o handoff falhasse, o cliente teria ouvido
+      // "alguém vai te procurar" sobre uma fila em que ele não entrou —
+      // a única forma de errar aqui que é pior do que o silêncio de
+      // antes.
+      //
+      // Não fala em "humano" nem em "robô": o cliente não precisa saber
+      // com quem estava falando, precisa saber que o assunto foi
+      // encaminhado e que vão retornar.
+      if (config.handoffNoticeEnabled) {
+        const notice = (config.handoffNoticeText ?? '').trim() || DEFAULT_HANDOFF_NOTICE
+        try {
+          await engineSendText({
+            accountId,
+            userId: configOwnerUserId,
+            conversationId,
+            contactId,
+            text: notice,
+            aiGenerated: true,
+          })
+        } catch (noticeErr) {
+          // Falhar aqui não desfaz a transferência, que é o que
+          // importa: a conversa já está na fila e alguém vai atender.
+          console.error('[ai auto-reply] handoff notice failed:', noticeErr)
+        }
       }
       return
     }

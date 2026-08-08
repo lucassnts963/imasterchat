@@ -1742,7 +1742,12 @@
       "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher.",
       "loading": "Loading the AI configuration…",
       "contextTimestamps": "Timestamps in the conversation context",
-      "contextTimestampsDesc": "Marks each message with when it was said, so the agent can tell yesterday from today. Without it, a \"tomorrow\" said yesterday still reads as tomorrow. Costs ~100–160 tokens per reply — turn it off if you do not use scheduling."
+      "contextTimestampsDesc": "Marks each message with when it was said, so the agent can tell yesterday from today. Without it, a \"tomorrow\" said yesterday still reads as tomorrow. Costs ~100–160 tokens per reply — turn it off if you do not use scheduling.",
+      "handoffNotice": "Tell the customer when transferring",
+      "handoffNoticeDesc": "When a conversation is passed to a person, the bot sends a message before going quiet. Off, it simply stops replying — how it worked until now.",
+      "handoffNoticeTextLabel": "Notice message",
+      "handoffNoticePlaceholder": "I am passing your request to the responsible team. Someone will get back to you here shortly.",
+      "handoffNoticeTextHint": "Empty uses the text above. Avoid saying \"I will get a human\": the customer does not need to learn who they were talking to, and promising someone \"now\" sets an expectation the queue cannot keep."
     },
     "aiKnowledge": {
       "loadFailed": "Failed to load knowledge base",

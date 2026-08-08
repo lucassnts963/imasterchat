@@ -38,6 +38,11 @@ export interface AiConfig {
   /** Marcar cada mensagem do transcript com quando foi dita. Ver
    *  `./transcript-stamp.ts` — é o que separa ontem de hoje. */
   contextTimestamps?: boolean
+  /** Avisar o cliente quando a conversa for passada para uma pessoa.
+   *  Desligado por padrão — ligar faz o bot enviar uma mensagem a mais. */
+  handoffNoticeEnabled?: boolean
+  /** O texto do aviso, nas palavras da conta. Nulo usa o padrão. */
+  handoffNoticeText?: string | null
 }
 
 /**

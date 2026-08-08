@@ -22,6 +22,19 @@ import { previewText, sendPushToAccount } from '@/lib/push/send'
 // send it twice.
 // ============================================================
 
+/**
+ * O aviso padrão, para a conta que ligou a chave e não escreveu o
+ * próprio texto.
+ *
+ * Não diz "humano" nem "atendente" de propósito. O cliente não precisa
+ * descobrir que estava falando com um robô para entender o que vai
+ * acontecer — precisa saber que o assunto foi encaminhado e que alguém
+ * retorna. Dizer "vou chamar uma pessoa" resolve a curiosidade dele e
+ * cria uma expectativa de imediatismo que a fila não sustenta.
+ */
+export const DEFAULT_HANDOFF_NOTICE =
+  'Vou encaminhar seu atendimento para o setor responsável. Em breve alguém entra em contato por aqui.'
+
 export type HandoffFailure = 'not_found' | 'invalid_assignee' | 'internal'
 
 export interface HandoffArgs {

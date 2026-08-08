@@ -48,7 +48,12 @@ export interface AvailabilityArgs {
   limit?: number
 }
 
-const DEFAULT_LIMIT = 40
+// 12, e não 40. Com 40 o modelo recebeu seis dias × sete horários e
+// colou os 42 no WhatsApp — uma parede que o cliente não lê e não
+// responde. Menos vagas por consulta forçam a conversa a afunilar, que
+// é como uma pessoa marcaria: oferece algumas, pergunta, oferece de
+// novo. Uma chamada a mais é barata; um cliente que desiste, não.
+const DEFAULT_LIMIT = 12
 /** Refuse to walk a silly number of days if `to` is far out. */
 const MAX_DAYS_SCANNED = 400
 
@@ -167,7 +172,16 @@ export function describeSlots(
   const lines = [...byDay.entries()].map(
     ([day, times]) => `${day}: ${times.join(', ')}`,
   )
-  const notes: string[] = []
+  const notes: string[] = [
+    // A instrução vai JUNTO da lista, e não no andaime, porque é aqui
+    // que o modelo está prestes a errar: com uma lista na mão, a
+    // tentação é colá-la inteira.
+    'HOW TO OFFER THESE: name at most 3 times, in one short line, and ask the customer ' +
+      'to pick or to say what suits them better. Never paste the whole list — a wall of ' +
+      'times reads as a form to fill in, not as an offer. If they are vague ("qualquer ' +
+      'dia", "semana que vem"), ask ONE narrowing question first (morning or afternoon? ' +
+      'which day?) and only then name times.',
+  ]
   if (settings && settings.leadTimeMinutes > 0) {
     const earliest = new Date(now.getTime() + settings.leadTimeMinutes * 60_000)
     // Só quando o corte realmente mordeu hoje: dizer "a antecedência é

@@ -76,6 +76,10 @@ export function AiConfig() {
   // sem as marcas, e ninguém liga uma chave para um bug que não sabe
   // que tem.
   const [contextTimestamps, setContextTimestamps] = useState(true);
+  // Nasce desligado, como a coluna: ligar faz o bot enviar uma mensagem
+  // a mais ao cliente, e mensagem enviada não volta atrás.
+  const [handoffNotice, setHandoffNotice] = useState(false);
+  const [handoffNoticeText, setHandoffNoticeText] = useState('');
   const [maxPerConversation, setMaxPerConversation] = useState(3);
   // Empty string = leave unassigned (shared queue).
   const [handoffAgentId, setHandoffAgentId] = useState('');
@@ -106,6 +110,8 @@ export function AiConfig() {
         setIsActive(data.is_active);
         setAutoReplyEnabled(data.auto_reply_enabled);
         setContextTimestamps(data.context_timestamps !== false);
+        setHandoffNotice(data.handoff_notice_enabled === true);
+        setHandoffNoticeText(data.handoff_notice_text ?? '');
         setMaxPerConversation(data.auto_reply_max_per_conversation ?? 3);
         setHandoffAgentId(data.handoff_agent_id ?? '');
         setMonthlyBudget(
@@ -161,6 +167,8 @@ export function AiConfig() {
     is_active: isActive,
     auto_reply_enabled: autoReplyEnabled,
     context_timestamps: contextTimestamps,
+    handoff_notice_enabled: handoffNotice,
+    handoff_notice_text: handoffNoticeText.trim() || null,
     auto_reply_max_per_conversation: maxPerConversation,
     handoff_agent_id: handoffAgentId || null,
     monthly_budget_usd: monthlyBudget.trim()
@@ -465,6 +473,43 @@ export function AiConfig() {
                 onCheckedChange={setAutoReplyEnabled}
                 disabled={disabled || !isActive}
               />
+            </div>
+
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t('handoffNotice')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('handoffNoticeDesc')}
+                  </p>
+                </div>
+                <Switch
+                  checked={handoffNotice}
+                  onCheckedChange={setHandoffNotice}
+                  disabled={disabled || !isActive}
+                />
+              </div>
+              {handoffNotice && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="ai-handoff-notice">
+                    {t('handoffNoticeTextLabel')}
+                  </Label>
+                  <Textarea
+                    id="ai-handoff-notice"
+                    value={handoffNoticeText}
+                    onChange={(e) => setHandoffNoticeText(e.target.value)}
+                    placeholder={t('handoffNoticePlaceholder')}
+                    maxLength={300}
+                    rows={2}
+                    disabled={disabled}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('handoffNoticeTextHint')}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">

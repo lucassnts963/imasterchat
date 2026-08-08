@@ -30,7 +30,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps',
+        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -93,6 +93,15 @@ export async function POST(request: Request) {
     // `!== false` e não `=== true`: a coluna nasce ligada, e um PUT
     // parcial que não mande o campo não pode desligá-la por omissão.
     const contextTimestamps = body.context_timestamps !== false
+    // `=== true` aqui, ao contrário do timestamps: a coluna nasce
+    // DESLIGADA, e um PUT parcial não pode ligar sozinho algo que faz o
+    // bot falar com o cliente.
+    const handoffNoticeEnabled = body.handoff_notice_enabled === true
+    const handoffNoticeText =
+      typeof body.handoff_notice_text === 'string' &&
+      body.handoff_notice_text.trim()
+        ? body.handoff_notice_text.trim().slice(0, 300)
+        : null
 
     let maxPer = Number(body.auto_reply_max_per_conversation)
     if (!Number.isFinite(maxPer)) maxPer = 3
@@ -222,6 +231,8 @@ export async function POST(request: Request) {
       is_active: isActive,
       auto_reply_enabled: autoReplyEnabled,
       context_timestamps: contextTimestamps,
+      handoff_notice_enabled: handoffNoticeEnabled,
+      handoff_notice_text: handoffNoticeText,
       auto_reply_max_per_conversation: maxPer,
     }
     // Only touch the handoff target when the form actually sent the field,

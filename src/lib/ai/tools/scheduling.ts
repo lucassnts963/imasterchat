@@ -34,7 +34,10 @@ import type { AgentTool, ToolContext, ToolOutcome } from './types'
 // ============================================================
 
 /** How far ahead `check_availability` will look when asked for "soon". */
-const DEFAULT_LOOKAHEAD_DAYS = 14
+// Uma semana, não duas. O padrão anterior fazia uma pergunta genérica
+// ("consegue uma demonstração?") varrer 14 dias, e o resultado foi o
+// modelo despejando seis dias de horários numa mensagem só.
+const DEFAULT_LOOKAHEAD_DAYS = 7
 
 export interface SchedulingToolDeps {
   settings: SchedulingSettings
