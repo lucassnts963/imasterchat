@@ -31,9 +31,11 @@
  * depois do almoço" e "voltou noutro dia". Uma noite de sono já muda o
  * assunto; uma pausa para o almoço, não.
  */
-const NEW_SESSION_HOURS = 8
+export const NEW_SESSION_HOURS_DEFAULT = 8
 
 export interface GapInput {
+  /** O limiar da conta. Ausente usa o padrão. */
+  thresholdHours?: number
   /** Quando chegou a mensagem atual. */
   current: Date
   /** Quando foi a mensagem anterior da conversa. Null se é a primeira. */
@@ -49,11 +51,12 @@ export interface GapInput {
 export function describeConversationGap({
   current,
   previous,
+  thresholdHours = NEW_SESSION_HOURS_DEFAULT,
 }: GapInput): string | null {
   if (!previous) return null
 
   const ms = current.getTime() - previous.getTime()
-  if (!Number.isFinite(ms) || ms < NEW_SESSION_HOURS * 3_600_000) return null
+  if (!Number.isFinite(ms) || ms < thresholdHours * 3_600_000) return null
 
   const hours = Math.floor(ms / 3_600_000)
   const howLong =

@@ -1969,7 +1969,8 @@
       "tabUsage": "Usage",
       "vaultTab": "Network",
       "guardrailsTab": "Limits",
-      "tabContext": "Context"
+      "tabContext": "Context",
+      "tabRules": "Rules"
     },
     "playground": {
       "notConfiguredError": "No agent configured yet — finish Setup first.",
@@ -2214,6 +2215,39 @@
         "guardrails": "Subjects the bot must not handle.",
         "tools": "What it can do beyond replying.",
         "transcript": "The last messages. Empty here because no conversation was picked."
+      }
+    },
+    "rules": {
+      "loading": "Loading…",
+      "save": "Save rules",
+      "saved": "Rules saved.",
+      "saveError": "Could not save. If scheduling is not set up yet, open Settings → Scheduling first.",
+      "description": "The numbers that govern how the agent talks. Each one is a trade-off — the amber line is what you pay by raising it.",
+      "sections": {
+        "conversation": "Conversation",
+        "scheduling": "Scheduling"
+      },
+      "fields": {
+        "new_session_hours": {
+          "label": "Hours of silence before it counts as a new conversation",
+          "hint": "When the customer comes back after this long, the agent treats it as a fresh contact: it stops assuming the earlier topic and stops handing off over an old unanswered question.",
+          "cost": "Too high and a next-day return reads as a continuation. Too low and it fires mid-conversation when the customer merely took a while to answer."
+        },
+        "offer_slots_max": {
+          "label": "Times offered per message",
+          "hint": "How many times the bot will name at once. It keeps the rest for the next question.",
+          "cost": "Above 3 the reply starts to read as a form. A high number here is what produced the message with 42 times."
+        },
+        "lookahead_days": {
+          "label": "Days ahead it searches",
+          "hint": "How far the agent looks when the customer does not give a date.",
+          "cost": "More days bring more slots and cost more tokens on every availability check."
+        },
+        "slot_fetch_limit": {
+          "label": "Slots fetched per check",
+          "hint": "How many slots the search returns to the model. It only offers the first few, but knows them all so it can answer \"what about Thursday?\" without checking again.",
+          "cost": "Every slot rides in the context and is paid in tokens. Lowering saves, but forces more round-trips during the conversation."
+        }
       }
     }
   },

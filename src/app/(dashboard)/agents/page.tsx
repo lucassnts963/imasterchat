@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import {
   Bot,
   Eye,
+  SlidersHorizontal,
   Sparkles,
   Settings2,
   BarChart3,
@@ -18,11 +19,12 @@ import { AiCostProjection } from '@/components/agents/ai-cost-projection';
 import { AiVault } from '@/components/agents/ai-vault';
 import { AiGuardrails } from '@/components/agents/ai-guardrails';
 import { AiContext } from '@/components/agents/ai-context';
+import { AiRules } from '@/components/agents/ai-rules';
 import { AiConfig } from '@/components/settings/ai-config';
 import { useAuth } from '@/hooks/use-auth';
 import { canEditSettings } from '@/lib/auth/roles';
 
-type Tab = 'playground' | 'vault' | 'guardrails' | 'context' | 'setup' | 'usage';
+type Tab = 'playground' | 'vault' | 'guardrails' | 'rules' | 'context' | 'setup' | 'usage';
 
 // A ordem da fita numa lista só, como o rail de Configurações faz com
 // SETTINGS_SECTIONS: acrescentar uma aba passa a ser uma linha aqui e um
@@ -31,6 +33,7 @@ const TABS = [
   { value: 'playground', icon: Sparkles, labelKey: 'tabPlayground' },
   { value: 'vault', icon: Network, labelKey: 'vaultTab' },
   { value: 'guardrails', icon: ShieldAlert, labelKey: 'guardrailsTab' },
+  { value: 'rules', icon: SlidersHorizontal, labelKey: 'tabRules' },
   { value: 'context', icon: Eye, labelKey: 'tabContext' },
   { value: 'setup', icon: Settings2, labelKey: 'tabSetup' },
   { value: 'usage', icon: BarChart3, labelKey: 'tabUsage' },
@@ -124,6 +127,10 @@ export default function AgentsPage() {
 
           <TabsContent value="guardrails" className="mt-4">
             <AiGuardrails />
+          </TabsContent>
+
+          <TabsContent value="rules" className="mt-4">
+            <AiRules />
           </TabsContent>
 
           <TabsContent value="context" className="mt-4">

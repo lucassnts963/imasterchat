@@ -48,11 +48,9 @@ export interface AvailabilityArgs {
   limit?: number
 }
 
-// 12, e não 40. Com 40 o modelo recebeu seis dias × sete horários e
-// colou os 42 no WhatsApp — uma parede que o cliente não lê e não
-// responde. Menos vagas por consulta forçam a conversa a afunilar, que
-// é como uma pessoa marcaria: oferece algumas, pergunta, oferece de
-// novo. Uma chamada a mais é barata; um cliente que desiste, não.
+// O padrão quando a conta não tem regra própria. Com 40 — o valor
+// original — o modelo recebeu seis dias × sete horários e colou os 42
+// no WhatsApp. Agora é `slot_fetch_limit` em Agentes → Regras.
 const DEFAULT_LIMIT = 12
 /** Refuse to walk a silly number of days if `to` is far out. */
 const MAX_DAYS_SCANNED = 400
@@ -156,9 +154,10 @@ export function describeSlots(
    *  cortou. Sem isto o modelo só vê a ausência de 09:00 e 10:00, e
    *  "ausente" ele traduz como "ocupado" — que é mentira quando quem
    *  tirou foi a antecedência mínima. */
-  settings?: { leadTimeMinutes: number },
+  settings?: { leadTimeMinutes: number; offerSlotsMax?: number },
   now: Date = new Date(),
 ): string {
+  const offerMax = settings?.offerSlotsMax ?? 3
   if (slots.length === 0) return 'No free slots in that range.'
 
   const byDay = new Map<string, string[]>()
@@ -176,7 +175,7 @@ export function describeSlots(
     // A instrução vai JUNTO da lista, e não no andaime, porque é aqui
     // que o modelo está prestes a errar: com uma lista na mão, a
     // tentação é colá-la inteira.
-    'HOW TO OFFER THESE: name at most 3 times, in one short line, and ask the customer ' +
+    `HOW TO OFFER THESE: name at most ${offerMax} time${offerMax === 1 ? '' : 's'}, in one short line, and ask the customer ` +
       'to pick or to say what suits them better. Never paste the whole list — a wall of ' +
       'times reads as a form to fill in, not as an offer. If they are vague ("qualquer ' +
       'dia", "semana que vem"), ask ONE narrowing question first (morning or afternoon? ' +

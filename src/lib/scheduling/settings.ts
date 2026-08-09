@@ -30,6 +30,12 @@ export interface SchedulingSettings {
   /** Como esta conta chama um agendamento — "demonstração", "visita
    *  técnica". Null usa o termo genérico. Ver `./label.ts`. */
   appointmentLabel: string | null
+  /** Dias à frente que o agente procura quando o cliente não diz data. */
+  lookaheadDays: number
+  /** Vagas que a consulta traz — vão todas ao modelo e custam tokens. */
+  slotFetchLimit: number
+  /** Horários que o bot NOMEIA por mensagem. Acima de 3 vira parede. */
+  offerSlotsMax: number
 }
 
 export const DEFAULT_TIMEZONE = 'America/Sao_Paulo'
@@ -42,10 +48,13 @@ interface SettingsRow {
   weekly_hours: unknown
   is_active: boolean
   appointment_label: string | null
+  lookahead_days: number
+  slot_fetch_limit: number
+  offer_slots_max: number
 }
 
 const SETTINGS_COLUMNS =
-  'timezone, slot_minutes, lead_time_minutes, max_advance_days, weekly_hours, is_active, appointment_label'
+  'timezone, slot_minutes, lead_time_minutes, max_advance_days, weekly_hours, is_active, appointment_label, lookahead_days, slot_fetch_limit, offer_slots_max'
 
 /**
  * Load the rules. Returns null when the account has none — which means
@@ -75,6 +84,9 @@ export async function loadSchedulingSettings(
     weeklyHours: parseWeeklyHours(data.weekly_hours),
     isActive: data.is_active,
     appointmentLabel: sanitizeAppointmentLabel(data.appointment_label),
+    lookaheadDays: data.lookahead_days,
+    slotFetchLimit: data.slot_fetch_limit,
+    offerSlotsMax: data.offer_slots_max,
   }
 }
 

@@ -1969,7 +1969,8 @@
       "tabUsage": "Uso",
       "vaultTab": "Vault",
       "guardrailsTab": "Limites",
-      "tabContext": "Contexto"
+      "tabContext": "Contexto",
+      "tabRules": "Regras"
     },
     "playground": {
       "notConfiguredError": "Nenhum agente configurado ainda — conclua a Configuração primeiro.",
@@ -2214,6 +2215,39 @@
         "guardrails": "Os assuntos que o bot não pode tratar.",
         "tools": "O que ele pode fazer além de responder.",
         "transcript": "As últimas mensagens. Vazia aqui porque nenhuma conversa foi escolhida."
+      }
+    },
+    "rules": {
+      "loading": "Carregando…",
+      "save": "Salvar regras",
+      "saved": "Regras salvas.",
+      "saveError": "Não foi possível salvar. Se o agendamento ainda não foi configurado, abra Configurações → Agendamento primeiro.",
+      "description": "Os números que governam como o agente conversa. Cada um é uma troca — o aviso em amarelo é o que você paga ao aumentar.",
+      "sections": {
+        "conversation": "Conversa",
+        "scheduling": "Agendamento"
+      },
+      "fields": {
+        "new_session_hours": {
+          "label": "Horas de silêncio para considerar conversa nova",
+          "hint": "Quando o cliente volta depois desse tempo, o agente trata como contato novo: para de assumir o assunto anterior e para de transferir por causa de pergunta antiga sem resposta.",
+          "cost": "Muito alto, um retorno no dia seguinte é lido como continuação. Muito baixo, ele dispara no meio de um atendimento em que o cliente só demorou a responder."
+        },
+        "offer_slots_max": {
+          "label": "Horários oferecidos por mensagem",
+          "hint": "Quantos horários o bot chega a nomear de uma vez. O resto ele guarda para a próxima pergunta.",
+          "cost": "Acima de 3 a resposta começa a parecer formulário. Foi um número alto aqui que gerou a mensagem com 42 horários."
+        },
+        "lookahead_days": {
+          "label": "Dias à frente que ele procura",
+          "hint": "Quanto o agente olha adiante quando o cliente não diz uma data.",
+          "cost": "Mais dias trazem mais vagas e custam mais tokens em toda consulta de horário."
+        },
+        "slot_fetch_limit": {
+          "label": "Vagas trazidas por consulta",
+          "hint": "Quantas vagas a busca devolve ao modelo. Ele oferece apenas as primeiras, mas conhece todas para responder \"e na quinta?\" sem consultar de novo.",
+          "cost": "Cada vaga vai no contexto e é paga em tokens. Baixar economiza, mas força mais idas ao servidor durante a conversa."
+        }
       }
     }
   },

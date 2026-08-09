@@ -89,18 +89,22 @@ Valem para o servidor inteiro, não por conta. Mudar exige editar
 São os que ainda exigem alterar arquivo e rebuildar. Divididos pelo que
 eu acho que deve virar campo e o que acho que não deve.
 
-### Deveriam ser configuráveis — são números de negócio
+### ~~Deveriam ser configuráveis~~ — resolvido, migração 059
 
-| onde | valor | por que varia entre negócios |
+Os quatro números de comportamento viraram campos em **Agentes →
+Regras**. Os padrões são exatamente os valores que estavam no código,
+então a migração não mudou o comportamento de conta nenhuma.
+
+| campo | padrão | onde estava |
 |---|---|---|
-| `lib/ai/conversation-gap.ts` | 8 horas | a partir de quanto silêncio um "oi" é conversa nova. Uma consultoria pensaria em dias; uma pizzaria, em duas horas |
-| `lib/ai/tools/scheduling.ts` | 7 dias | quanto o agente olha à frente ao procurar horário |
-| `lib/scheduling/availability.ts` | 12 vagas | quantas vagas a consulta traz |
-| `lib/scheduling/availability.ts` | "no máximo 3" | quantos horários o bot oferece por mensagem |
+| Horas de silêncio para conversa nova | 8 | `lib/ai/conversation-gap.ts` |
+| Horários oferecidos por mensagem | 3 | `lib/scheduling/availability.ts` |
+| Dias à frente que ele procura | 7 | `lib/ai/tools/scheduling.ts` |
+| Vagas trazidas por consulta | 12 | `lib/scheduling/availability.ts` |
 
-Os dois últimos foram ajustados esta semana justamente porque o bot
-despejou 42 horários numa mensagem. Se voltar a incomodar, hoje só se
-resolve mexendo em código — que é exatamente o problema.
+Cada campo mostra o que se paga ao aumentá-lo, porque todos são troca —
+mais dias e mais vagas custam tokens em toda consulta, e mais horários
+por mensagem transformam a oferta em formulário.
 
 ### Deveriam continuar no código — são texto que vai ao MODELO
 
@@ -122,13 +126,10 @@ configurável, e é: o aviso de transferência é campo, não constante.
 
 ---
 
-## O que falta: uma tela de Regras
+## A regra daqui para frente
 
-Os quatro números da primeira tabela não têm casa. Espalhá-los em
-"Configurar" misturaria credencial com comportamento numa tela que já
-está cheia.
+**Número que varia entre negócios nasce campo, não constante.** Texto
+que só o modelo lê continua no código.
 
-A proposta é **Agentes → Regras**: os números de comportamento juntos,
-cada um com o que ele custa e o que quebra se for mudado. E a ligação
-natural com **Agentes → Contexto**, que mostra o efeito — ver o que o
-modelo lê, ajustar o que governa, ver de novo.
+O par Regras + Contexto fecha o ciclo: ver o que o modelo lê, ajustar o
+que governa, ver de novo.

@@ -43,6 +43,8 @@ export interface AiConfig {
   handoffNoticeEnabled?: boolean
   /** O texto do aviso, nas palavras da conta. Nulo usa o padrão. */
   handoffNoticeText?: string | null
+  /** A partir de quantas horas de silêncio um retorno é conversa nova. */
+  newSessionHours?: number
 }
 
 /**

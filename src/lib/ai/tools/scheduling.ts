@@ -34,9 +34,8 @@ import type { AgentTool, ToolContext, ToolOutcome } from './types'
 // ============================================================
 
 /** How far ahead `check_availability` will look when asked for "soon". */
-// Uma semana, não duas. O padrão anterior fazia uma pergunta genérica
-// ("consegue uma demonstração?") varrer 14 dias, e o resultado foi o
-// modelo despejando seis dias de horários numa mensagem só.
+// O padrão quando a conta não tem regra própria. Agora é
+// `lookahead_days` em Agentes → Regras.
 const DEFAULT_LOOKAHEAD_DAYS = 7
 
 export interface SchedulingToolDeps {
@@ -77,7 +76,7 @@ function checkAvailabilityTool(deps: SchedulingToolDeps): AgentTool {
         },
         date_to: {
           type: 'string',
-          description: `Last day to look at, as YYYY-MM-DD. Defaults to ${DEFAULT_LOOKAHEAD_DAYS} days after date_from.`,
+          description: `Last day to look at, as YYYY-MM-DD. Defaults to ${settings.lookaheadDays || DEFAULT_LOOKAHEAD_DAYS} days after date_from.`,
         },
       },
       additionalProperties: false,
@@ -88,7 +87,10 @@ function checkAvailabilityTool(deps: SchedulingToolDeps): AgentTool {
       const from = parseDayStart(args.date_from, settings.timezone) ?? now
       const to =
         parseDayEnd(args.date_to, settings.timezone) ??
-        new Date(from.getTime() + DEFAULT_LOOKAHEAD_DAYS * 24 * 60 * 60_000)
+        new Date(
+          from.getTime() +
+            (settings.lookaheadDays || DEFAULT_LOOKAHEAD_DAYS) * 24 * 60 * 60_000,
+        )
 
       if (to <= from) {
         return { content: 'date_to must be after date_from.', isError: true }
@@ -102,7 +104,14 @@ function checkAvailabilityTool(deps: SchedulingToolDeps): AgentTool {
           from,
           to,
         )
-        const slots = computeAvailableSlots({ settings, busy, from, to, now })
+        const slots = computeAvailableSlots({
+          settings,
+          busy,
+          from,
+          to,
+          now,
+          limit: settings.slotFetchLimit || undefined,
+        })
         return { content: describeSlots(slots, settings.timezone, settings) }
       } catch (err) {
         return calendarFailure(err, 'read the calendar')

@@ -21,6 +21,14 @@ function bad(message: string) {
  * whether AI is set up. The encrypted key is NEVER returned — only a
  * `has_key` flag; the settings form shows a masked placeholder.
  */
+/** Inteiro dentro de um intervalo, com queda para o padrão. Espelha os
+ *  CHECK do banco para o app não mandar o que o banco recusaria. */
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, Math.floor(n)))
+}
+
 export async function GET() {
   try {
     const { supabase, accountId } = await getCurrentAccount()
@@ -30,7 +38,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text',
+        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -97,6 +105,10 @@ export async function POST(request: Request) {
     // DESLIGADA, e um PUT parcial não pode ligar sozinho algo que faz o
     // bot falar com o cliente.
     const handoffNoticeEnabled = body.handoff_notice_enabled === true
+    // Limites espelham o CHECK da 059. `readInt` fora do intervalo cai
+    // no padrão em vez de 400: é um número de ajuste fino, e recusar o
+    // salvo inteiro por causa dele seria desproporcional.
+    const newSessionHours = clampInt(body.new_session_hours, 1, 168, 8)
     const handoffNoticeText =
       typeof body.handoff_notice_text === 'string' &&
       body.handoff_notice_text.trim()
@@ -233,6 +245,7 @@ export async function POST(request: Request) {
       context_timestamps: contextTimestamps,
       handoff_notice_enabled: handoffNoticeEnabled,
       handoff_notice_text: handoffNoticeText,
+      new_session_hours: newSessionHours,
       auto_reply_max_per_conversation: maxPer,
     }
     // Only touch the handoff target when the form actually sent the field,
@@ -285,6 +298,60 @@ export async function POST(request: Request) {
  * Removes the account's AI config (turns everything off and forgets the
  * key). Also used to recover from a corrupted encrypted key.
  */
+// ============================================================
+// PATCH — muda só o que veio
+//
+// O POST acima exige `provider`, `model` e trata `api_key` ausente como
+// "apagar", porque ele é o formulário inteiro de configuração. Uma tela
+// que quer mexer em UM número não pode passar por ele: teria que
+// reenviar tudo, e a chave nem volta no GET — reenviá-la vazia a
+// apagaria.
+//
+// Daí o PATCH. Campo ausente é campo intocado, e nada aqui toca em
+// credencial.
+// ============================================================
+export async function PATCH(request: Request) {
+  try {
+    const { supabase, accountId } = await requireRole('admin')
+    const body = (await request.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null
+    if (!body || typeof body !== 'object') return bad('Invalid request body')
+
+    const patch: Record<string, unknown> = {}
+    if ('new_session_hours' in body) {
+      patch.new_session_hours = clampInt(body.new_session_hours, 1, 168, 8)
+    }
+    if ('context_timestamps' in body) {
+      patch.context_timestamps = body.context_timestamps !== false
+    }
+    if ('handoff_notice_enabled' in body) {
+      patch.handoff_notice_enabled = body.handoff_notice_enabled === true
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return bad('Nothing to update')
+    }
+
+    const { error } = await supabase
+      .from('ai_configs')
+      .update(patch)
+      .eq('account_id', accountId)
+
+    if (error) {
+      console.error('[ai/config PATCH] error:', error)
+      return NextResponse.json(
+        { error: 'Failed to update AI configuration' },
+        { status: 500 },
+      )
+    }
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    return toErrorResponse(err)
+  }
+}
+
 export async function DELETE() {
   try {
     const { supabase, accountId } = await requireRole('admin')

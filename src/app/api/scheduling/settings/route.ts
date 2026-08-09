@@ -37,6 +37,9 @@ const DEFAULTS = {
   },
   is_active: false,
   appointment_label: null as string | null,
+  lookahead_days: 7,
+  slot_fetch_limit: 12,
+  offer_slots_max: 3,
 }
 
 export async function GET() {
@@ -55,6 +58,9 @@ export async function GET() {
         weekly_hours: serializeWeeklyHours(settings.weeklyHours),
         is_active: settings.isActive,
         appointment_label: settings.appointmentLabel,
+        lookahead_days: settings.lookaheadDays,
+        slot_fetch_limit: settings.slotFetchLimit,
+        offer_slots_max: settings.offerSlotsMax,
       },
       configured: true,
     })
@@ -127,6 +133,10 @@ export async function PUT(request: Request) {
       // tamanho, mas quebra de linha e caractere de controle passariam
       // por ele — e este texto vai para o contexto do agente.
       appointment_label: sanitizeAppointmentLabel(body.appointment_label),
+      // Limites espelham os CHECK da 059.
+      lookahead_days: readInt(body.lookahead_days, { min: 1, max: 90, fallback: 7 }),
+      slot_fetch_limit: readInt(body.slot_fetch_limit, { min: 3, max: 60, fallback: 12 }),
+      offer_slots_max: readInt(body.offer_slots_max, { min: 1, max: 10, fallback: 3 }),
     }
 
     const { error } = await supabase
@@ -142,6 +152,73 @@ export async function PUT(request: Request) {
     }
 
     return NextResponse.json({ settings: payload, configured: true })
+  } catch (err) {
+    return toErrorResponse(err)
+  }
+}
+
+// ============================================================
+// PATCH — muda só o que veio
+//
+// O PUT acima é o formulário inteiro: campo ausente volta ao padrão. É
+// o comportamento certo para a tela de Agendamento, e é veneno para
+// qualquer outra — a tela de Regras mexe em três números e apagaria
+// fuso, expediente e antecedência no caminho.
+// ============================================================
+export async function PATCH(request: Request) {
+  try {
+    const { supabase, accountId } = await requireRole('admin')
+    const body = (await request.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+    }
+
+    // Limites espelham os CHECK da 059.
+    const BOUNDS: Record<string, { min: number; max: number; fallback: number }> = {
+      lookahead_days: { min: 1, max: 90, fallback: 7 },
+      slot_fetch_limit: { min: 3, max: 60, fallback: 12 },
+      offer_slots_max: { min: 1, max: 10, fallback: 3 },
+    }
+
+    const patch: Record<string, unknown> = {}
+    for (const [key, bounds] of Object.entries(BOUNDS)) {
+      if (key in body) patch[key] = readInt(body[key], bounds)
+    }
+    if ('appointment_label' in body) {
+      patch.appointment_label = sanitizeAppointmentLabel(body.appointment_label)
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+    }
+
+    // `update` e não `upsert`: sem linha, não há o que ajustar — a
+    // conta precisa passar pela tela de Agendamento primeiro, que é
+    // quem sabe fuso e expediente. Criar uma linha aqui, com padrões,
+    // esconderia essa etapa.
+    const { data, error } = await supabase
+      .from('ai_scheduling_settings')
+      .update(patch)
+      .eq('account_id', accountId)
+      .select('account_id')
+
+    if (error) {
+      console.error('[scheduling/settings PATCH] error:', error)
+      return NextResponse.json(
+        { error: 'Failed to update the scheduling rules' },
+        { status: 500 },
+      )
+    }
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: 'not_configured', code: 'not_configured' },
+        { status: 409 },
+      )
+    }
+    return NextResponse.json({ ok: true })
   } catch (err) {
     return toErrorResponse(err)
   }

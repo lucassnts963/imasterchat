@@ -55,6 +55,8 @@ export interface EnvironmentArgs {
    * que transformou um "Oi" em transferência para humano.
    */
   conversationId?: string | null
+  /** Limiar de "conversa nova", em horas. Ver `./conversation-gap.ts`. */
+  newSessionHours?: number
   /** Injectable for tests. */
   now?: Date
 }
@@ -91,6 +93,7 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     appointmentLabel = null,
     transcriptStamps = false,
     conversationId = null,
+    newSessionHours,
     now = new Date(),
   } = args
 
@@ -119,6 +122,7 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     const gap = describeConversationGap({
       current: now,
       previous: await loadPreviousMessageAt(db, conversationId, now),
+      thresholdHours: newSessionHours,
     })
     if (gap) lines.push(gap)
   }

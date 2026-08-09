@@ -205,6 +205,7 @@ export async function dispatchInboundToAiReply(
       // cliente recebe "[2026-08-03 08:12] Claro, posso ajudar".
       transcriptStamps: config.contextTimestamps !== false,
       conversationId,
+      newSessionHours: config.newSessionHours,
     })
 
     // The wiki the account maintains: approved rules, what is true
