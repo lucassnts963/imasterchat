@@ -38,7 +38,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours',
+        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -322,6 +322,14 @@ export async function PATCH(request: Request) {
     const patch: Record<string, unknown> = {}
     if ('new_session_hours' in body) {
       patch.new_session_hours = clampInt(body.new_session_hours, 1, 168, 8)
+    }
+    if ('context_message_limit' in body) {
+      // Nulo é escolha válida aqui, e não ausência: significa "volte a
+      // usar o que o servidor manda". Por isso não passa pelo clamp.
+      patch.context_message_limit =
+        body.context_message_limit === null
+          ? null
+          : clampInt(body.context_message_limit, 4, 60, 20)
     }
     if ('context_timestamps' in body) {
       patch.context_timestamps = body.context_timestamps !== false

@@ -63,9 +63,28 @@ export function maxToolSteps(config?: { maxToolSteps?: number | null }): number 
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_MAX_TOOL_STEPS
 }
 
-/** How many recent text messages to feed the model. Override with
- *  `AI_CONTEXT_MESSAGE_LIMIT`. */
-export function aiContextMessageLimit(): number {
+/**
+ * Quantas mensagens recentes alimentam o modelo.
+ *
+ * Por conta (`ai_configs.context_message_limit`), com a variável de
+ * ambiente como piso do servidor e a constante como último recurso —
+ * exatamente a precedência de `maxToolSteps`, e de propósito: duas
+ * regras iguais são uma regra a menos para lembrar.
+ *
+ * É o tamanho do contexto, então é o custo de toda resposta. Uma ótica
+ * resolve em seis mensagens; uma consultoria precisa de quarenta.
+ */
+export function aiContextMessageLimit(config?: {
+  contextMessageLimit?: number | null
+}): number {
+  const fromConfig = config?.contextMessageLimit
+  if (
+    typeof fromConfig === 'number' &&
+    Number.isFinite(fromConfig) &&
+    fromConfig > 0
+  ) {
+    return Math.floor(fromConfig)
+  }
   const raw = Number(process.env.AI_CONTEXT_MESSAGE_LIMIT)
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_CONTEXT_MESSAGE_LIMIT
 }

@@ -2247,6 +2247,11 @@
           "label": "Vagas trazidas por consulta",
           "hint": "Quantas vagas a busca devolve ao modelo. Ele oferece apenas as primeiras, mas conhece todas para responder \"e na quinta?\" sem consultar de novo.",
           "cost": "Cada vaga vai no contexto e é paga em tokens. Baixar economiza, mas força mais idas ao servidor durante a conversa."
+        },
+        "context_message_limit": {
+          "label": "Mensagens do histórico enviadas ao modelo",
+          "hint": "Quantas mensagens anteriores da conversa o agente enxerga ao responder. Menos que isso ele perde o fio; mais que isso raramente ajuda.",
+          "cost": "É o tamanho do contexto, então é o custo de TODA resposta. Uma ótica resolve em 6; uma consultoria pode precisar de 40. Se a conversa é longa e o assunto muda, o vault serve melhor que histórico maior."
         }
       }
     }

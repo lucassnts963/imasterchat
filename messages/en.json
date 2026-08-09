@@ -2247,6 +2247,11 @@
           "label": "Slots fetched per check",
           "hint": "How many slots the search returns to the model. It only offers the first few, but knows them all so it can answer \"what about Thursday?\" without checking again.",
           "cost": "Every slot rides in the context and is paid in tokens. Lowering saves, but forces more round-trips during the conversation."
+        },
+        "context_message_limit": {
+          "label": "History messages sent to the model",
+          "hint": "How many earlier messages of the conversation the agent sees when replying. Fewer and it loses the thread; more rarely helps.",
+          "cost": "This is the context size, so it is the cost of EVERY reply. An optician gets by on 6; a consultancy may need 40. If conversations are long and the topic shifts, the vault serves better than a bigger history."
         }
       }
     }

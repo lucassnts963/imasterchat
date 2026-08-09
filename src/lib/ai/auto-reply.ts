@@ -14,7 +14,7 @@ import { describeVaultContext, loadVaultContext } from './vault/retrieve'
 import { buildToolCatalog, resolveSchedulingContext } from './tools/registry'
 import { describeWeeklyHours } from '@/lib/scheduling/settings'
 import { recordAgentSteps } from './steps'
-import { buildSystemPrompt } from './defaults'
+import { aiContextMessageLimit, buildSystemPrompt } from './defaults'
 import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
@@ -133,6 +133,7 @@ export async function dispatchInboundToAiReply(
     const scheduling = await resolveSchedulingContext(db, accountId)
 
     const messages = await buildConversationContext(db, conversationId, {
+      limit: aiContextMessageLimit(config),
       timestamps: config.contextTimestamps !== false,
       timezone: scheduling?.settings.timezone,
     })

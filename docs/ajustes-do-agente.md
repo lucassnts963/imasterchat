@@ -78,16 +78,18 @@ delas é `NEXT_PUBLIC_*`).
 
 | variável | padrão | o que faz |
 |---|---|---|
-| `AI_CONTEXT_MESSAGE_LIMIT` | 20 | quantas mensagens do histórico vão ao modelo |
 | `AI_REQUEST_TIMEOUT_MS` | 30000 | timeout de UMA chamada ao provedor |
 | `AI_AGENT_TIMEOUT_MS` | 60000 | teto de relógio da execução inteira do agente |
 
-`AI_CONTEXT_MESSAGE_LIMIT` é a que mais parece candidata a subir para a
-tela de Regras: mexe direto no tamanho do contexto, ou seja no custo de
-toda resposta, e o número certo depende de quão longas são as conversas
-do ramo. As outras duas são infraestrutura — quem atende numa ótica não
-tem como opinar sobre timeout de provedor, e errar ali quebra de um
-jeito que parece bug da IA.
+Duas, e as duas são infraestrutura de propósito: quem atende numa ótica
+não tem como opinar sobre timeout de provedor, e errar ali quebra de um
+jeito que **parece bug da IA** — o cliente fica sem resposta e ninguém
+liga o sintoma ao campo que alguém mexeu semana passada.
+
+> `AI_CONTEXT_MESSAGE_LIMIT` saiu desta lista na migração 060. Virou
+> campo por conta (`context_message_limit`), na tela de Regras. A
+> variável continua valendo como piso do servidor para quem a definiu:
+> a coluna é anulável, e nulo significa "usa o que o servidor manda".
 
 > **`AI_MAX_TOOL_STEPS` NÃO pertence a esta lista.** Ela é só o piso do
 > servidor: `ai_configs.max_tool_steps` sobrescreve por conta, e esse
@@ -115,6 +117,7 @@ então a migração não mudou o comportamento de conta nenhuma.
 | campo | padrão | onde estava |
 |---|---|---|
 | Horas de silêncio para conversa nova | 8 | `lib/ai/conversation-gap.ts` |
+| Mensagens do histórico no contexto | 20 | `AI_CONTEXT_MESSAGE_LIMIT` (060) |
 | Horários oferecidos por mensagem | 3 | `lib/scheduling/availability.ts` |
 | Dias à frente que ele procura | 7 | `lib/ai/tools/scheduling.ts` |
 | Vagas trazidas por consulta | 12 | `lib/scheduling/availability.ts` |

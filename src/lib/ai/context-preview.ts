@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loadAiConfig } from './config'
-import { buildSystemPrompt } from './defaults'
+import { aiContextMessageLimit, buildSystemPrompt } from './defaults'
 import { buildEnvironment } from './environment'
 import { buildConversationContext } from './context'
 import { loadGuardrails, describeGuardrails } from './guardrails'
@@ -108,6 +108,7 @@ export async function buildContextPreview(
     buildToolCatalog({ db, accountId, conversationId, scheduling }),
     conversationId
       ? buildConversationContext(db, conversationId, {
+          limit: aiContextMessageLimit(config),
           timestamps,
           timezone: scheduling?.settings.timezone,
         })

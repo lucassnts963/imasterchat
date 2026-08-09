@@ -30,6 +30,7 @@ import { useAuth } from '@/hooks/use-auth';
 // ============================================================
 
 interface Rules {
+  context_message_limit: number;
   new_session_hours: number;
   lookahead_days: number;
   slot_fetch_limit: number;
@@ -37,6 +38,7 @@ interface Rules {
 }
 
 const DEFAULTS: Rules = {
+  context_message_limit: 20,
   new_session_hours: 8,
   lookahead_days: 7,
   slot_fetch_limit: 12,
@@ -46,6 +48,7 @@ const DEFAULTS: Rules = {
 /** Espelha os CHECK da migração 059 — o `min`/`max` do input avisa
  *  antes de o servidor precisar corrigir. */
 const BOUNDS: Record<keyof Rules, { min: number; max: number }> = {
+  context_message_limit: { min: 4, max: 60 },
   new_session_hours: { min: 1, max: 168 },
   lookahead_days: { min: 1, max: 90 },
   slot_fetch_limit: { min: 3, max: 60 },
@@ -67,6 +70,11 @@ export function AiRules() {
       const ai = await aiRes.json().catch(() => null);
       const sched = await schedRes.json().catch(() => null);
       setRules({
+        // Nulo na coluna quer dizer "usa o do servidor". A tela mostra o
+        // valor efetivo, não o nulo — o operador quer ver quantas
+        // mensagens vão, não descobrir que a resposta está noutro lugar.
+        context_message_limit:
+          ai?.context_message_limit ?? DEFAULTS.context_message_limit,
         new_session_hours: ai?.new_session_hours ?? DEFAULTS.new_session_hours,
         lookahead_days:
           sched?.settings?.lookahead_days ?? DEFAULTS.lookahead_days,
@@ -96,7 +104,10 @@ export function AiRules() {
         fetch('/api/ai/config', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ new_session_hours: rules.new_session_hours }),
+          body: JSON.stringify({
+            new_session_hours: rules.new_session_hours,
+            context_message_limit: rules.context_message_limit,
+          }),
         }),
         fetch('/api/scheduling/settings', {
           method: 'PATCH',
@@ -165,6 +176,7 @@ export function AiRules() {
           {t('sections.conversation')}
         </h3>
         {field('new_session_hours')}
+        {field('context_message_limit')}
       </section>
 
       <section className="space-y-2">

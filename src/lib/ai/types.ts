@@ -45,6 +45,10 @@ export interface AiConfig {
   handoffNoticeText?: string | null
   /** A partir de quantas horas de silêncio um retorno é conversa nova. */
   newSessionHours?: number
+  /** Mensagens do histórico enviadas ao modelo. Null cai na variável de
+   *  ambiente e, na falta dela, no padrão — mesma regra de
+   *  `maxToolSteps`. */
+  contextMessageLimit?: number | null
 }
 
 /**
