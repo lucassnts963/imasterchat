@@ -72,15 +72,32 @@ quando o bot fez algo inesperado.
 
 ## Só por variável de ambiente
 
-Valem para o servidor inteiro, não por conta. Mudar exige editar
-`apps/imasterchat/.env` e reiniciar.
+Valem para o **servidor inteiro**, não por conta. Mudar exige editar
+`apps/imasterchat/.env` e **reiniciar** (não precisa rebuild — nenhuma
+delas é `NEXT_PUBLIC_*`).
 
 | variável | padrão | o que faz |
 |---|---|---|
 | `AI_CONTEXT_MESSAGE_LIMIT` | 20 | quantas mensagens do histórico vão ao modelo |
-| `AI_MAX_TOOL_STEPS` | 6 | teto de passos (sobrescrito por conta) |
-| `AI_REQUEST_TIMEOUT_MS` | 30000 | timeout de uma chamada ao provedor |
-| `AI_AGENT_TIMEOUT_MS` | 60000 | teto de relógio da execução inteira |
+| `AI_REQUEST_TIMEOUT_MS` | 30000 | timeout de UMA chamada ao provedor |
+| `AI_AGENT_TIMEOUT_MS` | 60000 | teto de relógio da execução inteira do agente |
+
+`AI_CONTEXT_MESSAGE_LIMIT` é a que mais parece candidata a subir para a
+tela de Regras: mexe direto no tamanho do contexto, ou seja no custo de
+toda resposta, e o número certo depende de quão longas são as conversas
+do ramo. As outras duas são infraestrutura — quem atende numa ótica não
+tem como opinar sobre timeout de provedor, e errar ali quebra de um
+jeito que parece bug da IA.
+
+> **`AI_MAX_TOOL_STEPS` NÃO pertence a esta lista.** Ela é só o piso do
+> servidor: `ai_configs.max_tool_steps` sobrescreve por conta, e esse
+> campo já existe na tela ("Passos de ferramenta"). A precedência está
+> em `maxToolSteps()` — conta primeiro, variável depois, padrão por
+> último.
+
+E há uma quarta variável que não é ajuste de comportamento:
+`WHATSAPP_TEMPLATES_DRY_RUN`, um interruptor de desenvolvimento que
+impede o envio real de modelos à Meta.
 
 ---
 
