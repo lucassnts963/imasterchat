@@ -2225,7 +2225,8 @@
       "description": "Os números que governam como o agente conversa. Cada um é uma troca — o aviso em amarelo é o que você paga ao aumentar.",
       "sections": {
         "conversation": "Conversa",
-        "scheduling": "Agendamento"
+        "scheduling": "Agendamento",
+        "audio": "Áudio"
       },
       "fields": {
         "new_session_hours": {
@@ -2253,6 +2254,45 @@
           "hint": "Quantas mensagens anteriores da conversa o agente enxerga ao responder. Menos que isso ele perde o fio; mais que isso raramente ajuda.",
           "cost": "É o tamanho do contexto, então é o custo de TODA resposta. Uma ótica resolve em 6; uma consultoria pode precisar de 40. Se a conversa é longa e o assunto muda, o vault serve melhor que histórico maior."
         }
+      },
+      "audio": {
+        "policyLabel": "Quando o cliente manda um áudio",
+        "policies": {
+          "ignore": {
+            "label": "Não fazer nada",
+            "hint": "O áudio fica gravado e aparece na conversa, mas o agente não responde. É o comportamento anterior — e é silêncio do lado do cliente."
+          },
+          "notice": {
+            "label": "Pedir que escreva",
+            "hint": "Responde pedindo o pedido por escrito. Barato e acaba com o silêncio, mas exige esforço do cliente."
+          },
+          "transcribe": {
+            "label": "Transcrever e responder",
+            "hint": "Transcreve e trata como se fosse texto. A partir daí tudo funciona: contexto, palavras-chave, agendamento. Se a transcrição falhar, cai no pedido por escrito."
+          },
+          "handoff": {
+            "label": "Passar para uma pessoa",
+            "hint": "Transfere direto, sem tentar entender. Serve para quem prefere ouvir a arriscar."
+          }
+        },
+        "noticeLabel": "Mensagem quando não der para entender o áudio",
+        "noticePlaceholder": "Recebi seu áudio! Para eu te ajudar mais rápido, pode me escrever o que você precisa?",
+        "noticeHint": "Vazio usa o texto acima. Evite confessar limitação técnica — \"não consigo ouvir áudio\" convida o cliente a julgar a ferramenta em vez de resolver o problema dele.",
+        "providerLabel": "Quem transcreve",
+        "providers": {
+          "local": {
+            "label": "Whisper na nossa VPS",
+            "hint": "Sem custo por minuto, e o áudio do cliente não sai daqui. Mais lento: cerca de 11 segundos para 7 segundos de áudio, e proporcional à duração."
+          },
+          "elevenlabs": {
+            "label": "ElevenLabs (API)",
+            "hint": "Mais rápida e mais precisa, sobretudo com áudio ruim de celular. Cobra por minuto e o áudio sai para um terceiro — pese isso se as conversas forem sensíveis."
+          }
+        },
+        "keyLabel": "Chave da ElevenLabs",
+        "keyPlaceholder": "sk_…",
+        "keySaved": "••• chave salva — digite outra para trocar",
+        "keyHint": "Guardada criptografada. Deixe em branco para manter a atual."
       }
     }
   },

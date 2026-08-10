@@ -2225,7 +2225,8 @@
       "description": "The numbers that govern how the agent talks. Each one is a trade-off — the amber line is what you pay by raising it.",
       "sections": {
         "conversation": "Conversation",
-        "scheduling": "Scheduling"
+        "scheduling": "Scheduling",
+        "audio": "Audio"
       },
       "fields": {
         "new_session_hours": {
@@ -2253,6 +2254,45 @@
           "hint": "How many earlier messages of the conversation the agent sees when replying. Fewer and it loses the thread; more rarely helps.",
           "cost": "This is the context size, so it is the cost of EVERY reply. An optician gets by on 6; a consultancy may need 40. If conversations are long and the topic shifts, the vault serves better than a bigger history."
         }
+      },
+      "audio": {
+        "policyLabel": "When the customer sends an audio",
+        "policies": {
+          "ignore": {
+            "label": "Do nothing",
+            "hint": "The audio is stored and shows in the conversation, but the agent does not reply. This was the previous behaviour — and it is silence from the customer's side."
+          },
+          "notice": {
+            "label": "Ask them to type",
+            "hint": "Replies asking for the request in writing. Cheap and ends the silence, but puts the effort on the customer."
+          },
+          "transcribe": {
+            "label": "Transcribe and reply",
+            "hint": "Transcribes and treats it as text. From there everything works: context, keywords, scheduling. If transcription fails, it falls back to asking them to type."
+          },
+          "handoff": {
+            "label": "Pass to a person",
+            "hint": "Transfers straight away without trying to understand. For those who would rather listen than risk it."
+          }
+        },
+        "noticeLabel": "Message when the audio cannot be understood",
+        "noticePlaceholder": "Got your audio! So I can help faster, could you type what you need?",
+        "noticeHint": "Empty uses the text above. Avoid confessing a technical limit — \"I cannot hear audio\" invites the customer to judge the tool instead of solving their problem.",
+        "providerLabel": "Who transcribes",
+        "providers": {
+          "local": {
+            "label": "Whisper on our VPS",
+            "hint": "No per-minute cost, and the customer audio never leaves here. Slower: about 11 seconds for 7 seconds of audio, and proportional to length."
+          },
+          "elevenlabs": {
+            "label": "ElevenLabs (API)",
+            "hint": "Faster and more accurate, especially with poor phone audio. Charges per minute and the audio leaves to a third party — weigh that if conversations are sensitive."
+          }
+        },
+        "keyLabel": "ElevenLabs key",
+        "keyPlaceholder": "sk_…",
+        "keySaved": "••• key saved — type another to replace",
+        "keyHint": "Stored encrypted. Leave blank to keep the current one."
       }
     }
   },

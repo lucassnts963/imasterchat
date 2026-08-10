@@ -8,6 +8,11 @@ import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import {
+  handleInboundAudio,
+  type InboundAudioOutcome,
+} from '@/lib/audio/inbound'
+import { applyAudioSideEffect } from '@/lib/audio/side-effect'
 import { isReopening, reopenPatch } from '@/lib/conversations/reopen'
 import { previewText, sendPushToAccount } from '@/lib/push/send'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
@@ -695,11 +700,33 @@ async function processMessage(
     .eq('sender_type', 'customer')
   const isFirstInboundMessage = (priorCustomerMsgCount ?? 0) === 0
 
+  // Áudio: decidir ANTES do insert.
+  //
+  // Quando a política é transcrever, o texto vira o `content_text` desta
+  // linha, e o áudio deixa de ser caso especial em todo o resto —
+  // contexto, keyword_match, guardrails e agendamento passam a
+  // funcionar sem nenhuma alteração. Fazer isso num update depois daria
+  // o mesmo banco e um produto pior: a automação já teria disparado com
+  // string vazia.
+  let audioOutcome: InboundAudioOutcome | null = null
+  let effectiveText = contentText
+  if (message.type === 'audio' && message.audio?.id) {
+    audioOutcome = await handleInboundAudio({
+      db: supabaseAdmin(),
+      accountId,
+      mediaId: message.audio.id,
+      accessToken,
+    })
+    if (audioOutcome.action.action === 'text') {
+      effectiveText = audioOutcome.action.text
+    }
+  }
+
   const { error: msgError } = await supabaseAdmin().from('messages').insert({
     conversation_id: conversation.id,
     sender_type: 'customer',
     content_type: contentType,
-    content_text: contentText,
+    content_text: effectiveText,
     media_url: mediaUrl,
     message_id: message.id,
     status: 'delivered',
@@ -822,7 +849,7 @@ async function processMessage(
   // message all exist before any step — including send_message — runs.
   // Fire-and-forget: a slow or failing automation must not block the
   // webhook's 200 OK response to Meta.
-  const inboundText = contentText ?? message.text?.body ?? ''
+  const inboundText = effectiveText ?? message.text?.body ?? ''
   const automationTriggers: (
     | 'new_contact_created'
     | 'first_inbound_message'
@@ -894,6 +921,19 @@ async function processMessage(
         // to dismiss.
         tag: `msg:${conversation.id}`,
       },
+    })
+  }
+
+  // As políticas de áudio que FALAM com o cliente. Depois do insert e
+  // da conversa atualizada, pelo mesmo motivo do aviso de transferência:
+  // não prometer nada sobre um estado que ainda não existe.
+  if (audioOutcome && sideEffectsAllowed) {
+    await applyAudioSideEffect({
+      action: audioOutcome.action,
+      accountId,
+      conversationId: conversation.id,
+      contactId: contactRecord.id,
+      configOwnerUserId,
     })
   }
 

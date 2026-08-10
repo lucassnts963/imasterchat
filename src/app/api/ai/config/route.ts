@@ -6,6 +6,7 @@ import {
 } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
+import { isAudioPolicy } from '@/lib/audio/policy'
 import { validateAiCredentials } from '@/lib/ai/validate'
 import { embedTexts } from '@/lib/ai/embeddings'
 import { AiError, type AiProvider } from '@/lib/ai/types'
@@ -38,7 +39,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit',
+        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, audio_notice_text, audio_transcription_provider, elevenlabs_api_key',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -54,11 +55,12 @@ export async function GET() {
     if (!data) return NextResponse.json({ configured: false })
     // The keys are selected only to derive the has_* flags; neither is
     // returned to the client.
-    const { api_key, embeddings_api_key, ...safe } = data
+    const { api_key, embeddings_api_key, elevenlabs_api_key, ...safe } = data
     return NextResponse.json({
       configured: true,
       has_key: !!api_key,
       has_embeddings_key: !!embeddings_api_key,
+      has_elevenlabs_key: !!elevenlabs_api_key,
       ...safe,
     })
   } catch (err) {
@@ -322,6 +324,28 @@ export async function PATCH(request: Request) {
     const patch: Record<string, unknown> = {}
     if ('new_session_hours' in body) {
       patch.new_session_hours = clampInt(body.new_session_hours, 1, 168, 8)
+    }
+    if ('audio_policy' in body && isAudioPolicy(body.audio_policy)) {
+      patch.audio_policy = body.audio_policy
+    }
+    if ('audio_transcription_provider' in body) {
+      patch.audio_transcription_provider =
+        body.audio_transcription_provider === 'elevenlabs' ? 'elevenlabs' : 'local'
+    }
+    if ('audio_notice_text' in body) {
+      patch.audio_notice_text =
+        typeof body.audio_notice_text === 'string' && body.audio_notice_text.trim()
+          ? body.audio_notice_text.trim().slice(0, 300)
+          : null
+    }
+    if ('elevenlabs_api_key' in body) {
+      // Cifrada como as outras chaves. String vazia apaga; ausente não
+      // mexe — senão salvar a política de áudio apagaria a chave.
+      const raw =
+        typeof body.elevenlabs_api_key === 'string'
+          ? body.elevenlabs_api_key.trim()
+          : ''
+      patch.elevenlabs_api_key = raw ? encrypt(raw) : null
     }
     if ('context_message_limit' in body) {
       // Nulo é escolha válida aqui, e não ausência: significa "volte a

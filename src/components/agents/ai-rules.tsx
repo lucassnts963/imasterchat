@@ -9,6 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { AUDIO_POLICIES, type AudioPolicy } from '@/lib/audio/policy';
 
 // ============================================================
 // Os números que governam como o agente conversa.
@@ -60,6 +69,13 @@ export function AiRules() {
   const { canEditSettings } = useAuth();
   const [rules, setRules] = useState<Rules | null>(null);
   const [saving, setSaving] = useState(false);
+  // Áudio fica fora de `Rules` porque não é número: é uma escolha entre
+  // quatro comportamentos, mais o texto e a chave que só um deles usa.
+  const [audioPolicy, setAudioPolicy] = useState<AudioPolicy>('ignore');
+  const [audioProvider, setAudioProvider] = useState<'local' | 'elevenlabs'>('local');
+  const [audioNotice, setAudioNotice] = useState('');
+  const [elevenKey, setElevenKey] = useState('');
+  const [hasElevenKey, setHasElevenKey] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +99,12 @@ export function AiRules() {
         offer_slots_max:
           sched?.settings?.offer_slots_max ?? DEFAULTS.offer_slots_max,
       });
+      setAudioPolicy((ai?.audio_policy as AudioPolicy) ?? 'ignore');
+      setAudioProvider(
+        ai?.audio_transcription_provider === 'elevenlabs' ? 'elevenlabs' : 'local',
+      );
+      setAudioNotice(ai?.audio_notice_text ?? '');
+      setHasElevenKey(ai?.has_elevenlabs_key === true);
     } catch {
       setRules(DEFAULTS);
     }
@@ -107,6 +129,13 @@ export function AiRules() {
           body: JSON.stringify({
             new_session_hours: rules.new_session_hours,
             context_message_limit: rules.context_message_limit,
+            audio_policy: audioPolicy,
+            audio_transcription_provider: audioProvider,
+            audio_notice_text: audioNotice.trim() || null,
+            // Só manda a chave quando o operador digitou algo. Mandar
+            // string vazia APAGARIA a chave salva — e ele digitaria
+            // vazio toda vez que salvasse qualquer outra regra.
+            ...(elevenKey.trim() ? { elevenlabs_api_key: elevenKey.trim() } : {}),
           }),
         }),
         fetch('/api/scheduling/settings', {
@@ -124,6 +153,7 @@ export function AiRules() {
         return;
       }
       toast.success(t('saved'));
+      setElevenKey('');
       await load();
     } catch {
       toast.error(t('saveError'));
@@ -177,6 +207,105 @@ export function AiRules() {
         </h3>
         {field('new_session_hours')}
         {field('context_message_limit')}
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold text-foreground">
+          {t('sections.audio')}
+        </h3>
+        <div className="space-y-3 rounded-lg border border-border p-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="audio-policy">{t('audio.policyLabel')}</Label>
+            <Select
+              value={audioPolicy}
+              onValueChange={(v) => setAudioPolicy(v as AudioPolicy)}
+            >
+              <SelectTrigger id="audio-policy" className="w-full sm:w-72">
+                <SelectValue>
+                  {(v) => t(`audio.policies.${String(v)}.label`)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {AUDIO_POLICIES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {t(`audio.policies.${p}.label`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {t(`audio.policies.${audioPolicy}.hint`)}
+            </p>
+          </div>
+
+          {(audioPolicy === 'notice' || audioPolicy === 'transcribe') && (
+            <div className="space-y-1.5">
+              <Label htmlFor="audio-notice">{t('audio.noticeLabel')}</Label>
+              <Textarea
+                id="audio-notice"
+                value={audioNotice}
+                onChange={(e) => setAudioNotice(e.target.value)}
+                placeholder={t('audio.noticePlaceholder')}
+                maxLength={300}
+                rows={2}
+                disabled={!canEditSettings}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t('audio.noticeHint')}
+              </p>
+            </div>
+          )}
+
+          {audioPolicy === 'transcribe' && (
+            <div className="space-y-3 rounded-md bg-muted/40 p-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="audio-provider">{t('audio.providerLabel')}</Label>
+                <Select
+                  value={audioProvider}
+                  onValueChange={(v) =>
+                    setAudioProvider(v === 'elevenlabs' ? 'elevenlabs' : 'local')
+                  }
+                >
+                  <SelectTrigger id="audio-provider" className="w-full sm:w-72">
+                    <SelectValue>
+                      {(v) => t(`audio.providers.${String(v)}.label`)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="local">
+                      {t('audio.providers.local.label')}
+                    </SelectItem>
+                    <SelectItem value="elevenlabs">
+                      {t('audio.providers.elevenlabs.label')}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t(`audio.providers.${audioProvider}.hint`)}
+                </p>
+              </div>
+
+              {audioProvider === 'elevenlabs' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="eleven-key">{t('audio.keyLabel')}</Label>
+                  <Input
+                    id="eleven-key"
+                    type="password"
+                    value={elevenKey}
+                    onChange={(e) => setElevenKey(e.target.value)}
+                    placeholder={
+                      hasElevenKey ? t('audio.keySaved') : t('audio.keyPlaceholder')
+                    }
+                    disabled={!canEditSettings}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('audio.keyHint')}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="space-y-2">
