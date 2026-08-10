@@ -166,12 +166,25 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
 
     case "audio":
       return (
-        <div>
+        <div className="space-y-1.5">
           {message.media_url ? (
             <audio src={message.media_url} controls className="max-w-60" />
           ) : (
             <MediaUnavailable label={t("audio")} t={t} />
           )}
+          {/* A transcrição, quando a conta usa essa política.
+              Sem ela a atendente ouve o áudio para descobrir o que o bot
+              entendeu — e quando o bot erra, não há como saber POR QUE
+              sem apertar play. Foi assim que "reagendar" virou "reagir a
+              andar" sem ninguém enxergar.
+              Marcada como transcrição de propósito: quem lê precisa
+              saber que aquilo é o que a máquina ouviu, e não o que foi
+              dito. */}
+          {message.content_text?.trim() ? (
+            <p className="max-w-60 border-l-2 border-border pl-2 text-xs text-muted-foreground italic">
+              {t("transcript")}: {message.content_text.trim()}
+            </p>
+          ) : null}
         </div>
       );
 

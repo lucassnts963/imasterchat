@@ -30,6 +30,14 @@ export interface TranscribeInput {
   /** Dica de idioma. O Whisper detecta sozinho, mas errar em áudio
    *  curto é comum — "oi" pode virar inglês. */
   language?: string
+  /**
+   * Vocabulário esperado, para enviesar a decodificação.
+   *
+   * Só o provedor local usa: é o `initial_prompt` do faster-whisper. A
+   * ElevenLabs não expõe equivalente, e a precisão dela já é outra —
+   * foi ela que motivou a existência das duas opções.
+   */
+  prompt?: string
 }
 
 /** Teto de tamanho. Um áudio de WhatsApp raramente passa de 16 MB, e
@@ -128,6 +136,7 @@ async function viaLocal(input: TranscribeInput): Promise<string | null> {
   url.searchParams.set('output', 'text')
   url.searchParams.set('task', 'transcribe')
   if (input.language) url.searchParams.set('language', input.language)
+  if (input.prompt) url.searchParams.set('initial_prompt', input.prompt)
 
   const form = new FormData()
   form.append(

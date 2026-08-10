@@ -91,4 +91,7 @@ export const AUDIO_TRANSCRIPT_NOTE =
   'INTENT, not literally. If a word makes the request odd or contradicts the rest of ' +
   'the conversation, assume it was misheard and confirm in your reply — never act on ' +
   'a suspicious word. Do NOT mention transcription, speech-to-text, or that you could ' +
-  'not hear well; just ask naturally, the way anyone would when they did not catch a word.'
+  'not hear well; just ask naturally, the way anyone would when they did not catch a word. ' +
+  'An unclear transcript is NOT a reason to hand off to a human — ASK the customer to ' +
+  'confirm instead. Handing off because a word came out garbled turns a five-second ' +
+  'question into a queue the customer waits in.'

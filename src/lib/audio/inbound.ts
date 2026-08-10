@@ -9,6 +9,7 @@ import {
   type AudioPolicy,
 } from './policy'
 import { transcribeAudio, type TranscriptionProvider } from './transcribe'
+import { buildTranscriptionPrompt } from './prompt'
 
 // ============================================================
 // O áudio que chega, do webhook até a decisão.
@@ -90,6 +91,16 @@ export async function handleInboundAudio(args: {
       }
     }
 
+    // O termo do negócio entra no viés do transcritor. É a palavra que
+    // mais importa acertar e a mais fácil de errar — "demonstração" e
+    // "administração" soam parecido, e trocá-las muda o pedido inteiro.
+    // A conta já respondeu isso na tela de Agendamento.
+    const { data: sched } = await args.db
+      .from('ai_scheduling_settings')
+      .select('appointment_label')
+      .eq('account_id', args.accountId)
+      .maybeSingle<{ appointment_label: string | null }>()
+
     const media = await getMediaUrl({
       mediaId: args.mediaId,
       accessToken: args.accessToken,
@@ -111,6 +122,9 @@ export async function handleInboundAudio(args: {
       // áudio curto — um "oi" de dois segundos vira inglês com
       // frequência incômoda.
       language: 'pt',
+      prompt: buildTranscriptionPrompt({
+        appointmentLabel: sched?.appointment_label ?? null,
+      }),
     })
 
     return { policy, action: decideAudioAction({ policy, transcript }) }

@@ -233,7 +233,8 @@
       "interactiveReply": "[Resposta interativa]",
       "unsupported": "[Tipo de mensagem não suportado]",
       "aiBadge": "IA",
-      "aiBadgeTitle": "Enviada automaticamente pelo assistente de IA"
+      "aiBadgeTitle": "Enviada automaticamente pelo assistente de IA",
+      "transcript": "transcrição"
     },
     "actions": {
       "reply": "Responder",
