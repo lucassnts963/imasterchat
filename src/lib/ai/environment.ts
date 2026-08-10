@@ -3,6 +3,7 @@ import { formatInZone } from '@/lib/time/zone'
 import { describeAppointmentLabel } from '@/lib/scheduling/label'
 import { TRANSCRIPT_STAMP_NOTE } from './transcript-stamp'
 import { describeConversationGap } from './conversation-gap'
+import { AUDIO_TRANSCRIPT_NOTE } from '@/lib/audio/policy'
 
 // ============================================================
 // What the model is allowed to know before it starts talking.
@@ -57,6 +58,9 @@ export interface EnvironmentArgs {
   conversationId?: string | null
   /** Limiar de "conversa nova", em horas. Ver `./conversation-gap.ts`. */
   newSessionHours?: number
+  /** A conta transcreve áudio? Então o modelo precisa saber ler a marca
+   *  e desconfiar da palavra solta. */
+  audioTranscripts?: boolean
   /** Injectable for tests. */
   now?: Date
 }
@@ -94,6 +98,7 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
     transcriptStamps = false,
     conversationId = null,
     newSessionHours,
+    audioTranscripts = false,
     now = new Date(),
   } = args
 
@@ -115,6 +120,7 @@ export async function buildEnvironment(args: EnvironmentArgs): Promise<string> {
   // Antes das linhas do cliente: é regra de como LER a conversa, e a
   // conversa vem toda depois disto.
   if (transcriptStamps) lines.push(TRANSCRIPT_STAMP_NOTE)
+  if (audioTranscripts) lines.push(AUDIO_TRANSCRIPT_NOTE)
 
   // Vem antes dos fatos do cliente: é uma regra sobre COMO ler tudo que
   // vem depois, inclusive o transcript.

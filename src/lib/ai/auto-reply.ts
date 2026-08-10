@@ -207,6 +207,7 @@ export async function dispatchInboundToAiReply(
       transcriptStamps: config.contextTimestamps !== false,
       conversationId,
       newSessionHours: config.newSessionHours,
+      audioTranscripts: config.audioPolicy === 'transcribe',
     })
 
     // The wiki the account maintains: approved rules, what is true

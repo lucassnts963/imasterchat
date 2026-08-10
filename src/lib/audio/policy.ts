@@ -71,3 +71,24 @@ export function decideAudioAction(input: AudioDecisionInput): AudioAction {
       return { action: 'none' }
   }
 }
+
+/**
+ * O que o modelo precisa saber ao ler uma transcrição.
+ *
+ * Uma transcrição erra em palavra inteira. No primeiro teste em
+ * produção o Whisper devolveu "administração do sistema" para quem
+ * pediu "demonstração do sistema" — uma palavra, e o pedido inteiro
+ * muda de assunto.
+ *
+ * Sem esta instrução o modelo trata a palavra errada como certa e AGE
+ * sobre ela. Com ela, confirma quando algo não fecha — que é o que uma
+ * pessoa faz ao ouvir mal, e custa uma pergunta em vez de um
+ * agendamento errado.
+ */
+export const AUDIO_TRANSCRIPT_NOTE =
+  'Messages prefixed with [transcrição de áudio] were spoken, not typed: they come ' +
+  'from automatic speech-to-text and single words are often wrong. Read them for ' +
+  'INTENT, not literally. If a word makes the request odd or contradicts the rest of ' +
+  'the conversation, assume it was misheard and confirm in your reply — never act on ' +
+  'a suspicious word. Do NOT mention transcription, speech-to-text, or that you could ' +
+  'not hear well; just ask naturally, the way anyone would when they did not catch a word.'

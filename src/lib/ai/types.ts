@@ -49,6 +49,8 @@ export interface AiConfig {
    *  ambiente e, na falta dela, no padrão — mesma regra de
    *  `maxToolSteps`. */
   contextMessageLimit?: number | null
+  /** O que a conta faz com áudio. Só `transcribe` muda o prompt. */
+  audioPolicy?: string
 }
 
 /**
