@@ -37,7 +37,14 @@ const BASE_PT =
 export interface TranscriptionPromptInput {
   /** Como o negócio chama um agendamento. Ver `scheduling/label.ts`. */
   appointmentLabel?: string | null
+  /** Jargão do ramo que a conta escreveu na tela de Regras. */
+  vocabulary?: string | null
 }
+
+/** Espelha o CHECK da 062. Cortar aqui evita mandar ao Whisper um
+ *  prompt que o banco recusaria — e um prompt longo demais empurra o
+ *  começo da fala para fora da janela, piorando o que veio corrigir. */
+const MAX_VOCABULARY = 500
 
 /**
  * O `initial_prompt` para este negócio.
@@ -51,7 +58,22 @@ export interface TranscriptionPromptInput {
 export function buildTranscriptionPrompt(
   input: TranscriptionPromptInput = {},
 ): string {
+  const parts = [BASE_PT]
+
   const label = input.appointmentLabel?.trim()
-  if (!label) return BASE_PT
-  return `${BASE_PT} O cliente costuma pedir uma ${label}.`
+  if (label) parts.push(`O cliente costuma pedir uma ${label}.`)
+
+  // O jargão da conta vai por último: é o mais específico, e o que o
+  // modelo leu por último pesa mais na primeira palavra que ele decodifica.
+  const extra = input.vocabulary?.trim().slice(0, MAX_VOCABULARY)
+  if (extra) {
+    parts.push(
+      // Apresentado como termos DESTE negócio, e não como lista solta:
+      // o Whisper espera texto natural, e uma enumeração seca ensina
+      // menos que uma frase sobre o assunto.
+      `Termos deste negócio: ${extra.replace(/\s+/g, ' ')}`,
+    )
+  }
+
+  return parts.join(' ')
 }

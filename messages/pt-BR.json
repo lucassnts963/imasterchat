@@ -2293,7 +2293,11 @@
         "keyLabel": "Chave da ElevenLabs",
         "keyPlaceholder": "sk_…",
         "keySaved": "••• chave salva — digite outra para trocar",
-        "keyHint": "Guardada criptografada. Deixe em branco para manter a atual."
+        "keyHint": "Guardada criptografada. Deixe em branco para manter a atual.",
+        "vocabLabel": "Palavras do seu ramo",
+        "vocabPlaceholder": "armação, lente antirreflexo, grau, multifocal, Ray-Ban",
+        "vocabHint": "Nomes de produto, marcas e jargão que o transcritor costuma errar. Separe por vírgula. Verbos de agendamento e dias da semana já estão inclusos — não precisa repetir.",
+        "vocabCost": "Só vale para o Whisper local. Não escreva demais: o texto disputa espaço com o próprio áudio, e uma lista longa piora justamente o que ela veio corrigir. Acrescente só o que você viu sair errado."
       }
     }
   },

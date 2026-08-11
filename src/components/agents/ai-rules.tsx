@@ -75,6 +75,7 @@ export function AiRules() {
   const [audioProvider, setAudioProvider] = useState<'local' | 'elevenlabs'>('local');
   const [audioNotice, setAudioNotice] = useState('');
   const [elevenKey, setElevenKey] = useState('');
+  const [vocabulary, setVocabulary] = useState('');
   const [hasElevenKey, setHasElevenKey] = useState(false);
 
   const load = useCallback(async () => {
@@ -105,6 +106,7 @@ export function AiRules() {
       );
       setAudioNotice(ai?.audio_notice_text ?? '');
       setHasElevenKey(ai?.has_elevenlabs_key === true);
+      setVocabulary(ai?.transcription_vocabulary ?? '');
     } catch {
       setRules(DEFAULTS);
     }
@@ -132,6 +134,7 @@ export function AiRules() {
             audio_policy: audioPolicy,
             audio_transcription_provider: audioProvider,
             audio_notice_text: audioNotice.trim() || null,
+            transcription_vocabulary: vocabulary.trim() || null,
             // Só manda a chave quando o operador digitou algo. Mandar
             // string vazia APAGARIA a chave salva — e ele digitaria
             // vazio toda vez que salvasse qualquer outra regra.
@@ -284,6 +287,27 @@ export function AiRules() {
                   {t(`audio.providers.${audioProvider}.hint`)}
                 </p>
               </div>
+
+              {audioProvider === 'local' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="vocab">{t('audio.vocabLabel')}</Label>
+                  <Textarea
+                    id="vocab"
+                    value={vocabulary}
+                    onChange={(e) => setVocabulary(e.target.value)}
+                    placeholder={t('audio.vocabPlaceholder')}
+                    maxLength={500}
+                    rows={3}
+                    disabled={!canEditSettings}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('audio.vocabHint')}
+                  </p>
+                  <p className="text-xs text-amber-500/90">
+                    {t('audio.vocabCost')}
+                  </p>
+                </div>
+              )}
 
               {audioProvider === 'elevenlabs' && (
                 <div className="space-y-1.5">

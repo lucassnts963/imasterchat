@@ -50,6 +50,21 @@ verificada **antes** do modelo — não há como argumentar com ela.
 Liga e desliga cada ferramenta (agendar, remarcar, cancelar, chamar
 humano) individualmente.
 
+### Agentes → Regras
+
+Os números de comportamento e a política de áudio. Cada campo diz o que
+se paga ao mexer nele.
+
+| ajuste | o que faz |
+|---|---|
+| Horas para conversa nova | a partir de quanto silêncio um "oi" começa outra conversa |
+| Mensagens no contexto | tamanho do histórico enviado ao modelo — o custo de toda resposta |
+| Política de áudio | ignorar, pedir por escrito, transcrever, ou passar para uma pessoa |
+| Quem transcreve | Whisper na VPS ou ElevenLabs |
+| Palavras do seu ramo | jargão que o transcritor local deve esperar |
+| Horários por mensagem | quantos o bot nomeia de uma vez |
+| Dias à frente / vagas por consulta | tamanho da busca de horário |
+
 ### Agentes → Contexto
 
 Não ajusta nada — **mostra** exatamente o que o modelo lê, seção por

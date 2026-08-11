@@ -51,6 +51,8 @@ export interface AiConfig {
   contextMessageLimit?: number | null
   /** O que a conta faz com áudio. Só `transcribe` muda o prompt. */
   audioPolicy?: string
+  /** Jargão do ramo para enviesar o transcritor local. */
+  transcriptionVocabulary?: string | null
 }
 
 /**

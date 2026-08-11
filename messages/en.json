@@ -2293,7 +2293,11 @@
         "keyLabel": "ElevenLabs key",
         "keyPlaceholder": "sk_…",
         "keySaved": "••• key saved — type another to replace",
-        "keyHint": "Stored encrypted. Leave blank to keep the current one."
+        "keyHint": "Stored encrypted. Leave blank to keep the current one.",
+        "vocabLabel": "Words from your trade",
+        "vocabPlaceholder": "frames, anti-reflective lens, prescription, progressive, Ray-Ban",
+        "vocabHint": "Product names, brands and jargon the transcriber tends to get wrong. Comma-separated. Scheduling verbs and weekdays are already included — no need to repeat them.",
+        "vocabCost": "Applies to the local Whisper only. Do not overdo it: this text competes for room with the audio itself, and a long list makes worse exactly what it came to fix. Add only what you saw come out wrong."
       }
     }
   },

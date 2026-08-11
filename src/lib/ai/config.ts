@@ -19,10 +19,11 @@ interface AiConfigRow {
   new_session_hours: number
   context_message_limit: number | null
   audio_policy: string
+  transcription_vocabulary: string | null
 }
 
 const CONFIG_COLUMNS =
-  'provider, model, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, max_tool_steps, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy'
+  'provider, model, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, max_tool_steps, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, transcription_vocabulary'
 
 /**
  * Load and decrypt the account's AI config for *use* (draft or
@@ -93,6 +94,7 @@ export async function loadAiConfig(
     newSessionHours: row.new_session_hours,
     contextMessageLimit: row.context_message_limit,
     audioPolicy: row.audio_policy,
+    transcriptionVocabulary: row.transcription_vocabulary,
   }
 }
 

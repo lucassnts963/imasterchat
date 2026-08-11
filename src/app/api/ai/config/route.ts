@@ -39,7 +39,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, audio_notice_text, audio_transcription_provider, elevenlabs_api_key',
+        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, audio_notice_text, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -336,6 +336,13 @@ export async function PATCH(request: Request) {
       patch.audio_notice_text =
         typeof body.audio_notice_text === 'string' && body.audio_notice_text.trim()
           ? body.audio_notice_text.trim().slice(0, 300)
+          : null
+    }
+    if ('transcription_vocabulary' in body) {
+      patch.transcription_vocabulary =
+        typeof body.transcription_vocabulary === 'string' &&
+        body.transcription_vocabulary.trim()
+          ? body.transcription_vocabulary.trim().slice(0, 500)
           : null
     }
     if ('elevenlabs_api_key' in body) {

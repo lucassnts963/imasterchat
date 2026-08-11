@@ -30,6 +30,7 @@ interface AudioConfigRow {
   audio_policy: string
   audio_transcription_provider: string
   elevenlabs_api_key: string | null
+  transcription_vocabulary: string | null
 }
 
 export interface InboundAudioOutcome {
@@ -60,7 +61,7 @@ export async function handleInboundAudio(args: {
     const { data } = await args.db
       .from('ai_configs')
       .select(
-        'audio_policy, audio_transcription_provider, elevenlabs_api_key',
+        'audio_policy, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
       )
       .eq('account_id', args.accountId)
       .maybeSingle<AudioConfigRow>()
@@ -124,6 +125,7 @@ export async function handleInboundAudio(args: {
       language: 'pt',
       prompt: buildTranscriptionPrompt({
         appointmentLabel: sched?.appointment_label ?? null,
+        vocabulary: data?.transcription_vocabulary ?? null,
       }),
     })
 
