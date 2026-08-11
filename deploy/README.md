@@ -1,8 +1,12 @@
 # Deploy: iMasterChat + Supabase self-hosted na mesma VPS
 
 Sobe o app e o Supabase completo (Postgres, Auth, Storage, Realtime, Kong,
-Studio) num único `docker compose`, na mesma máquina. As 37 migrações são
+Studio) num único `docker compose`, na mesma máquina. As migrações são
 aplicadas por script — sem SQL Editor manual.
+
+Os containers são estes e só estes: os do Supabase, o `app`, o `cron` — e
+o `whisper`, se você quiser transcrição de áudio sem mandar o áudio para
+fora. Nada mais é necessário para o iMasterChat funcionar.
 
 ## Antes de começar
 
@@ -99,31 +103,109 @@ Idempotente: rode de novo a cada deploy que trouxer migração nova.
 
 ## 3. Variáveis do app
 
-Acrescente ao mesmo `.env`:
+Acrescente ao mesmo `.env`. Estão separadas pelo que acontece se
+faltarem — porque quase nenhuma ausência dá erro na tela: o recurso
+simplesmente não existe, e você descobre semanas depois.
+
+### 3.1 Obrigatórias — sem elas o app não serve para nada
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://api.imasterchat.com.br
 NEXT_PUBLIC_SITE_URL=https://app.imasterchat.com.br
 NEXT_PUBLIC_APP_LOCALE=pt-BR
+HOST_PORT=3000
 
-# 64 hex — criptografa os tokens de WhatsApp de cada cliente:
+# 64 hex — criptografa os tokens de WhatsApp e as chaves de IA de cada
+# cliente. GUARDE FORA DA VPS: sem ela, um backup restaurado devolve
+# esses campos como lixo e todo cliente precisa reconectar.
 #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ENCRYPTION_KEY=<64 hex>
 
+# O agendador interno usa este segredo para chamar as próprias rotas.
+# SEM ELE O CRON DORME: as automações com espera nunca retomam, e um
+# flow abandonado segura `idx_one_active_run_per_contact` e bloqueia
+# todo gatilho futuro daquele contato. É a falha mais silenciosa do
+# deploy inteiro — o container sobe, loga um aviso, e nada mais acontece.
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+AUTOMATION_CRON_SECRET=<64 hex>
+
+# Assinatura do webhook da Meta. Sem o secret, todo POST é recusado e
+# nenhuma mensagem entra.
 META_APP_SECRET=<App Secret do seu app Meta>
 META_APP_ID=<App ID>
+```
 
+`ANON_KEY` e `SERVICE_ROLE_KEY` o app lê direto do `.env` do Supabase — uma
+fonte só pras chaves, sem duplicar.
+
+> `META_APP_ID` serve às duas pontas: o servidor usa direto, e o compose
+> deriva dele o `NEXT_PUBLIC_META_APP_ID` que vai inlined no bundle. Não
+> crie uma segunda variável para o mesmo número — quando as duas
+> divergem, o popup do Cadastro Incorporado só não abre, sem erro em log.
+
+### 3.2 Cobrança — sem elas a tela de bloqueio fica sem para onde apontar
+
+```bash
 NEXT_PUBLIC_BILLING_CONTACT=https://wa.me/55XXXXXXXXXXX
 NEXT_PUBLIC_BILLING_PIX_KEY=<sua chave PIX>
 # Opcional: QR Code PIX (PNG em base64) exibido na tela de bloqueio.
 #   node -e "console.log(require('fs').readFileSync('qr.png').toString('base64'))"
 NEXT_PUBLIC_BILLING_PIX_QR=<base64 do PNG>
-
-HOST_PORT=3000
 ```
 
-`ANON_KEY` e `SERVICE_ROLE_KEY` o app lê direto do `.env` do Supabase — uma
-fonte só pras chaves, sem duplicar.
+### 3.3 Opcionais — cada bloco liga um recurso inteiro
+
+Nada quebra sem eles. O recurso apenas não aparece, e é por isso que
+vale ler a coluna do meio antes de decidir pular.
+
+| bloco | o que fica sem | quando configurar |
+|---|---|---|
+| Push / PWA | notificação no celular do atendente | quase sempre |
+| Google Agenda | o agente marca no app, mas não na agenda | se vender agendamento |
+| Telegram | aviso de conta quebrada chega a você | recomendado |
+| Cadastro Incorporado | o cliente conecta o WhatsApp sozinho | se for Tech Provider |
+| Whisper | transcrever áudio na própria VPS | se tratar áudio |
+
+```bash
+# --- Push / PWA ---
+# A pública é build arg E runtime: o painel é 'use client' e o envio é
+# servidor. Trocar o par derruba toda assinatura existente — cada
+# usuário precisa reativar a notificação na mão.
+#   npx web-push generate-vapid-keys
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=<pública>
+VAPID_PRIVATE_KEY=<privada>
+VAPID_SUBJECT=mailto:voce@seudominio.com.br
+
+# --- Google Agenda ---
+# O redirect precisa bater EXATAMENTE com o registrado no Google Cloud.
+# E publique a tela de consentimento: em "Testing" o refresh token
+# expira a cada 7 dias e o agendamento para sem avisar.
+GOOGLE_CLIENT_ID=<client id>
+GOOGLE_CLIENT_SECRET=<client secret>
+GOOGLE_OAUTH_REDIRECT_URI=https://app.imasterchat.com.br/api/google/callback
+
+# --- Alertas ao operador ---
+# Sem estas, os eventos continuam gravados e /admin → Eventos funciona.
+# Só não sai aviso — você descobre a chave vencida pelo cliente.
+TELEGRAM_BOT_TOKEN=<token do @BotFather>
+TELEGRAM_ALERT_CHAT_ID=<seu chat id>
+
+# --- Cadastro Incorporado (Embedded Signup) ---
+NEXT_PUBLIC_META_ES_CONFIG_ID=<Configuration ID do Facebook Login>
+
+# --- Transcrição de áudio na VPS ---
+# Só usada quando a conta escolhe "Whisper na VPS" em Agentes → Regras.
+# Exige subir o perfil: `--profile whisper` (ver passo 4).
+WHISPER_URL=http://whisper:9000
+
+# --- Ajustes finos ---
+TZ=America/Sao_Paulo
+# Hostnames aceitos num link de convite, além do NEXT_PUBLIC_SITE_URL.
+ALLOWED_INVITE_HOSTS=app.imasterchat.com.br
+```
+
+Os números de comportamento do agente **não** são variáveis de ambiente —
+são campos por conta, em Agentes → Regras. Ver [`docs/ajustes-do-agente.md`](../docs/ajustes-do-agente.md).
 
 ## 4. Subir o app
 
@@ -131,6 +213,29 @@ fonte só pras chaves, sem duplicar.
 docker compose -f supabase-stack/docker-compose.yml \
                -f deploy/docker-compose.app.yml up -d --build
 ```
+
+Sobem três serviços nossos: `app`, `cron` e — só com o perfil — `whisper`.
+
+```bash
+# Com transcrição de áudio na própria máquina:
+docker compose -f supabase-stack/docker-compose.yml \
+               -f deploy/docker-compose.app.yml \
+               --profile whisper up -d --build
+```
+
+O `whisper` custa ~500 MB de download na primeira vez e reserva até 2
+núcleos e 3 GB. Numa VPS de 2 núcleos ele briga com o app pelo
+processador — nesse tamanho, prefira a ElevenLabs, que é escolha de
+tela e não de deploy.
+
+Confira que o `cron` não está dormindo:
+
+```bash
+docker compose logs cron | head -3
+```
+
+Se aparecer `AUTOMATION_CRON_SECRET is empty`, ele subiu mas não vai
+fazer nada — volte ao passo 3.1.
 
 ## 4b. Proxy reverso: o que precisa ficar exposto
 

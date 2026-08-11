@@ -29,7 +29,13 @@ services:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
         NEXT_PUBLIC_APP_LOCALE: ${NEXT_PUBLIC_APP_LOCALE:-pt-BR}
-        NEXT_PUBLIC_META_APP_ID: ${NEXT_PUBLIC_META_APP_ID:-}
+        # Derivado de META_APP_ID de propósito, e não de uma variável
+        # NEXT_PUBLIC_ própria: o App ID não é segredo (ele aparece na
+        # URL do popup do Facebook), e pedir o mesmo número duas vezes
+        # no .env garante que uma hora as duas cópias divergem. Quando
+        # divergem, o sintoma é o popup do Cadastro Incorporado não
+        # abrir, sem erro em log nenhum.
+        NEXT_PUBLIC_META_APP_ID: ${META_APP_ID:-}
         NEXT_PUBLIC_META_ES_CONFIG_ID: ${NEXT_PUBLIC_META_ES_CONFIG_ID:-}
         # Build arg, e não só runtime: o painel de notificações é
         # `'use client'`, então a chave precisa estar inlined no bundle.
@@ -49,6 +55,23 @@ services:
       NEXT_PUBLIC_BILLING_PIX_KEY: ${NEXT_PUBLIC_BILLING_PIX_KEY:-}
       NEXT_PUBLIC_BILLING_PIX_QR: ${NEXT_PUBLIC_BILLING_PIX_QR:-}
       AUTOMATION_CRON_SECRET: ${AUTOMATION_CRON_SECRET:-}
+      NEXT_PUBLIC_META_ES_CONFIG_ID: ${NEXT_PUBLIC_META_ES_CONFIG_ID:-}
+
+      # Hostnames que podem aparecer num link de convite. Sem isto, um
+      # convite gerado por trás de proxy pode sair com a origem errada.
+      ALLOWED_INVITE_HOSTS: ${ALLOWED_INVITE_HOSTS:-}
+
+      # O relógio do container. Ele NÃO substitui o fuso da conta (esse
+      # fica em Configurações → Agendamento) — mas governa o carimbo dos
+      # logs, e depurar um agendamento com log em UTC e agenda em BRT
+      # custa meia hora toda vez.
+      TZ: ${TZ:-America/Sao_Paulo}
+
+      # --- Transcrição de áudio local (migração 061) ---
+      # Só é lida quando a conta escolhe "Whisper na VPS" em Agentes →
+      # Regras. Quem usa ElevenLabs, ou não usa áudio, pode ignorar e
+      # não subir o perfil `whisper` lá embaixo.
+      WHISPER_URL: ${WHISPER_URL:-http://whisper:9000}
 
       # --- Push / PWA (migração 051) ---
       # A pública aparece aqui E como build arg de propósito: o
@@ -169,3 +192,71 @@ services:
           fi
           sleep $${CRON_INTERVAL_SECONDS}
         done
+
+  # ============================================================
+  # Transcrição de áudio na própria máquina — OPCIONAL.
+  #
+  # Fica atrás de um profile porque a maioria dos deploys não precisa
+  # dele: só sobe quem escolher "Whisper na VPS" em Agentes → Regras.
+  # Quem usa ElevenLabs paga por minuto e não gasta CPU; quem não trata
+  # áudio não gasta nada.
+  #
+  #   docker compose ... --profile whisper up -d
+  #
+  # A razão de existir, quando a ElevenLabs faz o mesmo por API: o áudio
+  # do cliente NÃO SAI DA MÁQUINA. Para conversa de paciente, de
+  # contrato ou de cobrança, isso costuma ser o argumento inteiro.
+  #
+  # A troca é CPU. Uma transcrição usa o que puder pegar, por isso o
+  # limite abaixo — sem ele, um áudio longo compete com o app pelo
+  # processador e a inbox trava para todo mundo enquanto transcreve.
+  #
+  # Não publica porta: o app o alcança por nome de serviço. Ele não tem
+  # autenticação nenhuma, então expô-lo no proxy é entregar transcrição
+  # grátis para a internet — se algum dia precisar, ponha auth antes.
+  # ============================================================
+  whisper:
+    profiles: ['whisper']
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    restart: unless-stopped
+    environment:
+      # faster-whisper (CTranslate2), não o whisper original: em CPU é
+      # várias vezes mais rápido para a mesma qualidade, e é a única
+      # razão de isto ser viável sem GPU.
+      ASR_ENGINE: faster_whisper
+      # `small` é o equilíbrio para português falado ao celular.
+      # `base` erra nome próprio e número demais para agendamento;
+      # `medium` triplica tempo e memória sem ganho proporcional.
+      ASR_MODEL: small
+      # 8 bits: metade da memória, com diferença que não aparece em
+      # áudio de WhatsApp — que já chega comprimido.
+      ASR_QUANTIZATION: int8
+      ASR_MODEL_PATH: /data/whisper
+    volumes:
+      # O modelo baixa uma vez, ~500 MB. Sem o volume, toda recriação
+      # baixa de novo e o primeiro áudio depois do deploy demora
+      # minutos — que o cliente lê como "parou de responder".
+      - whisper-models:/data/whisper
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
+    healthcheck:
+      # `/docs` é a interface do FastAPI e responde assim que o serviço
+      # sobe. O modelo carrega na PRIMEIRA transcrição, não aqui — então
+      # "healthy" não quer dizer "pronto para o primeiro áudio".
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9000/docs').read()",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  whisper-models:
