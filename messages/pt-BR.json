@@ -1918,7 +1918,11 @@
       "errorDuplicate": "Já existe uma fila com esse nome.",
       "slaLabel": "Avisar após (minutos)",
       "slaPlaceholder": "sem aviso",
-      "slaHint": "Vazio = sem aviso. Preenchido, alguém é avisado quando uma conversa passa desse tempo esperando aqui."
+      "slaHint": "Vazio = sem aviso. Preenchido, alguém é avisado quando uma conversa passa desse tempo esperando aqui.",
+      "overflowLabel": "Se ninguém pegar, mandar para",
+      "noOverflow": "não passa adiante",
+      "overflowHint": "Depois desse tempo sem ninguém pegar, a conversa muda de fila sozinha. Um salto só.",
+      "overflowAfterLabel": "Passar adiante após (min)"
     }
   },
   "SignupPage": {

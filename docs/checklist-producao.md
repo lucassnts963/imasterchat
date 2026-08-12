@@ -823,6 +823,34 @@ tarde inteira e o sistema estava tecnicamente correto o tempo todo. Este
 - [ ] **Atender para o relógio.** Assuma a conversa antes do prazo e
       confirme que nenhum alerta sai.
 
+### Transbordo entre filas (6.3)
+
+Avisar resolve quando existe quem atenda. Não resolve o Financeiro numa
+sexta às 19h. Passado o prazo, a conversa muda de fila sozinha.
+
+- [ ] **Sem transbordo é o padrão.** Filas nascem com "Se ninguém pegar,
+      mandar para" = *não passa adiante*.
+
+- [ ] 🔴 **A conversa se move.** Numa fila humana, aponte o transbordo
+      para outra e ponha "Passar adiante após" = **1 minuto**. Encaminhe
+      uma conversa e espere dois ciclos do cron.
+      *Esperado:* ela aparece na fila de destino, e sai um evento
+      `queue/overflowed` em `/admin` → Eventos.
+
+- [ ] 🔴 **Um salto só — teste o pingue-pongue.** Configure A → B **e**
+      B → A, ambas com 1 minuto. Encaminhe para A e espere 15 minutos.
+      *Esperado:* a conversa vai de A para B e **PARA**. Se ficar
+      circulando, é o defeito que este item existe para pegar — movimento
+      que parece atendimento e é abandono.
+
+- [ ] **Não dá para apontar para si mesma.** Tente escolher a própria
+      fila no seletor: ela não deve aparecer na lista (e o banco recusa
+      de qualquer forma).
+
+- [ ] **O histórico registra a passagem.** Depois do transbordo,
+      `conversation_queue_stays` deve ter a passagem antiga fechada e uma
+      nova aberta na fila de destino.
+
 ### O comando do teste de reentrega
 
 ```bash

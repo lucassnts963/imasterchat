@@ -403,7 +403,7 @@ do teste de reentrega.
 |---|---|---|
 | 6.1 | ✅ **Alerta de SLA** — migração 070, campo "Avisar após" na tela de Filas | feito em 12/08/2026 |
 | 6.2 | **Rodízio de verdade** | quando um cliente tiver 3+ pessoas na mesma fila |
-| 6.3 | Transbordo entre filas | depende de 6.1 |
+| 6.3 | ✅ **Transbordo entre filas** — migração 071, um salto só | feito em 12/08/2026 |
 | 6.4 | Tela de tutoriais | `tela-de-tutoriais.md` |
 
 ### 6.2 — quando chegar a hora, o difícil é a corrida

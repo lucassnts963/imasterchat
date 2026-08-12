@@ -1918,7 +1918,11 @@
       "errorDuplicate": "A queue with that name already exists.",
       "slaLabel": "Alert after (minutes)",
       "slaPlaceholder": "no alert",
-      "slaHint": "Empty = no alert. Filled in, someone is warned when a conversation waits here longer than this."
+      "slaHint": "Empty = no alert. Filled in, someone is warned when a conversation waits here longer than this.",
+      "overflowLabel": "If nobody picks up, send to",
+      "noOverflow": "stays put",
+      "overflowHint": "After this long unattended, the conversation moves queue on its own. One hop only.",
+      "overflowAfterLabel": "Move after (minutes)"
     }
   },
   "SignupPage": {

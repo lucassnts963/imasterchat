@@ -1918,7 +1918,11 @@
       "errorDuplicate": "같은 이름의 대기열이 이미 있습니다.",
       "slaLabel": "경고 시간(분)",
       "slaPlaceholder": "경고 없음",
-      "slaHint": "비워두면 경고 없음. 값을 넣으면 이 시간을 넘겨 대기할 때 알립니다."
+      "slaHint": "비워두면 경고 없음. 값을 넣으면 이 시간을 넘겨 대기할 때 알립니다.",
+      "overflowLabel": "아무도 안 맡으면 보낼 곳",
+      "noOverflow": "이동 없음",
+      "overflowHint": "이 시간이 지나면 대화가 스스로 대기열을 옮깁니다. 한 번만.",
+      "overflowAfterLabel": "이동 시간(분)"
     }
   },
   "SignupPage": {

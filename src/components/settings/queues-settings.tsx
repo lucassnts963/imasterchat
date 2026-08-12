@@ -43,6 +43,8 @@ interface QueueRow {
   responsible_user_id: string | null;
   auto_assign: boolean;
   sla_seconds: number | null;
+  overflow_queue_id: string | null;
+  overflow_after_seconds: number | null;
   is_default: boolean;
   position: number;
 }
@@ -72,7 +74,7 @@ export function QueuesSettings() {
       supabase
         .from("queues")
         .select(
-          "id, name, description, attended_by, responsible_user_id, auto_assign, sla_seconds, is_default, position",
+          "id, name, description, attended_by, responsible_user_id, auto_assign, sla_seconds, overflow_queue_id, overflow_after_seconds, is_default, position",
         )
         .eq("account_id", accountId)
         .eq("active", true)
@@ -334,6 +336,94 @@ export function QueuesSettings() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {t("autoAssignHint")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Transbordo. Avisar resolve quando existe quem
+                      atenda; não resolve o Financeiro numa sexta às 19h.
+                      Passado o prazo, a conversa muda de fila sozinha —
+                      um salto só, para não virar pingue-pongue. */}
+                  {q.attended_by === "humans" && queues.length > 1 && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">{t("overflowLabel")}</Label>
+                        <Select
+                          value={q.overflow_queue_id ?? "none"}
+                          onValueChange={(v) =>
+                            void patch(q.id, {
+                              overflow_queue_id:
+                                String(v) === "none" ? null : String(v),
+                            })
+                          }
+                          disabled={!canEditSettings}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue>
+                              {(value) => {
+                                const id = String(value);
+                                if (id === "none") return t("noOverflow");
+                                return (
+                                  queues.find((x) => x.id === id)?.name ?? id
+                                );
+                              }}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              {t("noOverflow")}
+                            </SelectItem>
+                            {queues
+                              .filter((x) => x.id !== q.id)
+                              .map((x) => (
+                                <SelectItem key={x.id} value={x.id}>
+                                  {x.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">
+                          {t("overflowAfterLabel")}
+                        </Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={1440}
+                          value={
+                            q.overflow_after_seconds
+                              ? Math.round(q.overflow_after_seconds / 60)
+                              : ""
+                          }
+                          placeholder={t("slaPlaceholder")}
+                          onBlur={(e) =>
+                            void patch(q.id, {
+                              overflow_after_seconds: e.target.value
+                                ? Number(e.target.value) * 60
+                                : null,
+                            })
+                          }
+                          onChange={(e) =>
+                            setQueues((prev) =>
+                              prev.map((x) =>
+                                x.id === q.id
+                                  ? {
+                                      ...x,
+                                      overflow_after_seconds: e.target.value
+                                        ? Number(e.target.value) * 60
+                                        : null,
+                                    }
+                                  : x,
+                              ),
+                            )
+                          }
+                          disabled={!canEditSettings}
+                          className="h-8"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {t("overflowHint")}
                         </p>
                       </div>
                     </div>
