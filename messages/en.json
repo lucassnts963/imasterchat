@@ -162,7 +162,9 @@
       "unknown": "Unknown",
       "filterMine": "Mine",
       "queues": "Queue",
-      "allQueues": "All queues"
+      "allQueues": "All queues",
+      "filters": "Filters",
+      "clearFilters": "Clear filters"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -294,7 +296,11 @@
       "tookOver": "You’ve taken over this chat.",
       "resumed": "AI resumed.",
       "updateError": "Couldn’t update the AI assistant.",
-      "networkError": "Couldn’t reach the server."
+      "networkError": "Couldn’t reach the server.",
+      "youAreHandling": "You're handling this",
+      "someoneIsHandling": "A teammate is handling this",
+      "handlingHint": "The assistant stays quiet while the conversation has an owner.",
+      "giveBack": "Give back to AI"
     }
   },
   "Contacts": {

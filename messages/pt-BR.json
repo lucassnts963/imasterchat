@@ -162,7 +162,9 @@
       "unknown": "Desconhecido",
       "filterMine": "Minhas",
       "queues": "Fila",
-      "allQueues": "Todas as filas"
+      "allQueues": "Todas as filas",
+      "filters": "Filtros",
+      "clearFilters": "Limpar filtros"
     },
     "messageThread": {
       "backToConversations": "Voltar às conversas",
@@ -294,7 +296,11 @@
       "tookOver": "Você assumiu esta conversa.",
       "resumed": "IA retomada.",
       "updateError": "Não foi possível atualizar o assistente de IA.",
-      "networkError": "Não foi possível conectar ao servidor."
+      "networkError": "Não foi possível conectar ao servidor.",
+      "youAreHandling": "Você está atendendo",
+      "someoneIsHandling": "Um colega está atendendo",
+      "handlingHint": "O assistente não responde enquanto a conversa tiver dono.",
+      "giveBack": "Devolver para a IA"
     }
   },
   "Pipelines": {

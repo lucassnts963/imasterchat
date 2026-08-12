@@ -156,8 +156,34 @@ export function AiThreadBanner({
     );
   }
 
-  // Active, but a human already owns it → the bot won't fire; no banner.
-  if (assignedAgentId) return null;
+  // Sem pausa, mas com dono: alguém está atendendo.
+  //
+  // Aqui ficava `return null` — nenhuma tarja. Fazia sentido quando ter
+  // dono era raro: só acontecia por atribuição explícita, e quem
+  // atribuiu sabia o que tinha feito.
+  //
+  // Deixou de fazer sentido quando responder pelo painel passou a
+  // ASSUMIR a conversa: a atendente manda uma mensagem e, no gesto
+  // seguinte, a tarja some levando junto o botão de devolver para a IA.
+  // Some justamente o estado em que ela é mais necessária.
+  if (assignedAgentId) {
+    const mine = !!currentUserId && assignedAgentId === currentUserId;
+    return (
+      <Banner tone="muted">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-foreground">
+            {mine ? t("youAreHandling") : t("someoneIsHandling")}
+          </p>
+          <p className="truncate text-muted-foreground">
+            {t("handlingHint")}
+          </p>
+        </div>
+        <BannerButton onClick={() => toggle(false)} busy={busy} icon={Undo2}>
+          {t("giveBack")}
+        </BannerButton>
+      </Banner>
+    );
+  }
 
   // Active on this thread.
   return (

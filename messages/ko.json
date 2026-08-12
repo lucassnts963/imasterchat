@@ -162,7 +162,9 @@
       "unknown": "알 수 없음",
       "filterMine": "내 대화",
       "queues": "대기열",
-      "allQueues": "모든 대기열"
+      "allQueues": "모든 대기열",
+      "filters": "필터",
+      "clearFilters": "필터 지우기"
     },
     "messageThread": {
       "backToConversations": "대화 목록으로 돌아가기",
@@ -294,7 +296,11 @@
       "tookOver": "이 대화를 직접 처리하기 시작했습니다.",
       "resumed": "AI가 재개되었습니다.",
       "updateError": "AI 어시스턴트를 업데이트하지 못했습니다.",
-      "networkError": "서버에 연결할 수 없습니다."
+      "networkError": "서버에 연결할 수 없습니다.",
+      "youAreHandling": "내가 응대 중",
+      "someoneIsHandling": "동료가 응대 중",
+      "handlingHint": "대화에 담당자가 있는 동안에는 어시스턴트가 응답하지 않습니다.",
+      "giveBack": "AI에게 돌려주기"
     }
   },
   "Contacts": {
