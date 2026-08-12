@@ -1866,7 +1866,8 @@
       ],
       "labelTitle": "What do you call this?",
       "labelDesc": "The word the agent uses with the customer — and the one shown on screen. Leave empty for \"appointment\".",
-      "labelPlaceholder": "demo, site visit, consultation…"
+      "labelPlaceholder": "demo, site visit, consultation…",
+      "tokenRevoked": "Google rejected this access — the agent stopped scheduling. Click Reconnect. If it repeats every 7 days, publish the consent screen in Google Cloud: in testing mode the access expires on its own."
     },
     "push": {
       "title": "Device alerts",

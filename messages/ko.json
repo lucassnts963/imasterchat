@@ -1866,7 +1866,8 @@
       ],
       "labelTitle": "무엇이라고 부르시나요?",
       "labelDesc": "상담원이 고객과 대화할 때 사용하는 단어이며, 화면에도 표시됩니다. 비워두면 \"예약\"이 됩니다.",
-      "labelPlaceholder": "시연, 현장 방문, 상담…"
+      "labelPlaceholder": "시연, 현장 방문, 상담…",
+      "tokenRevoked": "Google가 이 액세스를 거부했습니다 — 에이전트가 예약을 멈췄습니다. 다시 연결하세요. 7일마다 반복되면 Google Cloud에서 동의 화면을 게시하세요."
     },
     "push": {
       "title": "Device alerts",

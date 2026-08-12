@@ -56,6 +56,9 @@ interface Settings {
 interface ConnectionStatus {
   available: boolean;
   connected: boolean;
+  /** Token utilizável na última ronda de saúde. `null` = ainda não
+   *  verificado — tratar como saudável, não como quebrado. */
+  usable?: boolean | null;
   google_email: string | null;
   calendar_id: string | null;
 }
@@ -201,6 +204,20 @@ export function SchedulingSettings() {
           <CardDescription>{t('connectionDesc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Conectado mas com o token recusado pelo Google.
+              Este aviso existe porque o estado anterior era pior que
+              não mostrar nada: a tela dizia "conectado", as ferramentas
+              de agendamento tinham saído do catálogo do agente, e o
+              cliente pedia horário para um bot que já não sabia marcar.
+              A causa quase sempre é a mesma — a tela de consentimento
+              do Google em "Testing" expira o token a cada 7 dias. */}
+          {status?.connected && status.usable === false && (
+            <p className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-muted-foreground">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              {t('tokenRevoked')}
+            </p>
+          )}
+
           {status && !status.available && (
             <p className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-muted-foreground">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />

@@ -1866,7 +1866,8 @@
       ],
       "labelTitle": "Como vocês chamam isso?",
       "labelDesc": "O termo que o agente usa ao falar com o cliente — e que aparece nas telas. Deixe vazio para \"agendamento\".",
-      "labelPlaceholder": "demonstração, visita técnica, consulta…"
+      "labelPlaceholder": "demonstração, visita técnica, consulta…",
+      "tokenRevoked": "O Google recusou este acesso — o agente parou de agendar. Clique em Reconectar. Se isso se repete a cada 7 dias, publique a tela de consentimento no Google Cloud: em modo de teste o acesso expira sozinho."
     },
     "push": {
       "title": "Avisos no celular",

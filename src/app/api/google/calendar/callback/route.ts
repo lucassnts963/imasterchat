@@ -21,9 +21,42 @@ import { OAUTH_STATE_COOKIE } from '../connect/route'
 // arrive as something the page can render.
 // ============================================================
 
+/**
+ * A origem pública deste app, para montar um link que o NAVEGADOR
+ * consiga abrir.
+ *
+ * `request.url` não serve: atrás do proxy, o app enxerga o próprio host
+ * interno, e o operador era mandado para `0.0.0.0:3000/settings` — uma
+ * URL que não existe fora do container. O OAuth terminava certo e
+ * parecia ter falhado.
+ *
+ * Ordem: a origem configurada primeiro (é a única que não depende de
+ * cabeçalho que alguém pode forjar), os cabeçalhos do proxy depois, e o
+ * `request.url` só como último recurso, para não haver caminho sem
+ * redirect nenhum.
+ */
+function publicOrigin(request: Request): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  if (configured) {
+    try {
+      return new URL(configured).origin
+    } catch {
+      // Configuração errada não pode derrubar o retorno do OAuth.
+    }
+  }
+
+  const host = request.headers.get('x-forwarded-host')
+  if (host) {
+    const proto = request.headers.get('x-forwarded-proto') ?? 'https'
+    return `${proto}://${host}`
+  }
+
+  return new URL(request.url).origin
+}
+
 /** Where the operator lands, with the outcome in the query string. */
 function settingsUrl(request: Request, params: Record<string, string>): URL {
-  const url = new URL('/settings', request.url)
+  const url = new URL('/settings', publicOrigin(request))
   // `?tab=` is what the settings page reads (settings-sections.ts).
   url.searchParams.set('tab', 'scheduling')
   for (const [key, value] of Object.entries(params)) {
