@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
+import { drainWebhookEvents } from '@/app/api/whatsapp/webhook/route'
 import { resumePendingExecution } from '@/lib/automations/engine'
 import type { AutomationContext } from '@/lib/automations/engine'
 
@@ -31,6 +32,28 @@ export async function GET(request: Request) {
   }
 
   const admin = supabaseAdmin()
+
+  // A rede para o que ficou para trás.
+  //
+  // O dreno acontece na própria requisição do webhook; isto aqui só pega
+  // o que sobrou quando uma execução morreu no meio, ou um evento que
+  // falhou e foi solto para nova tentativa. Roda ANTES das automações
+  // porque mensagem parada na fila é mais urgente que automação
+  // atrasada — e porque um evento drenado agora pode ser justamente o
+  // gatilho de uma automação.
+  let drained = { processed: 0, failed: 0 }
+  try {
+    drained = await drainWebhookEvents(200)
+    if (drained.processed || drained.failed) {
+      console.log(
+        `[cron] fila de webhook: ${drained.processed} drenados, ${drained.failed} falharam`,
+      )
+    }
+  } catch (err) {
+    // Não derruba o resto do cron: as automações não dependem disto.
+    console.error('[cron] dreno da fila de webhook falhou:', err)
+  }
+
   const { data: due, error } = await admin
     .from('automation_pending_executions')
     .select('*')
@@ -40,7 +63,8 @@ export async function GET(request: Request) {
     .limit(50)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!due || due.length === 0) return NextResponse.json({ processed: 0 })
+  if (!due || due.length === 0)
+    return NextResponse.json({ processed: 0, webhook_queue: drained })
 
   let processed = 0
   for (const row of due) {

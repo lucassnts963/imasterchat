@@ -3,6 +3,7 @@ import { loadAiConfig } from '@/lib/ai/config'
 import { validateAiCredentials } from '@/lib/ai/validate'
 import { AiError } from '@/lib/ai/types'
 import { loadGoogleConnection } from '@/lib/google/connection'
+import { pendingWebhookDepth } from '@/lib/webhooks/inbound-queue'
 import { verifyPhoneNumber } from '@/lib/whatsapp/meta-api'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { recordEvent } from './events'
@@ -361,10 +362,51 @@ export async function checkPlatform(
 ): Promise<Record<string, CheckResult>> {
   const result = await checkMigrations(db)
   await persist(db, null, 'migrations', result)
-  return { migrations: result }
+
+  const queue = await checkWebhookQueue(db)
+  await persist(db, null, 'webhook_queue', queue)
+
+  return { migrations: result, webhook_queue: queue }
 }
 
 /** O banco está na mesma migração que este build espera? */
+/**
+ * A fila de entrada está drenando?
+ *
+ * Esta verificação nasce junto com a fila, e não depois, por um motivo
+ * específico: se o dreno parar, o sintoma é caixa de entrada QUIETA —
+ * indistinguível de um dia devagar. É exatamente o modo de falha do
+ * sequestro de webhook pelo n8n, que passou dias sem ninguém notar.
+ *
+ * O critério é a IDADE do mais antigo, não a quantidade. Mil eventos
+ * chegando num lote da Meta e drenando em segundos é saúde; um único
+ * evento parado há dez minutos é problema.
+ */
+async function checkWebhookQueue(db: SupabaseClient): Promise<CheckResult> {
+  try {
+    const { pending, oldestSeconds } = await pendingWebhookDepth(db)
+    if (pending === 0) return { status: 'ok', detail: 'Fila vazia.' }
+
+    if (oldestSeconds !== null && oldestSeconds > 600) {
+      return {
+        status: 'failing',
+        code: 'queue_stalled',
+        detail: `${pending} evento(s) na fila, o mais antigo há ${Math.round(oldestSeconds / 60)} min. O dreno parou.`,
+      }
+    }
+    return {
+      status: 'ok',
+      detail: `${pending} evento(s) em trânsito, o mais antigo há ${oldestSeconds ?? 0}s.`,
+    }
+  } catch (err) {
+    return {
+      status: 'failing',
+      code: 'queue_unreadable',
+      detail: `Não foi possível ler a fila de webhook: ${err instanceof Error ? err.message : String(err)}`,
+    }
+  }
+}
+
 async function checkMigrations(db: SupabaseClient): Promise<CheckResult> {
   const expected = process.env.EXPECTED_MIGRATION
   if (!expected) {

@@ -1,4 +1,10 @@
 import { NextResponse, after } from 'next/server'
+import {
+  claimWebhookEvents,
+  enqueueWebhookEvents,
+  markProcessed,
+  releaseWithError,
+} from '@/lib/webhooks/inbound-queue'
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
@@ -199,6 +205,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
+  // GRAVA ANTES DE CONFIRMAR.
+  //
+  // O `after()` abaixo continua existindo e continua fazendo o trabalho
+  // na mesma requisição — a latência não muda. O que mudou é de onde vem
+  // a durabilidade: a linha já está no banco quando o 200 sai, então um
+  // container que morra no meio do processamento não leva a mensagem
+  // junto. E ela não voltaria: o 200 já foi dado, e a Meta não reentrega
+  // o que confirmamos.
+  //
+  // Se a gravação falhar, NÃO respondemos 200. Um 500 faz a Meta
+  // reentregar (por até 7 dias), que é exatamente o que se quer quando
+  // não conseguimos guardar — e é o oposto do que fazíamos antes, quando
+  // um banco fora do ar virava mensagem perdida em silêncio.
+  let enqueued = { queued: 0, total: 0 }
+  try {
+    enqueued = await enqueueWebhookEvents(supabaseAdmin(), body)
+  } catch (err) {
+    console.error('[webhook] falha ao enfileirar — devolvendo 500 para a Meta reentregar:', err)
+    return NextResponse.json({ error: 'queue unavailable' }, { status: 500 })
+  }
+
+  // Nada enfileirável (evento de template, ou um tipo que não tratamos):
+  // segue pelo caminho direto de sempre.
+  if (enqueued.total === 0) {
+    after(async () => {
+      try {
+        await processWebhook(body)
+      } catch (error) {
+        console.error('Error processing webhook:', error)
+      }
+    })
+    return NextResponse.json({ status: 'received' }, { status: 200 })
+  }
+
   // Process AFTER the response so we ack Meta within their ~20s timeout
   // (a slow ack triggers Meta retries + duplicate inserts), while still
   // guaranteeing the work runs to completion.
@@ -215,13 +255,63 @@ export async function POST(request: Request) {
   // maxDuration).
   after(async () => {
     try {
-      await processWebhook(body)
+      await drainWebhookEvents()
     } catch (error) {
-      console.error('Error processing webhook:', error)
+      console.error('Error draining webhook queue:', error)
     }
   })
 
   return NextResponse.json({ status: 'received' }, { status: 200 })
+}
+
+/**
+ * Drena a fila: pega o que falta e manda para o MESMO processador de
+ * sempre, reconstruindo a forma que ele espera.
+ *
+ * Serial de propósito. Em paralelo, duas mensagens da mesma conversa
+ * entram fora de ordem — o que bagunça a tela e o contexto que o agente
+ * lê. A ordem é por `received_at`, que é a ordem em que a Meta entregou.
+ *
+ * Exportada para o cron chamar: ele é a rede para o que ficou para trás
+ * quando uma execução morreu no meio.
+ */
+export async function drainWebhookEvents(limit = 200): Promise<{
+  processed: number
+  failed: number
+}> {
+  const db = supabaseAdmin()
+  const events = await claimWebhookEvents(db, limit)
+  let processed = 0
+  let failed = 0
+
+  for (const event of events) {
+    try {
+      await processWebhook({
+        entry: [
+          {
+            id: '',
+            changes: [
+              {
+                field: event.kind,
+                value: event.payload as WhatsAppWebhookEntry['changes'][number]['value'],
+              },
+            ],
+          },
+        ],
+      })
+      await markProcessed(db, event.id)
+      processed++
+    } catch (err) {
+      failed++
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`[webhook] evento ${event.id} falhou (tentativa ${event.attempts}):`, message)
+      // Solta para outro dreno tentar. Não some da fila — e é a
+      // profundidade da fila que a ronda de saúde vigia.
+      await releaseWithError(db, event.id, message)
+    }
+  }
+
+  return { processed, failed }
 }
 
 async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
