@@ -266,20 +266,49 @@ interruptor, e a que não gasta a chave da ElevenLabs de quem acha que
 parou o sistema. Quem quiser transcrição sem resposta automática tem o
 caminho certo: agente ligado, resposta automática desligada.
 
-## Onda 3 — as filas
+## Onda 3 — as filas (fundação PRONTA, telas pendentes)
 
-A fundação. Sem as telas, fila é dado que ninguém vê.
+| # | entrega | estado |
+|---|---|---|
+| 3.1 | `queues`, `queue_members`, `conversation_queue_stays`, `conversations.queue_id` | ✅ migração 065, aplicada |
+| 3.2 | Fila padrão `attended_by='ai'` por conta + backfill | ✅ 065 |
+| 3.5 | Registro das passagens em todo caminho | ✅ migração 066, aplicada |
+| 3.3 | Tela **Configurações → Filas** | ⬜ pendente |
+| 3.4 | Filtro de fila no inbox + a fila no item da lista | ⬜ pendente |
 
-| # | entrega |
-|---|---|
-| 3.1 | Migrações: `queues`, `queue_members`, `conversation_queue_stays`, `conversations.queue_id` |
-| 3.2 | Fila padrão `attended_by='ai'` para toda conta, e backfill das conversas existentes |
-| 3.3 | Tela **Configurações → Filas**: criar, descrever, responsável, `auto_assign` |
-| 3.4 | Filtro de fila no inbox + a fila no item da lista |
-| 3.5 | Abrir/fechar estada em todo caminho que muda `queue_id` |
+### O 3.5 mudou de lugar: saiu do TypeScript e foi para o banco
 
-O 3.5 é o que não pode ser deixado para depois: se a estada não for
-gravada desde o primeiro dia, o histórico daquele período não existe.
+A ideia original era um helper que todo caminho chamaria. Ela não
+sobrevive ao primeiro olhar em quem escreve `conversations`: **o
+navegador escreve direto na tabela** — o dropdown de atribuição e o
+seletor de status do inbox fazem `UPDATE` autorizados só pela RLS.
+Somando automações, fluxos, webhook e API pública, o helper dependeria
+de todo caminho lembrar de chamá-lo, para sempre, inclusive os que ainda
+não existem.
+
+O primeiro esquecido abre um buraco **permanente** no relatório, e um
+buraco que só aparece meses depois. Um gatilho não tem como ser
+esquecido.
+
+O preço, registrado honestamente: o **motivo** da saída passa a ser
+derivado da transição (`closed`, `reopened`, `handoff` quando a IA é
+desligada na mesma escrita, `manual` no resto) em vez de informado por
+quem move. Motivo aproximado com histórico completo vale mais que motivo
+preciso com falhas.
+
+Foram precisos **três** gatilhos, e o banco é que obrigou: `queue_id` só
+pode ser escrito antes da linha existir (`BEFORE`), e a estada só pode
+ser criada depois (`AFTER`), porque tem chave estrangeira para
+`conversations`. As duas coisas juntas num `BEFORE INSERT` falham com
+violação de FK — o teste em transação pegou isso antes de a migração ser
+aplicada.
+
+### O que já vale hoje, sem nenhuma tela
+
+Toda conversa nova cai sozinha em "Atendimento automático" e abre uma
+estada. Fechar a conversa fecha a passagem; reabrir abre outra. **O
+histórico começou a ser gravado** — que é o único item desta onda que
+não podia esperar, porque passado não gravado não volta.
 
 ## Onda 4 — o agente operando as filas
 
