@@ -4,9 +4,9 @@ Este é o pedaço do iMasterChat que fala com muita gente de uma vez e que avisa
 
 Três coisas precisam ficar claras antes de qualquer tutorial:
 
-- **Agendar um disparo não existe.** A tela mostra "Rascunho" e o sistema entende o status "Agendado", mas não há no código nada que escreva uma data de agendamento nem nada que execute um disparo no futuro. Salvar rascunho é só guardar o nome; o envio é sempre "agora".
-- **O disparo pelo painel acontece dentro do navegador da pessoa.** Quem manda os lotes para a Meta é a aba aberta. Fechar a aba no meio para o envio.
-- **Aviso no celular não é a mesma coisa que notificação no app.** São dois sistemas separados, com regras diferentes e configuração diferente.
+- **Agendar um disparo não existe.** A tela entende o status "Agendado" e o banco tem a coluna de data, mas não há no código nada que escreva essa data nem nada que execute um disparo no futuro. Salvar rascunho não agenda; o envio é sempre "agora".
+- **O disparo pelo painel acontece dentro do navegador da pessoa.** Quem manda os lotes para a Meta é a aba aberta. Fechar a aba para o envio.
+- **Aviso no celular não é a mesma coisa que notificação no app.** São dois sistemas separados, com regras, gatilhos e configuração diferentes.
 
 ## Para que serve (visão do cliente)
 
@@ -14,8 +14,8 @@ O dono do negócio e a equipe conseguem:
 
 - **Mandar a mesma mensagem para muitos clientes de uma vez**, usando um modelo já aprovado pela Meta (é a única forma de falar com quem não escreveu nas últimas 24 horas).
 - **Escolher para quem vai**: todos os contatos, só quem tem certas etiquetas (podendo também excluir etiquetas), quem bate uma regra de campo personalizado, ou uma lista vinda de um arquivo CSV.
-- **Personalizar a mensagem por pessoa**: cada variável do modelo ({{1}}, {{2}}...) pode receber um valor fixo, o nome/telefone/e-mail do contato ou um campo personalizado.
-- **Acompanhar a campanha**: quantos foram enviados, entregues, lidos, quantos responderam e quantos falharam, com um funil e a lista de destinatário por destinatário.
+- **Personalizar a mensagem por pessoa**: cada variável do modelo (`{{1}}`, `{{2}}`...) pode receber um valor fixo, o nome/telefone/e-mail do contato ou um campo personalizado.
+- **Acompanhar a campanha**: quantos foram enviados, entregues, lidos, quantos responderam e quantos falharam, com um funil e a lista destinatário por destinatário, incluindo a mensagem de erro de quem falhou.
 - **Exportar a lista de destinatários em CSV** para conferir fora do sistema.
 - **Criar e gerenciar os modelos de mensagem** dentro do próprio app: escrever, mandar para a análise da Meta, ver se foi aprovado ou rejeitado (e o motivo), editar e reenviar, apagar, ou trazer de uma vez os modelos que já existem na conta da Meta.
 - **Ser avisado quando um colega atribuir uma conversa a você**, na tela Notificações, com contador de não lidas no menu lateral e atualização em tempo real.
@@ -26,23 +26,25 @@ O que **não** existe e as pessoas costumam achar que existe:
 
 - **Agendamento de disparo.** Não há campo de data no assistente e não há nada que execute um envio depois.
 - **Pausar, cancelar ou retomar um disparo em andamento.** Uma vez começado, ele vai até o fim ou morre com a aba.
+- **Retomar um rascunho.** O rascunho é gravado, mas clicar nele abre a tela de detalhe (sem destinatários), não o assistente. Continuar significa refazer os passos.
 - **Reenviar só para quem falhou.** Não existe botão de reprocessar; seria uma campanha nova.
 - **Fila ou processamento em segundo plano no painel.** Se a aba fechar, os destinatários que não foram ficam parados como "Pendente" para sempre.
 - **Aviso de resposta de campanha, de erro de envio ou de qualquer outra coisa na tela Notificações.** O banco só aceita um tipo de notificação: conversa atribuída.
+- **Aviso no celular quando alguém te atribui uma conversa.** Push só existe para mensagem nova de cliente e para transferência do robô para uma pessoa.
 - **Central de aparelhos do push.** Não há tela que liste ou desconecte os avisos dos seus outros celulares/computadores; cada aparelho só desliga a si mesmo.
 - **Modo offline.** O componente que entrega os avisos no celular não guarda nada para uso sem internet, de propósito.
-- **Um limite de quantos contatos cabem em "todos os contatos".** Não há limite escrito no assistente; o teto real vem do banco e não foi medido.
+- **Um limite conhecido de quantos contatos cabem em "todos os contatos".** Não há limite escrito no assistente; o teto real vem do banco e não foi medido.
 
 ## Como se usa, na prática
 
 ### Disparar uma campanha
 
-1. Menu lateral → **Disparos em massa**. A lista mostra cada campanha com nome, modelo, número de destinatários, barra de entrega, barra de leitura, status e data. Enquanto houver campanha "Enviando", a tela se atualiza sozinha a cada 5 segundos (e pausa a atualização se você trocar de aba).
+1. Menu lateral → **Disparos em massa**. A lista mostra cada campanha com nome, modelo, número de destinatários, barra de entrega, barra de leitura, status e data. Enquanto houver campanha "Enviando", a tela se atualiza sozinha a cada 5 segundos (e pausa a atualização se você trocar de aba, retomando com uma busca nova quando você volta).
 2. Botão **Novo disparo**. Ele só fica ativo para quem pode enviar mensagens (papel `agent` ou acima); para quem não pode, o botão aparece bloqueado.
 3. **Passo 1 — Modelo.** Aparecem somente modelos com status APROVADO. Se a lista estiver vazia, o próprio passo manda criar um modelo em Configurações antes.
 4. **Passo 2 — Público.** Quatro opções: *Todos os contatos*, *Filtrar por etiquetas* (com uma segunda lista de etiquetas para excluir), *Campo personalizado* (campo + operador É / Não é / Contém + valor) e *Upload de CSV* (arquivo com uma coluna `phone` em formato E.164 e, opcionalmente, `name`).
 5. **Passo 3 — Personalizar.** Para cada variável do modelo, escolha *Valor fixo*, *Campo do contato* ou *Campo personalizado*. Se o modelo tem cabeçalho de imagem/vídeo/documento, aqui é onde se informa a **URL da mídia** — e ela é a mesma para todos os destinatários da campanha.
-6. **Passo 4 — Revisar e enviar.** Dê o nome da campanha. Dois botões: **Salvar como rascunho** (grava a campanha vazia, sem destinatários, com status Rascunho) e **Enviar disparo**.
+6. **Passo 4 — Revisar e enviar.** Dê o nome da campanha. Dois botões: **Salvar como rascunho** e **Enviar disparo**.
 7. Durante o envio a tela mostra "Processando X de Y destinatários". **Não feche esta aba.** O envio é feito pelo próprio navegador, em lotes de 10 contatos com 1 segundo de pausa entre lotes.
 8. Ao terminar, a campanha fica **Enviado** (ou **Falhou**, se nenhum destinatário tiver saído).
 
@@ -52,18 +54,18 @@ Se o público veio de CSV, os telefones do arquivo viram contatos de verdade na 
 
 1. **Disparos em massa** → clique na campanha.
 2. A tela traz seis números (Total de destinatários, Enviados, Entregues, Lidos, Responderam, Com falha), o funil Enviado → Entregue → Lido → Respondeu e a tabela de destinatários, com filtro por status e a coluna Erro para quem falhou.
-3. **Exportar CSV** baixa a tabela de destinatários.
-4. **Excluir** apaga a campanha e todos os destinatários dela. O botão fica desabilitado enquanto o status for "Enviando".
+3. **Exportar CSV** baixa a tabela de destinatários (com aspas no padrão RFC 4180, então nome com vírgula não quebra o arquivo).
+4. **Excluir** apaga a campanha e todos os destinatários dela, com confirmação na própria tela. O botão fica desabilitado enquanto o status for "Enviando".
 5. Esta tela **não** se atualiza sozinha: ela busca os dados uma vez ao abrir. Para ver o avanço das entregas e leituras, recarregue a página.
 
 Se um contato for apagado depois da campanha, a linha continua no histórico do disparo, só que sem nome (aparece "Unknown").
 
 ### Criar um modelo de mensagem
 
-1. Menu lateral → **Configurações** → aba **Modelos de mensagem**.
-2. **Novo modelo**: nome (só letras minúsculas, números e underscore), categoria, idioma, cabeçalho opcional (texto, imagem, vídeo ou documento), corpo com as variáveis, rodapé e botões.
+1. Menu lateral → **Configurações** → aba **Modelos** (o painel se chama "Modelos de mensagem").
+2. **Novo modelo**: nome (só letras minúsculas, números e underscore), categoria, idioma, cabeçalho opcional (texto, imagem, vídeo ou documento), corpo com as variáveis, valores de exemplo, rodapé e botões (até 10).
 3. Salvar envia o modelo para análise da Meta e o status local passa a refletir o que a Meta diz: PENDING, APPROVED, REJECTED e assim por diante. Quando é rejeitado, o motivo devolvido pela Meta aparece na tela.
-4. **Editar** um modelo aprovado dispara uma nova análise: o status volta para PENDENTE.
+4. **Editar** um modelo dispara uma nova análise: o status volta para PENDENTE. Só dá para editar modelo que esteja em APPROVED, REJECTED ou PAUSED.
 5. **Sincronizar da Meta** traz os modelos que já existem na sua conta do WhatsApp Business (inclusive os criados direto no Gerenciador da Meta). Essa sincronização nunca apaga um modelo que só existe aqui dentro.
 6. **Excluir** apaga o modelo na Meta e depois localmente.
 7. Modelos de categoria **Autenticação** não podem ser criados por aqui: crie no Gerenciador da Meta e traga com Sincronizar da Meta.
@@ -90,30 +92,34 @@ Escolher "Desligado" apaga o registro daquele aparelho no servidor e cancela a a
 
 ### Reagir a uma mensagem
 
-Na **Caixa de entrada**, o menu que aparece ao passar o mouse sobre a bolha da mensagem tem a opção de reagir com emoji. A reação vai para o WhatsApp do cliente e aparece na conversa; escolher o mesmo emoji de novo (reação vazia) remove. Reações que o cliente manda chegam pelo webhook e aparecem em tempo real.
+Na **Caixa de entrada**, o menu que aparece sobre a bolha da mensagem tem a opção de reagir com emoji. A reação vai para o WhatsApp do cliente e aparece na conversa; escolher o mesmo emoji de novo (reação vazia) remove. Reações que o cliente manda chegam pelo webhook e aparecem em tempo real. Não dá para reagir a uma mensagem que ainda não tem identificador da Meta.
 
 ## O que dá para configurar
 
 | Ajuste | Onde | O que muda |
 |---|---|---|
-| Modo de aviso no celular deste aparelho (Desligado / Só o que precisa de gente / Toda mensagem) | Configurações → aba **Avisos no celular** | Define se e quando aquele navegador toca. Vale por aparelho, não por pessoa. Qualquer membro pode mexer no próprio |
-| Criar, editar, reenviar e apagar modelo | Configurações → aba **Modelos de mensagem** | Altera o modelo aqui e na Meta. **Criar exige papel admin**; editar e apagar são barrados pela segurança do banco para quem não é admin, mas veja a pegadinha em "Limites e pegadinhas" |
-| Sincronizar da Meta | Configurações → aba **Modelos de mensagem** | Traz até 2000 modelos da Meta (20 páginas de 100). **Exige papel admin** |
+| Modo de aviso no celular deste aparelho (Desligado / Só o que precisa de gente / Toda mensagem) | Configurações → aba **Avisos no celular** | Define se e quando aquele navegador toca. Vale por aparelho, não por pessoa. Qualquer membro mexe no próprio |
+| Criar modelo e enviar para a Meta | Configurações → aba **Modelos** | Cria a linha local e submete à análise. **Exige papel admin** |
+| Editar / reenviar / apagar modelo | Configurações → aba **Modelos** | Altera o modelo aqui e na Meta. A rota não checa papel; quem barra a escrita local é a regra do banco (`admin`) — veja a pegadinha em "Limites e pegadinhas" |
+| Sincronizar da Meta | Configurações → aba **Modelos** | Traz até 2000 modelos da Meta (20 páginas de 100). **Exige papel admin** |
 | Modelo, público, variáveis, URL de mídia e nome da campanha | Disparos em massa → Novo disparo | Monta o disparo. **Exige papel agent ou acima** |
-| Salvar como rascunho | Disparos em massa → Novo disparo → passo Revisar e enviar | Cria a campanha com status Rascunho e zero destinatários. Não agenda nada |
+| Salvar como rascunho | Disparos em massa → Novo disparo → Revisar e enviar | Cria a campanha com status Rascunho e zero destinatários. Não agenda nada e não pode ser retomada pelo assistente |
 | Filtro por status e Exportar CSV | Disparos em massa → detalhe da campanha | Só afeta a visualização e o arquivo baixado |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Variável de ambiente (`.env`, `Dockerfile`, `docker-compose.app.yml`) | Chave pública dos avisos no celular. Precisa estar presente **no build** e em runtime; sem ela o painel diz que o servidor não está configurado |
-| `VAPID_PRIVATE_KEY` | Variável de ambiente (só servidor) | Chave privada dos avisos no celular. Sem ela nenhum push é enviado |
-| `VAPID_SUBJECT` | Variável de ambiente | Identificação do remetente para o serviço de push (`mailto:` ou `https:`). Padrão embutido: `mailto:admin@imasterchat.app` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Variável de ambiente (`.env.local.example:210`, `Dockerfile:35,42`, `deploy/docker-compose.app.yml:42,79`) | Chave pública dos avisos no celular. Precisa estar presente **no build** e em runtime; sem ela o painel diz que o servidor não está configurado |
+| `VAPID_PRIVATE_KEY` | Variável de ambiente, só servidor (`.env.local.example:211`) | Chave privada dos avisos no celular. Sem ela nenhum push é enviado |
+| `VAPID_SUBJECT` | Variável de ambiente (`.env.local.example:215`) | Identificação do remetente para o serviço de push (`mailto:` ou `https:`). Padrão embutido: `mailto:admin@imasterchat.app` |
 | `WHATSAPP_TEMPLATES_DRY_RUN` | Variável de ambiente | Modo de ensaio: enviar, editar e apagar modelo não chamam a Meta; o modelo recebe um identificador falso `dry-run-<uuid>` |
-| `WACRM_ENABLE_WRITES` + `WACRM_ENABLE_BROADCASTS` | Variáveis de ambiente do servidor MCP | Só com as duas ligadas a ferramenta `send_broadcast` fica disponível para um assistente externo — e ainda assim ela exige `confirm=true` na chamada |
+| `WACRM_ENABLE_WRITES` + `WACRM_ENABLE_BROADCASTS` | Variáveis de ambiente do servidor MCP (`mcp-server/src/config.ts:50-56`) | Só com as duas ligadas a ferramenta `send_broadcast` fica disponível para um assistente externo — e ainda assim ela exige `confirm=true` na chamada |
 | Cadência do disparo pelo painel (10 por chamada, 1 s entre lotes) | Código: `src/hooks/use-broadcast-sending.ts:62-63` | Ritmo do envio. Não há tela para isso |
+| Tamanho do lote de inserção de destinatários (200) | Código: `src/hooks/use-broadcast-sending.ts:66` | Quantas linhas por `insert` |
 | Orçamento de disparos (5 chamadas por 60 s por usuário) | Código: `src/lib/rate-limit.ts:123` | Ver a pegadinha dos 50 destinatários abaixo |
+| Orçamento de reações (120/min) e da API pública (120/min por chave) | Código: `src/lib/rate-limit.ts:127` e `:156` | Teto de chamadas por janela |
 | Teto de destinatários da API pública (1000 por requisição) | Código: `src/lib/whatsapp/broadcast-core.ts:77` | Acima disso a requisição é recusada com 400 |
 | Tempo máximo do envio da API pública (60 s) | Código: `src/app/api/v1/broadcasts/route.ts:37` | Passou disso, o envio é cortado no meio |
 | Teto de aparelhos alcançados por aviso (200) e validade do aviso (1 h) | Código: `src/lib/push/send.ts:105` e `:126` | Quantos aparelhos da conta recebem cada push e por quanto tempo o serviço tenta entregar |
 | Atualização automática da lista de disparos (5 s) | Código: `src/app/(dashboard)/broadcasts/page.tsx:28` | Frequência do polling |
-| Textos dos avisos e do painel de push | `messages/pt-BR.json` (bloco `Notifications` e `Settings.push`) | Redação exibida ao usuário |
+| Teto de páginas do "Sincronizar da Meta" (20 páginas de 100) | Código: `src/app/api/whatsapp/templates/sync/route.ts:169-171` | Quantos modelos vêm por sincronização |
+| Textos dos avisos e do painel de push | `messages/pt-BR.json` (bloco `Notifications`, linhas 2304-2320, e `Settings.push`) | Redação exibida ao usuário |
 
 ## Como funciona por dentro
 
@@ -122,22 +128,24 @@ Na **Caixa de entrada**, o menu que aparece ao passar o mouse sobre a bolha da m
 Todo o orquestrador é código de navegador (`src/hooks/use-broadcast-sending.ts`, `'use client'` na linha 1):
 
 1. Resolve a audiência. Para "todos os contatos" é um `.select('*')` sem `.limit()` (`use-broadcast-sending.ts:161`). Para CSV, os telefones viram linhas em `contacts` antes de tudo, deduplicados por telefone e inseridos em lotes de 200 (`:219-288`).
-2. Insere a linha em `broadcasts` direto pelo Supabase do cliente, com `status: 'sending'`, `total_recipients` preenchido e os cinco contadores semeados em zero (`:356`, `:371-377`).
-3. Insere as linhas de `broadcast_recipients` com status `pending`. Se a inserção de um lote falhar, o hook marca a campanha inteira como `failed` e escreve `failed_count` à mão (`:407-413`) — é o único ponto do sistema que escreve um contador com valor diferente de zero fora do trigger.
+2. Insere a linha em `broadcasts` direto pelo Supabase do cliente, com `status: 'sending'`, `total_recipients` preenchido, `template_variables`, `audience_filter` (tipo, etiquetas, etiquetas excluídas e regra de campo personalizado) e os cinco contadores **semeados em zero** (`:356-377`).
+3. Insere as linhas de `broadcast_recipients` com status `pending`. Se a inserção de um lote falhar, o hook marca a campanha inteira como `failed` e escreve `failed_count` à mão (`:407-413`) — é o único ponto do sistema que escreve um contador com valor **diferente de zero** fora do trigger.
 4. Resolve as variáveis por contato, ordenando as chaves numericamente para que `{{1}}` venha antes de `{{10}}` (`:94-99`). Cabeçalho de mídia vira `messageParams.headerMediaUrl`, igual para todos (`:448-455`).
 5. Chama `POST /api/whatsapp/broadcast` em lotes de 10, com `await sleep(1000)` entre lotes (`:62-63`, `:477`, `:553`), e escreve o status de cada destinatário conforme a resposta (`:507-546`).
 6. No fim, vira o status da campanha para `sent` ou, se todos falharam, `failed` (`:561-565`).
 
 A rota `/api/whatsapp/broadcast` **não escreve nada no banco**: ela lê `whatsapp_config` e `message_templates` e chama a Meta (`route.ts:123-162`). Todo o estado por destinatário é escrito pelo navegador.
 
+O botão "Salvar como rascunho" (`broadcasts/new/page.tsx:84-129`) grava nome, modelo, idioma, `template_variables`, um `audience_filter` reduzido (só `type` e `tagIds`), `total_recipients: 0` e os cinco contadores em zero. O próprio comentário do código (`:75-83`) registra que isso serve para reconhecer o rascunho, não para voltar ao assistente.
+
 ### O caminho do disparo pela API pública
 
 `src/lib/whatsapp/broadcast-core.ts` tem duas fases:
 
-- `createBroadcast` (`:85-247`) valida (`template_name` obrigatório, `recipients` não vazio, máximo 1000), lê a configuração do WhatsApp, lê a linha do modelo (e aborta com `template_malformed` se ela estiver corrompida, `:137-143`), descarta telefones fora do E.164 contando-os como `rejected` sem criar linha (`:151-155`), colapsa destinatários que resolvem para o mesmo contato mantendo a primeira ocorrência (`:173-178`) e persiste `broadcasts` + `broadcast_recipients`. **Não semeia contadores** de propósito (`:188-206`).
-- `deliverBroadcast` (`:262-327`) percorre os destinatários **sequencialmente e sem nenhuma pausa**, tentando variantes de telefone só quando o erro da Meta é "recipient not allowed" (`:291`), e atualiza a linha do destinatário para `sent` (com `whatsapp_message_id`) ou `failed`. No fim vira o status da campanha para `sent` se pelo menos um saiu.
+- `createBroadcast` (`:85-247`) valida (`template_name` obrigatório, `recipients` não vazio, máximo 1000), lê a configuração do WhatsApp, lê a linha do modelo (e aborta com `template_malformed` se ela estiver corrompida, `:137-143`), descarta telefones fora do E.164 contando-os como `rejected` sem criar linha (`:151-155`), colapsa destinatários que resolvem para o mesmo contato mantendo a primeira ocorrência (`:173-178`) e persiste `broadcasts` + `broadcast_recipients`. **Não semeia contadores**, de propósito e com comentário explicando (`:188-206`).
+- `deliverBroadcast` (`:262-327`) percorre os destinatários **sequencialmente e sem nenhuma pausa**, tentando variantes de telefone só quando o erro da Meta é "recipient not allowed" (`:291`; regex em `phone-utils.ts:102-104`), e atualiza a linha do destinatário para `sent` (com `whatsapp_message_id`) ou `failed`. No fim vira o status da campanha para `sent` se pelo menos um saiu.
 
-A rota `POST /api/v1/broadcasts` responde **202 antes de enviar qualquer mensagem** (`route.ts:82-91`) e faz o fan-out dentro de `after()` (`:80`), com `maxDuration = 60` (`:37`). `GET /api/v1/broadcasts/{id}` serve para poll e filtra por `account_id` na mão (`:28`), devolvendo 404 para id de outra conta.
+A rota `POST /api/v1/broadcasts` responde **202 antes de enviar qualquer mensagem** (`route.ts:82-91`) e faz o fan-out dentro de `after()` (`:80`), com `maxDuration = 60` (`:37`). `GET /api/v1/broadcasts/{id}` serve para poll e filtra por `account_id` na mão (`:28`), devolvendo 404 para id de outra conta. Nas rotas `/api/v1` o cliente é service-role (`api-context.ts:112`): a isolação por conta vem dos filtros no código, não da RLS.
 
 ### Contadores
 
@@ -157,11 +165,13 @@ O `status` guardado é o **enum cru da Meta** (DRAFT, PENDING, APPROVED, REJECTE
 
 - `POST /api/whatsapp/templates/submit` — valida, manda para a Meta, faz upsert local por `(user_id, name, language)` (`:75`). Falha da Meta grava a linha como DRAFT com `submission_error` (`:193-200`) e devolve 429 quando a mensagem contém "429".
 - `POST /api/whatsapp/templates/sync` — pagina de 100 em 100 com teto de 20 páginas (`:169-173`), casa por `(account_id, name, language)` para decidir update ou insert (`:242-287`), nunca apaga e devolve `truncated` quando bateu o teto.
-- `src/lib/whatsapp/template-webhook.ts` — trata os campos de webhook da Meta e casa por `meta_template_id` **sem filtrar por conta** (`:136`), avisando no log quando casa em mais de uma linha (`:155-159`). O motivo de rejeição só é preenchido no evento REJECTED e é limpo em qualquer outra transição (`:126-131`).
+- `src/lib/whatsapp/template-webhook.ts` — trata os três campos de webhook de template da Meta (status, qualidade e componentes) e casa por `meta_template_id` **sem filtrar por conta** (`:136`), avisando no log quando casa em mais de uma linha (`:155-159`). O motivo de rejeição só é preenchido no evento REJECTED e é limpo em qualquer outra transição (`:126-131`).
+
+A tela lê `message_templates` direto pelo Supabase (`template-manager.tsx:194`) e chama as rotas para escrever (`:268-354`).
 
 ### Notificações no app
 
-Nascem **exclusivamente** de um gatilho no Postgres em `conversations` (`027_notifications.sql:116-118`) — não existe nenhum `insert` em `notifications` no código da aplicação. A partir da migração 055 o gatilho grava só os **fatos** (`actor_name`, `contact_name`) e deixa `title`/`body` nulos (`055:78-90`); quem monta a frase, na língua de quem lê, é a tela (`notifications/page.tsx:36-51`). Linhas anteriores à 055 continuam sendo exibidas com o texto em inglês gravado no banco, porque a tela respeita `n.title` quando ele existe (`:37`). Quando `actor_name` é nulo, a tela usa a frase "Uma conversa com X foi atribuída a você" em vez de inventar um nome. O gatilho não notifica quem se atribui a si mesmo, e essa checagem só roda quando existe `auth.uid()` — uma atribuição feita por service-role sempre notifica (`055:62-64`). O gatilho engole os próprios erros: uma falha ao criar o aviso nunca derruba a atribuição da conversa (`055:93-97`).
+Nascem **exclusivamente** de um gatilho no Postgres em `conversations` (`027_notifications.sql:116-118`) — não existe nenhum `insert` em `notifications` no código da aplicação. A partir da migração 055 o gatilho grava só os **fatos** (`actor_name`, `contact_name`) e deixa `title`/`body` nulos (`055:78-90`); quem monta a frase, na língua de quem lê, é a tela (`notifications/page.tsx:36-51`). Linhas anteriores à 055 continuam sendo exibidas com o texto em inglês gravado no banco, porque a tela respeita `n.title` quando ele existe (`:37`). Quando `actor_name` é nulo, a tela usa a frase "Uma conversa com X foi atribuída a você" em vez de inventar um nome (`messages/pt-BR.json:2317-2318`). O gatilho não notifica quem se atribui a si mesmo, e essa checagem só roda quando existe `auth.uid()` — uma atribuição feita por service-role sempre notifica (`055:62-64`). O gatilho engole os próprios erros: uma falha ao criar o aviso nunca derruba a atribuição da conversa (`055:93-97`).
 
 A tabela está na publicação de Realtime com `REPLICA IDENTITY FULL` (`027:31`, `:123-131`); a tela (`:83-117`) e o contador do menu lateral (`use-unread-notifications.ts:33-54`) assinam mudanças.
 
@@ -169,12 +179,12 @@ A tabela está na publicação de Realtime com `REPLICA IDENTITY FULL` (`027:31`
 
 Tudo está em `src/lib/push/send.ts`:
 
-- `isPushConfigured()` (`:41-71`) lê `NEXT_PUBLIC_VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` e **cacheia o resultado em módulo** — mudar a variável exige reiniciar o processo.
-- `sendPushToAccount()` (`:81-161`) sai calado se não houver VAPID (`:92`), lê no máximo 200 assinaturas da conta (`:105`), manda com TTL de 1 hora (`:126`), apaga assinaturas mortas quando o serviço devolve 404 ou 410 (`:135-145`) e **nunca lança** (`:157-160`).
+- `isPushConfigured()` (`:41-71`) lê `NEXT_PUBLIC_VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` e **cacheia o resultado em módulo** — mudar a variável exige reiniciar o processo. `VAPID_SUBJECT` tem padrão `mailto:admin@imasterchat.app` (`:54`).
+- `sendPushToAccount()` (`:81-161`) sai calado se não houver VAPID (`:92`), lê no máximo 200 assinaturas da conta (`:105`), manda com TTL de 1 hora (`:126`), apaga assinaturas mortas quando o serviço devolve 404 ou 410 (`:135-145`) e **nunca lança** (`:157-160`). O carimbo `last_used_at` só é atualizado quando nenhuma assinatura morreu naquele envio — os ramos são `if/else if` (`:144-153`).
 - A regra de quem recebe: um evento urgente (`human_needed`) alcança **os dois modos**; um evento comum (`all`) alcança só quem escolheu "Toda mensagem" (`:103`).
 - O texto do aviso é cortado em 120 caracteres com reticências (`:164-167`).
 
-Existem exatamente **dois** eventos que geram push: mensagem nova do cliente (urgência `all`, `webhook/route.ts:911-925`) e transferência para humano (urgência `human_needed`, com `urgent: true`, `src/lib/conversations/handoff.ts:139-149`). O push de mensagem nova só sai se a conta não estiver bloqueada por cobrança e se o texto não for vazio (`webhook:911`).
+Existem exatamente **dois** eventos que geram push: mensagem nova do cliente (urgência `all`, `webhook/route.ts:911-925`) e transferência para humano (urgência `human_needed`, com `urgent: true`, `src/lib/conversations/handoff.ts:139-149`). O push de mensagem nova só sai se a conta não estiver bloqueada por cobrança e se o texto não for vazio (`webhook:911`; `billing/side-effects.ts:58-59`).
 
 O componente de entrega no navegador é `public/sw.js`: **sem handler de fetch de propósito** (comentário `:8-15`), só mostra a notificação (`:29-57`) e trata o clique reaproveitando uma aba já aberta (`:59-79`). Só a transferência para humano faz o aparelho vibrar (`:53`). Avisos são agrupados por conversa via `tag` (`:48`), então cinco mensagens do mesmo cliente viram um aviso que se atualiza. O registro do service worker acontece **só** quando a pessoa escolhe um modo nas Configurações (`push-notifications.tsx:93`) — é o único `navigator.serviceWorker.register` de todo o `src/`.
 
@@ -182,11 +192,11 @@ A assinatura é por **navegador**, não por pessoa: `endpoint` é UNIQUE (`051:3
 
 ### Reações
 
-Reação é estado por `(mensagem, ator)`, nunca uma mensagem nova: emoji vazio apaga, emoji preenchido faz upsert com `onConflict: 'message_id,actor_type,actor_id'` — tanto pelo webhook do cliente (`webhook/route.ts:563-591`) quanto pela rota do atendente (`react/route.ts:127-154`). A rota recusa reagir a mensagem que não tem identificador da Meta (`react/route.ts:58-65`).
+Reação é estado por `(mensagem, ator)`, nunca uma mensagem nova: emoji vazio apaga, emoji preenchido faz upsert com `onConflict: 'message_id,actor_type,actor_id'` — tanto pelo webhook do cliente (`webhook/route.ts:563-591`) quanto pela rota do atendente (`react/route.ts:127-154`). A rota recusa reagir a mensagem que não tem identificador da Meta (`react/route.ts:58-65`). A coluna `conversation_id` é desnormalizada só para o Realtime poder filtrar por igualdade (`009:21-22,45`); a tela assina esses canais em `message-thread.tsx:362,392,405`.
 
 ## Limites e pegadinhas
 
-**Disparo pelo painel trava a partir de mais ou menos 50 destinatários.** O endpoint aceita 5 chamadas por 60 segundos por usuário (`rate-limit.ts:123`) e o painel gasta uma chamada por lote de 10, com 1 segundo entre lotes. Pela leitura do código, o sexto lote (a partir do 51º destinatário) cai na mesma janela e recebe 429; quando um lote volta com erro, o hook marca **os 10 destinatários daquele lote como "Com falha"**, com a mensagem de erro gravada na linha (`use-broadcast-sending.ts:489-491`, `:535-546`). Esse encadeamento não foi verificado com um disparo real — o que o cliente vê na tela nesse momento não foi observado. Para listas grandes, o caminho correto hoje é a API pública, não o painel.
+**Disparo pelo painel trava a partir de mais ou menos 50 destinatários.** O endpoint aceita 5 chamadas por 60 segundos por usuário (`rate-limit.ts:123`) e o painel gasta uma chamada por lote de 10, com 1 segundo entre lotes. Pela leitura do código, o sexto lote (a partir do 51º destinatário) cai na mesma janela e recebe 429; quando um lote volta com erro, o hook marca **os 10 destinatários daquele lote como "Com falha"**, com a mensagem de erro gravada na linha (`use-broadcast-sending.ts:489-491`, `:535-546`). Esse encadeamento não foi verificado com um disparo real — o que o cliente vê na tela nesse momento não foi observado. Para listas grandes, o caminho hoje é a API pública, não o painel.
 
 **O limitador é um Map na memória do processo** (`rate-limit.ts:46`): o teto de 5/min vale por instância do servidor e não é compartilhado entre réplicas.
 
@@ -200,15 +210,15 @@ Reação é estado por `(mensagem, ator)`, nunca uma mensagem nova: emoji vazio 
 
 **Destinatários repetidos na API pública são colapsados.** Dois números que resolvem para o mesmo contato viram um envio só.
 
-**"Agendado" é fantasma.** A coluna `broadcasts.scheduled_at` existe (`001:302`), o status "scheduled" é aceito pelo banco e traduzido como "Agendado" na tela, e o tipo TypeScript declara o campo — mas nada em `src/` escreve nessa coluna e não há executor. Um tutorial jamais deve prometer agendamento.
+**"Agendado" é fantasma.** A coluna `broadcasts.scheduled_at` existe (`001:302`), o status `scheduled` é aceito pelo banco e traduzido como "Agendado" na tela, e o tipo TypeScript declara o campo (`src/types/index.ts:401`) — mas nada em `src/` escreve nessa coluna e não há executor. Um tutorial jamais deve prometer agendamento.
 
-**Rascunho não é campanha pela metade.** Salvar rascunho grava a campanha com zero destinatários; a audiência escolhida no assistente **não** é guardada. Voltar depois significa refazer os passos.
+**Rascunho não volta para o assistente.** O rascunho guarda nome, modelo, variáveis e um filtro de público reduzido (só o tipo e as etiquetas — regra de campo personalizado, etiquetas de exclusão e arquivo CSV não são guardados), com zero destinatários. Clicar nele na lista abre a tela de detalhe, que só oferece exportar e excluir. Não há botão de "continuar" nem de "enviar agora".
 
 **Cabeçalho de mídia é uma URL só para toda a campanha.** Não dá para variar a imagem por destinatário.
 
-**Apagar modelo pode apagar na Meta mesmo sem permissão.** As rotas `PATCH` e `DELETE` de `/api/whatsapp/templates/{id}` **não fazem nenhuma checagem de papel no código** (`templates/[id]/route.ts:70-81`, `:245-268`) — diferente de `submit` e `sync`, que exigem admin. A rota de DELETE chama a Meta **antes** de apagar a linha local (`:280-304`, depois `:306-309`); a segurança do banco só protege a linha local. Na prática, um membro sem papel de admin consegue provocar a exclusão do modelo na Meta. Trate isso como defeito conhecido, não como comportamento a documentar para o cliente.
+**Apagar modelo pode apagar na Meta mesmo sem permissão — defeito confirmado.** As rotas `PATCH` e `DELETE` de `/api/whatsapp/templates/{id}` **não fazem nenhuma checagem de papel no código** (`templates/[id]/route.ts:70-81`, `:245-268`), diferente de `submit` e `sync`, que exigem admin. A rota de DELETE chama a Meta **antes** de apagar a linha local (`:280-304`, depois `:306-309`), e a regra do banco só protege a linha local. Na prática, um membro sem papel de admin — inclusive um `viewer` — consegue provocar a exclusão do modelo na Meta. Trate como defeito conhecido, não como comportamento a documentar para o cliente.
 
-**O link do aviso no celular não abre a conversa.** O push é montado com `/inbox?conversation=<id>` (`webhook/route.ts:918` e `handoff.ts:145`), mas a Caixa de entrada lê o parâmetro `c` (`inbox/page.tsx:44`). Clicar no aviso abre a Caixa de entrada sem selecionar a conversa. O aviso da tela **Notificações** não tem esse problema: ele navega com `?c=` (`notifications/page.tsx:149`).
+**O link do aviso no celular não abre a conversa — defeito confirmado.** O push é montado com `/inbox?conversation=<id>` (`webhook/route.ts:918` e `handoff.ts:145`), mas a Caixa de entrada lê o parâmetro `c` (`inbox/page.tsx:44`). Clicar no aviso abre a Caixa de entrada sem selecionar a conversa. O aviso da tela **Notificações** não tem esse problema: ele navega com `?c=`.
 
 **Aviso no celular não avisa sobre atribuição de conversa.** Só existem dois gatilhos de push: mensagem nova de cliente e transferência para humano. Quem depende de saber que recebeu uma conversa precisa olhar a tela Notificações.
 
@@ -226,9 +236,15 @@ Reação é estado por `(mensagem, ator)`, nunca uma mensagem nova: emoji vazio 
 
 **Qualquer agente pode mexer na reação de qualquer um.** Depois da migração 017, a regra de segurança de `message_reactions` deixou de exigir que o ator seja você (`009:80-89` versus `017:584-598`).
 
-**Um viewer não vê "Novo disparo" ativo**, mas a proteção real do disparo pelo painel está na rota (`requireRole('agent')`) e nas regras do banco — a tela só esconde o botão.
+**Um viewer não vê "Novo disparo" ativo**, mas a proteção real do disparo pelo painel está na rota (`requireRole('agent')`) e nas regras do banco — a tela só desabilita o botão.
 
-**O que não foi medido:** quantos contatos realmente voltam em "todos os contatos" (a consulta não tem `.limit()`; o teto vem da configuração do PostgREST, que não foi encontrada configurada no repositório); se a Meta de fato entrega o evento "sent"; e o estado final dos privilégios de coluna da tabela `notifications` — a migração 027 tentou permitir UPDATE só em `read_at`, mas a migração 044 faz `GRANT ALL` em todas as tabelas do schema, o que pela ordem de aplicação anula essa restrição (a segurança por linha continua valendo: cada um só mexe nas próprias notificações).
+**O que não foi medido ou confirmado:**
+
+- Quantos contatos realmente voltam em "todos os contatos". A consulta não tem `.limit()` (`use-broadcast-sending.ts:161`); o teto vem do `db-max-rows` do PostgREST, que não foi encontrado configurado no repositório.
+- Se a Meta de fato entrega o evento `sent` por webhook. O código trata o caso (`webhook/route.ts:431`), o que não é prova de que chega.
+- O estado final dos privilégios de coluna da tabela `notifications`: a migração 027 tentou permitir UPDATE só em `read_at` (`027:50-51`), mas a 044 faz `GRANT ALL` em todas as tabelas do schema (`044:43`) e, pela ordem alfabética de aplicação (`deploy/apply-migrations.sh:92`), anula essa restrição. A segurança por linha continua valendo: cada um só mexe nas próprias notificações. Isso não foi verificado num banco real.
+- Se alguém alterou a publicação `supabase_realtime` fora das migrações (por exemplo pelo Studio). A afirmação de que `broadcasts` não é realtime vale para o que as migrações fazem.
+- Detalhes de validação de formulário do gerenciador de modelos e quais ações aparecem para cada status: o arquivo não foi lido por inteiro.
 
 ## Referência
 
@@ -238,54 +254,56 @@ Reação é estado por `(mensagem, ator)`, nunca uma mensagem nova: emoji vazio 
 |---|---|---|---|
 | `broadcasts` | A campanha: nome, modelo, filtro de audiência, status e contadores agregados | `001_initial_schema.sql:294`; conta e regras finais em `017_account_sharing.sql:185,285,304,448-452` | Ler: qualquer membro. Inserir/alterar/apagar: `agent` ou acima |
 | `broadcast_recipients` | Uma linha por contato dentro da campanha; fonte de verdade do status e ponto de ligação com o id de mensagem da Meta | `001:321`; `003_broadcast_recipient_wamid.sql:26-36`; `004_contact_delete_set_null.sql:26-44`; `017:533-541` | Ler: qualquer membro da conta dona da campanha. Escrever: `agent` ou acima |
-| `message_templates` | Catálogo local dos modelos da Meta, com status cru, motivo de rejeição e nota de qualidade | `001:211`; `014_message_templates_meta_integration.sql`; `017:182,282,301,427-431` | Ler: qualquer membro. Inserir/alterar/apagar: `admin` ou acima |
+| `message_templates` | Catálogo local dos modelos da Meta, com status cru, motivo de rejeição, erro de submissão e nota de qualidade | `001:211`; `014_message_templates_meta_integration.sql`; `017:182,282,301,427-431` | Ler: qualquer membro. Inserir/alterar/apagar: `admin` ou acima |
 | `notifications` | Aviso dentro do app; hoje só "conversa atribuída a você" | `027_notifications.sql`; `055_notifications_i18n.sql` | Cada pessoa lê e atualiza só as suas. Não há regra de INSERT nem de DELETE para o cliente — as linhas nascem do gatilho |
-| `push_subscriptions` | Uma linha por navegador, com endpoint, chaves e o modo de aviso daquele aparelho | `051_push_subscriptions.sql` | Cada pessoa vê e mexe só nas suas, mesmo sendo admin |
+| `push_subscriptions` | Uma linha por navegador, com endpoint, chaves de criptografia e o modo de aviso daquele aparelho | `051_push_subscriptions.sql` | Cada pessoa vê e mexe só nas suas, mesmo sendo admin. O remetente roda com service-role e ignora a RLS |
 | `message_reactions` | Uma reação (emoji) por (mensagem, ator); ator pode ser cliente ou atendente | `009_message_actions.sql:42-114`; `017:571-598` | Ler: qualquer membro. Escrever/apagar: `agent` ou acima, sem distinguir de quem é a reação |
 
 Detalhes que importam:
 
-- `broadcasts.status` aceita `draft`, `scheduled`, `sending`, `sent`, `failed` (`001:303`). `scheduled` nunca é escrito pelo sistema.
-- `broadcast_recipients.status` aceita `pending`, `sent`, `delivered`, `read`, `replied`, `failed` (`001:325`).
+- `broadcasts.status` aceita `draft`, `scheduled`, `sending`, `sent`, `failed` (`001:303`). `scheduled` nunca é escrito pelo sistema, assim como `scheduled_at` (`001:302`).
+- `broadcasts.template_variables` guarda o mapa `{chave: {type, value}}` montado no assistente; `audience_filter` guarda o filtro de público.
+- `broadcast_recipients.status` aceita `pending`, `sent`, `delivered`, `read`, `replied`, `failed` (`001:325`), com índice composto `(broadcast_id, status)` (`003:35-36`).
 - `broadcast_recipients.contact_id` deixou de ser obrigatório e virou `ON DELETE SET NULL` na migração 004 — apagar contato não apaga o histórico.
 - Apagar a campanha apaga os destinatários em cascata (`001:323`).
-- `message_templates.status` aceita `DRAFT`, `PENDING`, `APPROVED`, `REJECTED`, `PAUSED`, `DISABLED`, `IN_APPEAL`, `PENDING_DELETION` (`014:108-119`), com padrão `DRAFT`.
-- `message_templates.buttons` é JSONB com no máximo 10 elementos (`014:142-150`).
-- `notifications.type` só aceita `conversation_assigned` (`027:9-10`). `title` deixou de ser obrigatório na 055 e está marcada como legado.
-- `push_subscriptions.notify_mode` é o enum `push_notify_mode` com `all` e `human_needed`, padrão `human_needed` (`051:20-28`). "Desligado" não é um valor: é a ausência da linha.
-- `message_reactions` é única por `(message_id, actor_type, actor_id)` (`009:50`).
+- `message_templates.status` aceita `DRAFT`, `PENDING`, `APPROVED`, `REJECTED`, `PAUSED`, `DISABLED`, `IN_APPEAL`, `PENDING_DELETION` (`014:108-119`), com padrão `DRAFT`. O CHECK em TitleCase da 001 foi derrubado pela 014 (`014:70-91`).
+- `message_templates.category` aceita `Marketing`, `Utility`, `Authentication` (`001:215`); `header_type` aceita `text`, `image`, `video`, `document` (`001:217`); `quality_score` aceita NULL, `GREEN`, `YELLOW`, `RED` (`014:60-62`).
+- `message_templates.buttons` é JSONB com no máximo 10 elementos (`014:142-150`). O índice único é `(user_id, name, language)` (`014:190-191`).
+- `notifications.type` só aceita `conversation_assigned` (`027:9-10`). `title` deixou de ser obrigatório na 055 e está marcada como legado (`055:33-38`); `actor_name` e `contact_name` são congelados no momento do fato (`055:29-31`).
+- `push_subscriptions.notify_mode` é o enum `push_notify_mode` com `all` e `human_needed`, padrão `human_needed` (`051:20-28`). "Desligado" não é um valor: é a ausência da linha. `user_agent` é cortado em 200 caracteres na gravação.
+- `message_reactions` é única por `(message_id, actor_type, actor_id)` (`009:50`), com `actor_type` em `customer`/`agent` (`009:46`).
 
 ### Rotas
 
 | Método | Rota | Autenticação e papel exigido | O que faz |
 |---|---|---|---|
-| POST | `/api/whatsapp/broadcast` | Sessão, `requireRole('agent')` (`:75`), com portão de cobrança; limite de 5 chamadas/60 s por usuário (`:80`) | Envia o modelo para uma lista de telefones chamando a Meta e devolve o resultado por telefone. Não escreve no banco. Aceita `recipients:[{phone,params,messageParams}]` e a forma legada `phone_numbers[] + template_params[]` |
-| POST | `/api/v1/broadcasts` | Chave de API com escopo `broadcasts:send` (`:48`); 120 req/min por chave; cliente service-role (a isolação por conta é feita no código, não pelas regras do banco) | Cria a campanha e as linhas de destinatário, responde 202 e envia depois, em segundo plano (limite de 60 s). Corpo: `template_name`, `template_language`, `name`, `recipients:[{to,params}]`, máximo 1000 |
+| POST | `/api/whatsapp/broadcast` | Sessão, `requireRole('agent')` (`:75`), com portão de cobrança (402); limite de 5 chamadas/60 s por usuário (`:80`) | Envia o modelo para uma lista de telefones chamando a Meta e devolve o resultado por telefone. **Não escreve no banco.** Aceita `recipients:[{phone,params,messageParams}]` e a forma legada `phone_numbers[] + template_params[]` |
+| POST | `/api/v1/broadcasts` | Chave de API com escopo `broadcasts:send` (`:48`); 120 req/min por chave, checados antes do escopo; cliente service-role | Cria a campanha e as linhas de destinatário, responde 202 e envia depois, em segundo plano (limite de 60 s). Corpo com `template_name`, `template_language`, `name`, `recipients:[{to,params}]`, máximo 1000 |
 | GET | `/api/v1/broadcasts/{id}` | Chave de API com escopo `broadcasts:send` (`:19`); filtro manual por conta (`:28`) | Devolve status e contadores da campanha para poll. Id de outra conta cai em 404 |
-| GET | `/api/push/subscribe` | Sessão, qualquer membro (`:22`) | Diz se o servidor tem VAPID e se aquele endpoint de navegador já está assinado, com o modo atual |
+| GET | `/api/push/subscribe` | Sessão, qualquer membro (`:22`) | Diz se o servidor tem VAPID (`available`) e, se o `endpoint` for passado na query, se aquele navegador já está assinado e em qual modo. Sem `endpoint`, responde `subscribed: false` |
 | POST | `/api/push/subscribe` | Sessão, qualquer membro (`:51`) | Registra ou atualiza a assinatura do navegador (upsert por `endpoint`). Devolve 400 com `push_not_configured` se faltar VAPID. Modo inválido cai para `human_needed`; user agent é cortado em 200 caracteres |
 | DELETE | `/api/push/subscribe` | Sessão, qualquer membro (`:118`) | Apaga a linha daquele endpoint, filtrando também pelo usuário |
 | POST | `/api/whatsapp/templates/submit` | Sessão, `requireRole('admin')` (`:102`) | Valida e envia o modelo para aprovação da Meta; upsert local por `(user_id,name,language)`. Recusa categoria `Authentication`. Respeita `WHATSAPP_TEMPLATES_DRY_RUN` |
-| PATCH | `/api/whatsapp/templates/{id}` | Sessão apenas; **sem checagem de papel no código** (`:60-81`) — quem barra é a regra do banco (`admin`) | Edita o modelo na Meta e devolve o status local para PENDING. Só aceita modelos em APPROVED, REJECTED ou PAUSED e exige identificador da Meta |
-| DELETE | `/api/whatsapp/templates/{id}` | Sessão apenas; **sem checagem de papel no código** (`:245-268`) | Apaga na Meta (quando há identificador e não é ensaio) e depois apaga a linha local |
+| PATCH | `/api/whatsapp/templates/{id}` | Sessão apenas; **sem checagem de papel no código** (`:60-81`) — quem barra a escrita local é a regra do banco (`admin`) | Edita o modelo na Meta e devolve o status local para PENDING. Só aceita modelos em APPROVED, REJECTED ou PAUSED e exige identificador da Meta. Valida o id como UUID antes de tocar no banco |
+| DELETE | `/api/whatsapp/templates/{id}` | Sessão apenas; **sem checagem de papel no código** (`:245-268`) | Apaga na Meta (quando há identificador e não é ensaio) e **depois** apaga a linha local |
 | POST | `/api/whatsapp/templates/sync` | Sessão, `requireRole('admin')` (`:136`) | Puxa os modelos da Meta (100 por página, até 20 páginas), atualiza ou insere por `(account_id,name,language)`, nunca apaga, sinaliza `truncated` |
-| POST | `/api/whatsapp/react` | Sessão, `requireRole('agent')` (`:27`); limite de 120/min por usuário | Manda a reação para a Meta e espelha em `message_reactions`. Emoji vazio apaga |
-| POST | `/api/whatsapp/webhook` | Assinatura HMAC da Meta; inválida devolve 401 (`:184-193`). Depois roda com service-role | Faz o status por destinatário avançar, marca "respondeu", grava reações do cliente, atualiza status e qualidade dos modelos e dispara o aviso de mensagem nova |
-| GET | `/api/whatsapp/webhook` | `hub.verify_token` comparado com o token de cada linha de `whatsapp_config` (`:113-135`) | Handshake de verificação do webhook da Meta |
+| POST | `/api/whatsapp/react` | Sessão, `requireRole('agent')` (`:27`); limite de 120/min por usuário | Manda a reação para a Meta e espelha em `message_reactions`. Emoji vazio apaga; emoji preenchido faz upsert |
+| POST | `/api/whatsapp/webhook` | Assinatura HMAC da Meta sobre o corpo cru; inválida devolve 401 (`:184-193`). Depois roda com service-role | Faz o status por destinatário avançar, marca "respondeu", grava reações do cliente, atualiza status e qualidade dos modelos e dispara o aviso de mensagem nova |
+| GET | `/api/whatsapp/webhook` | `hub.verify_token` comparado com o token descriptografado de cada linha de `whatsapp_config` (`:113-135`) | Handshake de verificação do webhook da Meta |
 
 ### Telas
 
 | Nome no menu / caminho | Rota | O que traz |
 |---|---|---|
-| Disparos em massa | `/broadcasts` | Lista de campanhas com barras de entrega e leitura; atualiza a cada 5 s enquanto houver campanha enviando e pausa com a aba escondida; botão "Novo disparo" bloqueado para quem não pode enviar |
+| Disparos em massa | `/broadcasts` | Lista de campanhas com barras de entrega e leitura; atualiza a cada 5 s enquanto houver campanha enviando e pausa com a aba escondida; botão "Novo disparo" desabilitado para quem não pode enviar. Clicar numa linha abre o detalhe |
 | Disparos em massa → Novo disparo | `/broadcasts/new` | Assistente de 4 passos (Modelo, Público, Personalizar, Revisar e enviar) e o botão "Salvar como rascunho" |
 | Disparos em massa → detalhe | `/broadcasts/[id]` | Seis cartões de estatística, funil, tabela de destinatários com filtro por status, exportação CSV e exclusão com confirmação (bloqueada enquanto envia). Sem atualização automática |
-| Notificações | `/notifications` | Até 100 avisos, em tempo real, com marcar-como-lida e marcar-todas; clicar abre a conversa |
-| Configurações → Avisos no celular | `/settings?tab=push` | Três opções por aparelho (Desligado, Só o que precisa de gente, Toda mensagem). Único lugar que registra o service worker |
-| Configurações → Modelos de mensagem | `/settings?tab=templates` | Criar, editar, reenviar, apagar e "Sincronizar da Meta" |
+| Notificações | `/notifications` | Até 100 avisos, em tempo real, com marcar-como-lida (otimista) e marcar-todas; clicar abre a conversa. É aqui que a frase do aviso é montada |
+| Configurações → Avisos no celular | `/settings?tab=push` | Três opções por aparelho (Desligado, Só o que precisa de gente, Toda mensagem). Único lugar do app que registra o service worker e chama `pushManager.subscribe` |
+| Configurações → Modelos | `/settings?tab=templates` | Criar, editar, reenviar, apagar e "Sincronizar da Meta". Lê `message_templates` direto do banco e escreve pelas rotas |
 | Caixa de entrada (conversa aberta) | `/inbox` | Renderiza e assina em tempo real as reações das mensagens |
 | Painel | `/dashboard` | O feed de atividade mostra as 5 campanhas mais recentes, com link para Disparos em massa |
 
 ### Ferramenta MCP
 
-`send_broadcast` (`mcp-server/src/tools/broadcast.ts`) só é registrada quando `WACRM_ENABLE_WRITES` **e** `WACRM_ENABLE_BROADCASTS` estão ligadas, e ainda recusa a chamada sem `confirm=true` (`:52-59`).
+`send_broadcast` (`mcp-server/src/tools/broadcast.ts`) só é registrada quando `WACRM_ENABLE_WRITES` **e** `WACRM_ENABLE_BROADCASTS` estão ligadas (`mcp-server/src/config.ts:50-56`), e ainda recusa a chamada sem `confirm=true` (`:52-59`).

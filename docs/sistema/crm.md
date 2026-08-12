@@ -403,7 +403,7 @@ Colunas que valem lembrar:
 | GET | `/api/v1/contacts/[id]` | chave de API, escopo `contacts:read` | Lê um contato; contato de outra conta devolve 404, nunca 403 | `src/app/api/v1/contacts/[id]/route.ts` |
 | PATCH | `/api/v1/contacts/[id]` | chave de API, escopo `contacts:write` | Atualiza name/email/company (null limpa) e substitui o conjunto de etiquetas por diferença | `src/app/api/v1/contacts/[id]/route.ts` |
 | POST | `/api/whatsapp/webhook` | assinatura HMAC-SHA256 da Meta (`META_APP_SECRET`); escreve com service role | Não é rota "de CRM", mas é onde o contato nasce na maioria dos casos: acha ou cria por telefone, atualiza o nome do perfil e dispara `new_contact_created` / `first_inbound_message` | `src/app/api/whatsapp/webhook/route.ts` |
-| POST | `/api/whatsapp/send` | sessão; valida que o contato é da conta antes de abrir a conversa | Usada pela ficha do contato com `contact_id` e sem `conversation_id`, para iniciar conversa por modelo | `src/app/api/whatsapp/send/route.ts` |
+| POST | `/api/whatsapp/send` | sessão + `requireRole('agent')` (`send/route.ts:34`); valida que o contato é da conta antes de abrir a conversa | Usada pela ficha do contato com `contact_id` e sem `conversation_id`, para iniciar conversa por modelo | `src/app/api/whatsapp/send/route.ts` |
 
 ### Telas
 

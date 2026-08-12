@@ -1,311 +1,365 @@
 # API pública, chaves e webhooks de saída
 
-Este é o pedaço do iMasterChat que permite operar a conta sem abrir o painel. Uma ferramenta de fora (um robô no n8n, um script da empresa, um formulário do site, o servidor MCP que acompanha o repositório) recebe uma chave de API e, com ela, consegue mandar mensagem no WhatsApp, ler e criar contatos, ler conversas, passar uma conversa para um atendente humano, marcar e cancelar agendamentos e disparar campanhas. O caminho de volta são os webhooks de saída: o iMasterChat avisa um endereço HTTPS da empresa toda vez que chega mensagem, muda o status de entrega de uma mensagem enviada ou nasce/reabre uma conversa. Tudo isso vive sob `/api/v1`, com autenticação por chave portadora (`Authorization: Bearer wacrm_live_…`), autorização exclusivamente por escopos e um limite de chamadas por chave.
+O iMasterChat tem uma porta de entrada para programas, além da porta de entrada para pessoas. Enquanto o dashboard serve para alguém clicar, a API pública (`/api/v1/…`) serve para um sistema de fora — um site, um ERP, um fluxo do n8n, um Zapier, um agente de IA externo — mandar mensagem no WhatsApp, cadastrar contato, ler conversa, marcar agendamento e disparar campanha, sem que ninguém abra a tela. A credencial disso não é login e senha: é uma **chave de API**, criada em Configurações, presa a exatamente uma conta e limitada aos **escopos** (permissões) que você marcar na hora de criar. O caminho inverso são os **webhooks de saída**: endereços HTTPS que a conta registra para que o iMasterChat avise, por conta própria, quando chega mensagem, quando o status de entrega muda ou quando uma conversa nasce/reabre. Cada aviso vai assinado, para o sistema que recebe conseguir provar que veio mesmo daqui.
+
+---
 
 ## Para que serve (visão do cliente)
 
-Com uma chave de API, o dono do negócio consegue amarrar o WhatsApp ao resto das ferramentas dele:
+Em linguagem de dono de negócio, esta parte do sistema permite:
 
-- **Mandar mensagem a partir de outro sistema.** O sistema de vendas, o site ou o robô manda um número de telefone e um texto (ou um modelo aprovado, ou uma imagem/PDF) e a mensagem sai pelo WhatsApp da conta. Se o telefone ainda não existir na base, o contato e a conversa são criados na hora.
-- **Cadastrar e atualizar clientes de fora.** Um formulário do site cria o contato com nome, e-mail, empresa e etiquetas. Se o telefone já existir, o sistema reaproveita o contato em vez de duplicar.
-- **Ler a base e o histórico.** Listar contatos (com busca e filtro por etiqueta), listar conversas, ler as mensagens de uma conversa.
-- **Chamar um humano.** Um robô externo que percebeu que não dá conta pode empurrar a conversa para a fila de pendentes, deixar uma nota explicando o motivo e (opcionalmente) apontar para um atendente específico. Nesse caminho, a IA do aplicativo realmente para de responder naquela conversa.
-- **Marcar, remarcar e cancelar agendamentos.** Útil para quem usa um agente de agendamento externo integrado ao Google Calendar.
-- **Disparar campanha de modelo (broadcast) por script**, com até 1000 destinatários por chamada, e depois consultar o andamento.
-- **Ser avisado do que acontece.** A empresa registra um endereço HTTPS e o iMasterChat faz um POST assinado nesse endereço quando chega mensagem nova, quando uma mensagem enviada muda de status e quando uma conversa é criada ou reaberta. Serve para acender um alerta interno, alimentar um painel próprio, gravar em outro banco.
+- **Mandar WhatsApp a partir de outro sistema.** O site da ótica confirma um pedido e o iMasterChat manda a mensagem para o cliente, sem ninguém digitar. Basta o número no formato internacional (`+5511999998888`): se o contato ainda não existe, ele é criado; se a conversa ainda não existe, ela é aberta.
+- **Manter a base de contatos sincronizada.** O sistema de vendas cria ou atualiza o contato no iMasterChat (nome, e-mail, empresa, etiquetas) sem digitação dupla.
+- **Ler o que está acontecendo.** Listar conversas, ler o histórico de mensagens de uma conversa, ver contatos — para montar relatório próprio, painel próprio ou alimentar uma IA de fora.
+- **Passar uma conversa para um humano.** Um robô externo que percebe que travou pode empurrar a conversa para a fila de pendentes, deixar uma nota explicando o motivo, opcionalmente já apontando o atendente — e nessa operação a IA do produto realmente fica calada naquela conversa.
+- **Marcar, remarcar e cancelar agendamentos.** Útil para quem usa um fluxo externo (n8n) para conversar com o cliente e agendar; o registro fica no CRM do iMasterChat mesmo que o diálogo tenha sido conduzido fora.
+- **Disparar campanha em massa por modelo aprovado.** Até mil destinatários por chamada, com acompanhamento de status.
+- **Ser avisado em tempo real.** Registrar um endereço HTTPS que recebe um POST assinado a cada mensagem recebida, mudança de status de entrega, conversa criada ou conversa reaberta. É assim que se integra o iMasterChat a um sistema que precisa reagir na hora.
 
-Duas coisas que o cliente precisa entender antes de vender ou usar isso:
+O que o cliente final **não** consegue fazer por aqui: administrar usuários, alterar configuração da conta, mexer em fluxos, automações ou faturamento. A API pública cobre mensagens, contatos, conversas, agendamentos, campanhas e webhooks — nada além disso.
 
-- A chave completa aparece **uma única vez**, na hora em que é criada. Depois disso o sistema só mostra o prefixo. Perdeu, revoga e cria outra.
-- Não existe tela para webhooks. Registrar um endereço de webhook só é possível chamando a API com uma chave que tenha o escopo `webhooks:manage`. Isso é trabalho de quem faz a integração, não do dono da ótica.
+---
 
 ## Como se usa, na prática
 
-### Criar uma chave de API
+### 1. Criar a chave de API
 
-1. Abra **Configurações** e, no grupo **Espaço de trabalho**, a seção **Chaves de API**.
-2. Clique em **Nova chave de API**. O botão só aparece para quem é administrador ou dono da conta; os demais membros veem a lista e a mensagem "Peça a um administrador para criar uma."
-3. No diálogo, preencha **Nome** (até 80 caracteres, algo como "Automação do Zapier") e marque os **Escopos** que a integração precisa. A dica na tela avisa que uma chave sem escopo nenhum ainda consegue chamar `GET /api/v1/me` só para testar se funciona.
-4. Clique em **Criar chave**. A tela troca para "Copie sua chave de API", com o texto completo e o botão **Copiar**. Esta é a única vez em que a chave inteira aparece.
-5. Clique em **Concluir**. A partir daí a linha na lista mostra apenas o prefixo (por exemplo `wacrm_live_a1b2c3d4…`), os escopos como etiquetas, quando foi criada, quando foi usada pela última vez (ou "nunca usada") e, se houver, a data de expiração.
+1. Abrir **Configurações** e, no trilho lateral, no grupo **Espaço de trabalho**, a seção **Chaves de API**.
+2. Clicar em **Nova chave de API**. O botão só aparece para quem é administrador ou dono da conta.
+3. Preencher o **Nome** (até 80 caracteres — é só um rótulo, para você saber depois qual integração usa aquela chave, por exemplo "Automação do Zapier").
+4. Marcar os **Escopos**. Cada escopo é uma permissão; marque só o que a integração precisa. Uma chave sem nenhum escopo ainda serve para testar a conexão (consegue chamar `GET /api/v1/me`), mas não faz mais nada.
+5. Clicar em **Criar chave**. A tela troca para a visão **Copie sua chave de API**, com a chave completa e um botão **Copiar**.
 
-### Revogar uma chave
+**Esta é a única vez que a chave completa aparece.** Depois de fechar em **Concluir**, a lista mostra apenas o começo dela (por exemplo `wacrm_live_a1b2c3d4…`). Se a chave for perdida, o caminho é revogar e criar outra.
 
-Na mesma tela **Chaves de API**, botão **Revogar** na linha da chave (também restrito a admin/dono). A chave para de funcionar imediatamente, mas a linha continua na lista com o selo **Revogada** — é trilha de auditoria, não some.
+### 2. Usar a chave
 
-### Usar a chave
+O sistema que vai chamar a API manda a chave no cabeçalho HTTP:
 
-Toda chamada vai para `/api/v1/...` com o cabeçalho `Authorization: Bearer wacrm_live_…`. O primeiro teste recomendado é `GET /api/v1/me`, que devolve o nome da conta e os escopos da chave e não exige escopo nenhum.
+```
+Authorization: Bearer wacrm_live_XXXXXXXX…
+```
 
-### Registrar um webhook de saída
+O prefixo `Bearer ` é opcional — mandar só a chave crua também funciona.
 
-Não há tela. Com uma chave que tenha `webhooks:manage`, faz-se `POST /api/v1/webhooks` informando a `url` (obrigatoriamente `https://`) e a lista de eventos assinados. A resposta 201 traz o **segredo de assinatura** em texto puro — uma única vez. Esse segredo é o que o sistema do cliente usa para conferir o cabeçalho `X-Wacrm-Signature` de cada entrega. Depois disso, nenhuma rota devolve o segredo de novo.
+Teste de fumaça recomendado antes de qualquer coisa: `GET /api/v1/me`. Ele devolve o nome da conta e a lista de escopos da chave. Se responder, a chave está viva e ligada à conta certa.
+
+### 3. Revogar a chave
+
+Na mesma tela **Chaves de API**, botão **Revogar** na linha da chave (também só para administrador/dono). A revogação é imediata e definitiva: a chave para de funcionar na próxima chamada. A linha **continua aparecendo na lista**, com o selo **Revogada** — de propósito, como trilha de auditoria de que aquela chave existiu.
+
+### 4. Registrar um webhook de saída
+
+**Não existe tela para isso.** Webhooks são gerenciados exclusivamente por chamada à própria API, com uma chave que tenha o escopo `webhooks:manage`:
+
+1. `POST /api/v1/webhooks` com `{"url": "https://…", "events": ["message.received"]}`.
+2. A resposta 201 traz o campo `secret` (começa com `whsec_`) — o segredo de assinatura, mostrado **uma única vez**. Guarde-o no sistema que vai receber os avisos.
+3. A partir daí, cada evento assinado chega por POST naquele endereço, com o cabeçalho `X-Wacrm-Signature`.
+
+A URL precisa ser `https://`. `http://` é recusado com erro 400.
+
+---
 
 ## O que dá para configurar
 
-| Ajuste | Onde | O que muda |
-| --- | --- | --- |
-| Criar chave de API: nome (até 80 caracteres) e escopos | Tela Configurações → Chaves de API, botão "Nova chave de API" — **exige admin ou dono** | Nasce uma credencial nova; o texto completo aparece uma única vez |
-| Revogar chave | Tela Configurações → Chaves de API, botão "Revogar" — **exige admin ou dono** | A chave passa a devolver 401; a linha fica na lista marcada como Revogada |
-| Validade da chave (`expiresInDays`, no máximo 365 dias) | Só via `POST /api/account/api-keys`, campo `expiresInDays` do corpo JSON (`src/app/api/account/api-keys/route.ts:112-122`) — **não existe na tela** | Chave criada pela tela nunca expira; só uma chamada direta define prazo |
-| Vocabulário de escopos (10 hoje) | `src/lib/api-keys/scopes.ts:16-27` (lista) e `:32-43` (descrições da UI) | Adicionar ou remover uma capacidade da API. Não exige migração: a coluna é `text[]` livre |
-| Limite de chamadas da API pública (hoje 120 por minuto, por chave) | `src/lib/rate-limit.ts:156` (`publicApi`) | Quantas requisições uma chave faz por minuto antes de tomar 429 |
-| Limite das rotas de gestão de chave (hoje 30 por minuto, por usuário) | `src/lib/rate-limit.ts:149` (`adminAction`) | Quantas chaves um admin cria por minuto |
-| Trocar o limitador em memória por um compartilhado (Redis/Upstash) | `src/lib/rate-limit.ts:60-90` (função `checkRateLimit`); instrução no cabeçalho `:9-14` | Faz o limite valer de verdade em deploy com mais de uma instância |
-| Tempo limite de entrega do webhook (5000 ms) e falhas consecutivas para desativar (15) | `src/lib/webhooks/deliver.ts:31` e `:34` | Quanto o sistema espera pelo endpoint do cliente e quando desiste dele |
-| Tolerância de defasagem na verificação de assinatura (300 s) | `src/lib/webhooks/sign.ts:45` | Janela aceita pelo verificador de referência contra reenvio (replay) |
-| Vocabulário de eventos de webhook (4 hoje) | `src/lib/webhooks/events.ts:10-15` | Quais eventos um endpoint pode assinar. Não exige migração |
-| Registrar/editar/desativar/apagar endpoint de webhook (`url`, `events`, `is_active`) | Somente pela API: `POST`/`GET /api/v1/webhooks` e `GET`/`PATCH`/`DELETE /api/v1/webhooks/{id}`, com chave de escopo `webhooks:manage`. **Não há tela** | O endereço que recebe os eventos e quais eventos ele recebe |
-| `ENCRYPTION_KEY` (64 hex) | `.env` do app (`deploy/docker-compose.app.yml:50`, `deploy/README.md:122`); lido em `src/lib/whatsapp/encryption.ts:29` | Cifra e decifra o segredo do webhook. Trocá-la quebra **todos** os endpoints já registrados: o decrypt falha, conta como falha de entrega e 15 dessas desativam o endpoint |
-| `SUPABASE_SERVICE_ROLE_KEY` e `NEXT_PUBLIC_SUPABASE_URL` | `.env` do app (`deploy/docker-compose.app.yml:49`); lidos em `src/lib/flows/admin-client.ts:11-12` | Sem eles o cliente service-role de todo o caminho da API pública não sobe |
-| `WACRM_BASE_URL` e `WACRM_API_KEY` | `mcp-server/.env` (ou o bloco `env` da configuração do cliente MCP); lidos em `mcp-server/src/config.ts:27-28` | Instância e chave usadas pelo servidor MCP que acompanha o repositório |
-| `WACRM_ENABLE_WRITES` e `WACRM_ENABLE_BROADCASTS` | `mcp-server/.env`; lidos em `mcp-server/src/config.ts:49-50` | Liberam as ferramentas de escrita e de disparo em massa no servidor MCP. Por padrão ele é somente leitura; `WACRM_ENABLE_BROADCASTS` sem `WACRM_ENABLE_WRITES` derruba o servidor com erro |
+| Ajuste | Onde | O que muda | Exige admin |
+|---|---|---|---|
+| Criar chave de API (nome + escopos) | Tela **Configurações → Chaves de API**, botão **Nova chave de API** | Cria uma credencial nova e mostra o texto dela uma vez | Sim (admin/owner) |
+| Revogar chave de API | Tela **Configurações → Chaves de API**, botão **Revogar** | Chave para de autenticar; linha fica na lista com selo Revogada | Sim (admin/owner) |
+| Listar chaves da conta | Tela **Configurações → Chaves de API** | Só visualização (nome, prefixo, escopos, datas) | Não — qualquer membro vê a lista |
+| Validade da chave (`expiresInDays`, no máximo 365 dias) | Só por chamada direta a `POST /api/account/api-keys` (`src/app/api/account/api-keys/route.ts:112-122`). **A tela nunca envia esse campo** | Chave passa a expirar sozinha na data. Sem o campo, a chave nunca expira | Sim (admin/owner) |
+| Registrar / editar / desativar / apagar webhook | Só por API: `POST/GET /api/v1/webhooks`, `GET/PATCH/DELETE /api/v1/webhooks/{id}` com escopo `webhooks:manage`. Não há tela | Quais endereços recebem quais eventos | Não se aplica: a autorização é por escopo da chave, não por papel |
+| Vocabulário de escopos (hoje 10) | Código: `src/lib/api-keys/scopes.ts:16-27` (lista) e `:32-43` (descrições da tela) | Quais permissões existem para marcar. Não exige migração de banco | — |
+| Vocabulário de eventos de webhook (hoje 4) | Código: `src/lib/webhooks/events.ts:10-15` | Quais eventos podem ser assinados. Não exige migração | — |
+| Limite de chamadas da API pública (hoje 120 por minuto, por chave) | Código: `src/lib/rate-limit.ts:156` (`publicApi`) | Quantas chamadas uma chave faz por minuto antes do 429 | — |
+| Limite das rotas de gestão de chave (hoje 30 por minuto, por usuário) | Código: `src/lib/rate-limit.ts:149` (`adminAction`) | Quantas chaves um mesmo usuário cria por minuto | — |
+| Timeout de entrega do webhook (5000 ms) e falhas consecutivas até desativar (15) | Código: `src/lib/webhooks/deliver.ts:31` e `:34` | Paciência com um endpoint lento; quando o endpoint é desligado sozinho | — |
+| Tolerância de defasagem de relógio na verificação da assinatura (300 s) | Código: `src/lib/webhooks/sign.ts:45` | Quanto atraso o verificador de referência aceita antes de considerar replay | — |
+| `ENCRYPTION_KEY` (64 caracteres hexadecimais) | Variável de ambiente do app (`deploy/docker-compose.app.yml:50`, `deploy/README.md:122`), lida em `src/lib/whatsapp/encryption.ts:29` | Cifra e decifra o segredo dos webhooks. **Trocá-la quebra todos os endpoints já registrados** | — |
+| `SUPABASE_SERVICE_ROLE_KEY` e `NEXT_PUBLIC_SUPABASE_URL` | Variáveis de ambiente do app (`deploy/docker-compose.app.yml:49`), lidas em `src/lib/flows/admin-client.ts:11-12` | Sem elas, todo o caminho da API pública não sobe | — |
+| `WACRM_BASE_URL` e `WACRM_API_KEY` | `mcp-server/.env`, lidas em `mcp-server/src/config.ts:27-28` | Instância e chave usadas pelo servidor MCP que consome esta API | — |
+| `WACRM_ENABLE_WRITES` e `WACRM_ENABLE_BROADCASTS` | `mcp-server/.env`, lidas em `mcp-server/src/config.ts:49-50` | Liberam ferramentas de escrita e de disparo em massa no servidor MCP (padrão: só leitura). Ligar broadcasts sem ligar writes é erro de inicialização | — |
+
+---
 
 ## Como funciona por dentro
 
-### O caminho de uma requisição autenticada
+### O caminho de uma chamada autenticada
 
-1. A rota chama `requireApiKey(request, '<escopo>')` (`src/lib/auth/api-context.ts`).
-2. O cabeçalho `Authorization` é lido aceitando com ou sem o prefixo `Bearer ` (`api-context.ts:62-64`).
-3. Rejeição estrutural barata antes de qualquer hash ou ida ao banco: o valor precisa começar com `wacrm_live_` e ter algo depois (`api-context.ts:85`, implementação em `src/lib/api-keys/keys.ts:76-78`).
-4. O texto é hasheado com SHA-256 hex (`keys.ts:67`) e procurado por igualdade na coluna `key_hash` (`src/lib/api-keys/store.ts:40-41`), usando o cliente **service-role** — ou seja, o lookup ignora RLS (`store.ts:37`). Quem estabelece a conta é o próprio hash.
-5. Revogação e expiração são conferidas em JavaScript depois do SELECT, e ambas devolvem `null` (`store.ts:51-54`). Chave inexistente, revogada e expirada produzem o **mesmo 401 indistinguível** (`api-context.ts:90-95`).
-6. Rate limit: `checkRateLimit('apikey:<id da linha>', RATE_LIMITS.publicApi)` (`api-context.ts:99`), orçamento `{ limit: 120, windowMs: 60_000 }` (`src/lib/rate-limit.ts:156`).
-7. Só então o escopo é conferido: `if (scope && !hasScope(row.scopes, scope)) throw forbidden(...)` (`api-context.ts:104-106`). `hasScope` é literalmente `granted.includes(required)` (`scopes.ts:80`).
-8. O contexto devolvido carrega `accountId` e um cliente service-role (`api-context.ts:112`). Cada rota escopa a query por conta na mão.
-9. `last_used_at` é atualizado em fire-and-forget: nunca é aguardado e uma falha só gera `console.warn` (`store.ts:82,88-91`).
+Todo endpoint `/api/v1/*` começa igual, em `src/lib/auth/api-context.ts`:
 
-Consequência da ordem: uma chave válida **sem** o escopo certo consome orçamento de rate limit; uma chave inválida não consome nada e não é limitada de forma alguma.
+1. **Extrai o portador.** O cabeçalho `Authorization` é aceito com ou sem `Bearer ` (`api-context.ts:62-64`).
+2. **Rejeição estrutural barata.** O valor precisa começar com `wacrm_live_` e ter conteúdo depois; senão, 401 sem tocar no banco (`api-context.ts:85`, implementação em `src/lib/api-keys/keys.ts:76-78`).
+3. **Resolve a chave pelo hash.** Calcula SHA-256 do texto apresentado e faz `SELECT … WHERE key_hash = …` (`src/lib/api-keys/store.ts:40-41`, chamado em `api-context.ts:89`). O banco nunca guardou o texto da chave — só o digest (`keys.ts:67`, coluna em `026_api_keys.sql:47`).
+4. **Descarta revogada/expirada em JavaScript**, depois do SELECT: `store.ts:51-54`. Chave desconhecida, revogada e expirada devolvem o **mesmo 401 indistinguível** (`api-context.ts:90-95`) — de propósito, para não revelar se a chave já existiu.
+5. **Aplica o rate limit** com o bucket `apikey:<id da linha>` e o orçamento `publicApi` (`api-context.ts:99`; `src/lib/rate-limit.ts:156` = 120 requisições / 60 000 ms).
+6. **Checa o escopo.** Cada rota declara **um** escopo; `hasScope` é literalmente `granted.includes(required)` (`api-context.ts:104-106`, `src/lib/api-keys/scopes.ts:80`). O papel do usuário que criou a chave é irrelevante em tempo de requisição.
+7. **Devolve o contexto** com `accountId`, `createdBy` e um cliente Supabase **service-role** (`api-context.ts:112`), ou seja, que ignora RLS. O isolamento entre contas não vem do banco nesse caminho: vem do `account_id` que cada rota coloca na query.
 
-### Isolamento por conta
+Detalhes que importam para quem for mexer:
 
-Toda rota `/api/v1` isola por conta, mas por dois mecanismos diferentes:
+- **A geração da chave** é `randomBytes(32).toString('base64url')` prefixado por `wacrm_live_` (`keys.ts:52-53`, prefixo em `:25`). O `key_prefix` guardado para exibição é o prefixo mais os 8 primeiros caracteres do corpo (`keys.ts:57`, `DISPLAY_BODY_CHARS = 8` em `:33`).
+- **`timingSafeHexEqual` existe e é exportada em `keys.ts:88`, mas não é chamada por nenhum código de produção** — só pelo arquivo de teste. O caminho real compara por igualdade no SQL. O comentário do arquivo sugere o contrário.
+- **`last_used_at` é fire-and-forget**: `void supabaseAdmin().from('api_keys').update(...)` (`store.ts:82`), com falha virando apenas `console.warn` (`store.ts:88-91`). Nunca derruba a requisição, e por isso pode ficar levemente desatualizado.
+- **O middleware global não protege `/api/v1`.** A lista de caminhos protegidos em `src/middleware.ts:73` não inclui a API pública, e a única checagem de API cobre `/api/whatsapp/` (`middleware.ts:81`). Toda a autenticação de `/api/v1` é responsabilidade do `requireApiKey` dentro de cada rota — uma rota nova que esquecer de chamá-lo fica aberta.
 
-- Na maioria, filtro direto `.eq('account_id', ctx.accountId)` na própria query (ex.: `src/app/api/v1/webhooks/[id]/route.ts:31`).
-- Em `GET /api/v1/conversations/{id}/messages`, um portão de posse: a conversa é conferida contra `account_id` antes (`messages/route.ts:29-35`) e só depois as mensagens são buscadas com `.eq('conversation_id', id)` (`messages/route.ts:37-43`) — a tabela `messages` não é filtrada por `account_id` nessa query.
+### Envelope, paginação e isolamento
 
-O resultado observável é o mesmo: um id de outra conta devolve **404**, nunca 403, por decisão deliberada de não revelar existência.
+- **Envelope de resposta** (`src/lib/api/v1/respond.ts`): sucesso é `{ data }` (`:86`); erro é `{ error: { code, message } }` (`:113`); qualquer exceção que não seja `ApiError` vira um 500 genérico com `console.error`, para não vazar texto interno (`:128-132`).
+- **Paginação keyset** por `(created_at DESC, id DESC)`, limite padrão 50 e teto 100 (`src/lib/api/v1/pagination.ts:20-21`, clamp em `:44-50`, filtro em `:106`). Um cursor malformado é tratado como ausente — volta para a primeira página em vez de dar erro.
+- O cursor é revalidado na decodificação (UUID válido + timestamp parseável, `pagination.ts:82-84`) porque seus valores são interpolados crus no `.or()` do PostgREST. É essa validação que impede injeção de sintaxe de filtro por cursor forjado.
+- **Isolamento por conta**: toda rota isola, mas por dois mecanismos. A maioria filtra direto com `.eq('account_id', ctx.accountId)` (ex.: `src/app/api/v1/webhooks/[id]/route.ts:31`). Em `GET /api/v1/conversations/{id}/messages` o filtro de conta está no **gate anterior** sobre `conversations` (`messages/route.ts:29-35`); a query de mensagens em si filtra só por `conversation_id` (`:37-43`). O comportamento observável é o mesmo: id de outra conta devolve **404, nunca 403** — por decisão de não revelar existência.
+- **Autoria das escritas**: não existe usuário logado numa chamada de API, então as escritas são atribuídas ao dono do `whatsapp_config` da conta; se não houver, ao `owner_user_id` da conta; se nem isso existir, erro 500 (`src/lib/api/v1/contacts.ts:77-94`).
 
-### Middleware
+### Rate limit
 
-O middleware global **não** protege `/api/v1`. A lista de caminhos protegidos (`src/middleware.ts:73`) cobre telas do painel, e a única checagem de API cobre `/api/whatsapp/` (`middleware.ts:81`). A autenticação da API pública é inteiramente responsabilidade do `requireApiKey` de cada rota.
+O limitador é uma **janela fixa em memória do processo Node**: um `Map` de módulo (`src/lib/rate-limit.ts:46`). Não há Redis, tabela nem cookie. A primeira chamada da janela cria a entrada com `count = 1` e `resetAt = agora + windowMs`; ao estourar, devolve falha até o `resetAt` (`rate-limit.ts:74-81`). Não há timer de limpeza — entradas velhas são varridas oportunisticamente a cada 1000 chamadas (`:51`, `:66-70`).
 
-### Paginação e envelope
+Ordem importante: o limite roda **depois** de resolver a chave e **antes** da checagem de escopo (`api-context.ts:89 → 94 → 99 → 104`). Consequências:
+- uma chave válida chamando rota sem o escopo certo **consome** orçamento;
+- uma chave inválida ou inexistente **não consome nada e não é limitada de forma alguma** — não há proteção de força bruta por essa via.
 
-- Keyset por `(created_at DESC, id DESC)`, limite padrão 50 e teto 100 (`src/lib/api/v1/pagination.ts:20-21,44-50`, filtro em `:106`).
-- Cursor malformado é tratado como ausente (volta à primeira página) em vez de erro.
-- O cursor é revalidado na decodificação (UUID e timestamp parseável) porque seus valores são interpolados crus no filtro `.or()` do PostgREST — é isso que impede injeção de sintaxe de filtro por cursor forjado (`pagination.ts:82-84`).
-- Sucesso: `{ data }` (`src/lib/api/v1/respond.ts:86`). Falha: `{ error: { code, message } }` (`respond.ts:113`). Exceção que não seja `ApiError` vira 500 genérico com `console.error`, para não vazar texto interno (`respond.ts:128-132`).
-- O 429 traz `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset` (segundos unix) (`respond.ts:74-80`).
+O 429 devolve `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset` (este em segundos unix) — `src/lib/api/v1/respond.ts:74-80`.
 
-### Autoria das escritas feitas por API
+### Webhooks de saída
 
-Não existe usuário logado numa chamada de API. `resolveAuditUserId` (`src/lib/api/v1/contacts.ts:77-94`) atribui a escrita ao dono do `whatsapp_config` da conta; se não houver config, ao `owner_user_id` da conta; se nem isso, erro 500. É a mesma convenção do webhook de entrada, então um contato criado por API é indistinguível de um criado pelo webhook.
+- **Segredo**: `whsec_` + 32 bytes de CSPRNG em base64url (`src/lib/webhooks/endpoints.ts:33`, prefixo em `:12`). Diferente da chave de API, é guardado **cifrado** com AES-256-GCM, não hasheado (`src/app/api/v1/webhooks/route.ts:83`; cifra em `src/lib/whatsapp/encryption.ts:37-48`, algoritmo na linha 40) — o servidor precisa dele em texto para assinar cada entrega.
+- **Assinatura**: cabeçalho `X-Wacrm-Signature: t=<segundos unix>,v1=<hex>`, onde `v1 = HMAC-SHA256(secret, "${t}.${rawBody}")` sobre o **corpo exato enviado**, não uma re-serialização (`src/lib/webhooks/sign.ts:29-32`). O verificador de referência tolera 300 s de defasagem e compara em tempo constante (`sign.ts:45`, `:59`, `:67`).
+- **Cabeçalhos de cada entrega**, além do `Content-Type`: `X-Wacrm-Event`, `X-Wacrm-Webhook-Id`, `X-Wacrm-Signature` (`src/lib/webhooks/deliver.ts:117-121`).
+- **Corpo**: `{ id: <uuid por entrega>, event, occurred_at, account_id, data }` (`deliver.ts:66-72`).
+- **Seleção de destinos**: só endpoints da conta com `is_active = true` e que contenham o evento no array `events` (`deliver.ts:55-58`).
+- **Guarda SSRF antes de cada POST**: a URL é resolvida por DNS e recusada se qualquer endereço for loopback, privado, link-local (inclui `169.254.169.254`, endereço de metadados de nuvem), ULA, CGNAT, ou se o host for do tipo `localhost` / `.local` / `.internal` (`deliver.ts:96-100`, regras em `src/lib/webhooks/ssrf.ts:29-47` e `:67-74`). O próprio arquivo registra que **não** protege contra DNS rebinding, porque o `fetch` não permite fixar o IP resolvido no socket (`ssrf.ts:16-18`).
+- **Uma tentativa só**, timeout de 5 s, redirects não seguidos (`redirect: 'manual'`, para um 3xx não desviar a entrega para um endereço interno). Qualquer status não-ok, incluindo 3xx, conta como falha (`deliver.ts:126-129`, `DELIVERY_TIMEOUT_MS = 5000` em `:31`).
+- **Contabilidade de falha**: cada falha consecutiva chama a RPC atômica `record_webhook_failure` (`deliver.ts:151-154`), que incrementa `failure_count` e seta `is_active = false` ao atingir 15 (`MAX_CONSECUTIVE_FAILURES = 15` em `deliver.ts:34`; lógica em `028_webhook_endpoints.sql:97-101`). Uma entrega bem-sucedida zera `failure_count` e carimba `last_delivery_at` (`deliver.ts:132-135`).
+- **Nunca lança**: `dispatchWebhookEvent` engole qualquer erro com `console.error` (`deliver.ts:80-83`), para não afetar o 200 devolvido à Meta.
+- **Origem dos eventos**: os quatro eventos nascem exclusivamente do webhook de entrada da Meta — `src/app/api/whatsapp/webhook/route.ts:460` (`message.status_updated`), `:634` (`conversation.created`), `:770` (`conversation.reopened`), `:966` (`message.received`). Não há outro emissor no repositório. O `message.received` é **aguardado** dentro do `after()` da rota, deliberadamente, porque uma promise solta poderia ser congelada antes de entregar (`webhook/route.ts:959-966`).
 
-### Etiquetas via API
+### Rotas de gestão de chave (dashboard)
 
-`setContactTags` (`src/lib/api/v1/contacts.ts:160-217`) recebe **nomes** de etiqueta, resolve/cria os ids e faz um diff contra as etiquetas atuais (só mexe no que muda). Cada etiqueta adicionada passa por `addContactTagAndDispatch` (`contacts.ts:205-210`) — diferente do caminho de importação de CSV, que não dispara a automação de `tag_added`.
+`/api/account/api-keys` é o outro caminho, e é diferente do `/api/v1`: usa **sessão por cookie** e o cliente Supabase **com RLS** (`src/lib/auth/account.ts:160`, contexto devolvido em `:236`). Criar exige `requireRole('admin')` na rota **e** passa pela policy `api_keys_insert` (`api-keys/route.ts:73`; `026_api_keys.sql:75-76`). Listar é aberto a qualquer membro (`api-keys/route.ts:49`) e usa `SAFE_COLUMNS`, que omite `key_hash` de propósito (`:42-43`). Revogar é UPDATE de `revoked_at` filtrando por `account_id` e `.is('revoked_at', null)`; zero linhas afetadas vira 404 (`api-keys/[id]/route.ts:45-48`, `:59-65`).
 
-### Geração e guarda da chave
-
-- 32 bytes de CSPRNG em base64url, prefixados por `wacrm_live_` (`keys.ts:52-53`, prefixo em `:25`).
-- O banco guarda só o digest SHA-256 hex (`keys.ts:67`, gravado em `src/app/api/account/api-keys/route.ts:133`).
-- `key_prefix` é o prefixo literal mais os 8 primeiros caracteres do corpo aleatório (`keys.ts:57`, `DISPLAY_BODY_CHARS = 8` em `:33`) — é o que a tela mostra.
-- O texto puro sai uma única vez, no 201 da criação (`api-keys/route.ts:152`); a listagem usa `SAFE_COLUMNS`, que exclui `key_hash` (`api-keys/route.ts:42-43`).
-- As rotas de gestão usam o cliente SSR com RLS (sessão do usuário), não service-role (`src/lib/auth/account.ts:160,236`).
-- Revogar é soft-delete: `.update({ revoked_at })` filtrando por `account_id` e `.is('revoked_at', null)`; zero linhas afetadas vira 404 "not found or already revoked" (`src/app/api/account/api-keys/[id]/route.ts:45-48,59-65`).
-
-### Entrega dos webhooks de saída
-
-1. `dispatchWebhookEvent(accountId, event, data)` seleciona os endpoints da conta com `is_active = true` **e** que contenham o evento no array `events` (`src/lib/webhooks/deliver.ts:55-58`).
-2. Guarda SSRF: a URL é resolvida por DNS e recusada se qualquer endereço for loopback, privado, link-local (inclui `169.254.169.254`, o endereço de metadados), ULA, CGNAT, ou se o host for do tipo `localhost` / `.local` / `.internal` (`deliver.ts:96-100`, regras em `src/lib/webhooks/ssrf.ts:29-47,67-74`). A recusa **conta como falha de entrega**.
-3. O segredo é decifrado (`deliver.ts:103-111`). Falha ao decifrar aborta a entrega e conta como falha.
-4. O corpo é montado uma vez e é exatamente o que se assina: `{ id: <uuid por entrega>, event, occurred_at, account_id, data }` (`deliver.ts:66-72`).
-5. Assinatura: `X-Wacrm-Signature: t=<segundos unix>,v1=<hex>`, onde `v1 = HMAC-SHA256(secret, "${t}.${rawBody}")` sobre o corpo exato enviado, não uma re-serialização (`src/lib/webhooks/sign.ts:29-32`).
-6. Cabeçalhos da entrega, além do `Content-Type`: `X-Wacrm-Event`, `X-Wacrm-Webhook-Id`, `X-Wacrm-Signature` (`deliver.ts:117-121`).
-7. POST único, com `redirect: 'manual'` (para um 3xx não desviar a entrega para um endereço interno) e `AbortSignal.timeout(5000)` (`deliver.ts:126-129`, `DELIVERY_TIMEOUT_MS` em `:31`). Qualquer status não-ok, inclusive 3xx, é falha.
-8. Sucesso zera `failure_count` e carimba `last_delivery_at` (`deliver.ts:132-135`). Falha chama a RPC atômica `record_webhook_failure` (`deliver.ts:151-154`), que incrementa e desativa o endpoint ao atingir 15 falhas consecutivas (`MAX_CONSECUTIVE_FAILURES` em `:34`; lógica em `supabase/migrations/028_webhook_endpoints.sql:97-101`).
-9. `dispatchWebhookEvent` nunca lança: qualquer erro é engolido com `console.error` (`deliver.ts:80-83`), para não afetar o 200 devolvido à Meta.
-
-O verificador de referência (`sign.ts:45,59,67`) tolera 300 segundos de defasagem no timestamp e compara em tempo constante.
-
-Os 4 eventos nascem exclusivamente do webhook de entrada da Meta: `message.status_updated` (`src/app/api/whatsapp/webhook/route.ts:460`), `conversation.created` (`:634`), `conversation.reopened` (`:770`) e `message.received` (`:966`). Este último é **aguardado** (`await`) dentro do `after()` da rota, deliberadamente, porque uma promise solta poderia ser congelada antes de entregar (`webhook/route.ts:959-966`).
-
-### Segredo do webhook
-
-`whsec_` + 32 bytes de CSPRNG em base64url (`src/lib/webhooks/endpoints.ts:33`, prefixo em `:12`). Diferente da chave de API, ele é guardado **cifrado** (AES-256-GCM, `src/lib/whatsapp/encryption.ts:37-48`, algoritmo na linha 40) e não hasheado, porque o servidor precisa dele em texto para assinar cada entrega. O select público (`WEBHOOK_PUBLIC_COLUMNS`, `endpoints.ts:18-19`) não inclui a coluna `secret`.
+---
 
 ## Limites e pegadinhas
 
-**Chaves de API**
+**Sobre a chave**
 
-- A tela de criação **nunca envia `expiresInDays`** (`src/components/settings/api-keys-settings.tsx:321`; não há campo de validade em lugar nenhum do formulário, `:406-453`). Toda chave criada pelo painel é **sem expiração**. Só uma chamada direta ao `POST /api/account/api-keys` consegue definir prazo. Não prometa "chave que expira sozinha" com base na interface.
-- Qualquer membro, inclusive viewer, **vê a lista de chaves** (nome, prefixo, escopos, datas). Só criar e revogar exigem admin/dono.
-- O papel de quem criou a chave é irrelevante em tempo de requisição. A autorização é 100% por escopo. Uma chave criada por um admin que depois vira viewer continua fazendo tudo que os escopos dela permitem, até ser revogada.
-- Uma chave **sem nenhum escopo** ainda autentica e consegue chamar `GET /api/v1/me`, porque essa rota chama `requireApiKey` sem argumento de escopo (`src/app/api/v1/me/route.ts:22`).
-- A função `timingSafeHexEqual` existe e é exportada (`keys.ts:88`), mas **não é chamada por nenhum código de produção** — só pelo arquivo de teste. A verificação real é um SELECT por igualdade em `key_hash`. O comentário do arquivo sugere o contrário.
-- O banco **não restringe** o vocabulário de escopos: a coluna é `text[]` livre (`026_api_keys.sql:48`). Uma linha com escopo inventado é aceita pelo Postgres; quem valida é a aplicação.
+- **A chave completa aparece uma única vez.** Não existe "ver de novo" nem recuperação. Perdeu, revoga e cria outra.
+- **Toda chave criada pela tela é sem validade.** O formulário nunca envia `expiresInDays` (`src/components/settings/api-keys-settings.tsx:321`; não há campo de expiração em `:406-453`). Só uma chamada direta ao `POST /api/account/api-keys` consegue definir prazo, e mesmo assim o máximo é 365 dias.
+- **Qualquer membro, inclusive viewer, vê a lista de chaves** (nome, prefixo, escopos, datas). Não vê o texto da chave. Criar e revogar é que exigem admin/owner.
+- **Revogar não apaga a linha.** A chave revogada continua na lista com selo **Revogada**. Isso é intencional.
+- **Uma chave sem escopo nenhum ainda autentica** e consegue chamar `GET /api/v1/me`, porque essa rota chama `requireApiKey` sem exigir escopo (`src/app/api/v1/me/route.ts:22`). Serve como teste de conexão; não serve para mais nada.
+- **O escopo é a única autorização.** O papel de quem criou a chave não é reavaliado em tempo de requisição. Uma chave com `broadcasts:send` continua disparando campanha mesmo que o admin que a criou perca o cargo ou saia da conta — enquanto a chave não for revogada.
+- **A verificação da chave é um SELECT por igualdade em hash**, não uma comparação em tempo constante em memória. A função de comparação segura existe no código mas não é usada em produção.
+- **O banco não restringe o vocabulário de escopos**: a coluna é `text[]` livre (`026_api_keys.sql:48`). Adicionar escopo é mudança de código, não migração.
 
-**Rate limit**
+**Sobre o rate limit**
 
-- O estado mora em **memória do processo Node**, um `Map` de módulo (`src/lib/rate-limit.ts:46`). Não há Redis, tabela nem cookie.
-- Com mais de uma instância o limite é silenciosamente derrotado: cada processo tem seu próprio `Map`, então N instâncias permitem N × 120/min. O próprio arquivo documenta isso e aponta a troca por Redis/Upstash como solução (`rate-limit.ts:9-14`). **Quantas instâncias o deploy do cliente roda é desconhecido** — sem essa informação não dá para afirmar qual é o teto real.
-- É janela fixa, não token bucket (`rate-limit.ts:74-81`). Não há timer de limpeza: entradas expiradas são varridas oportunisticamente a cada 1000 chamadas (`rate-limit.ts:51,66-70`).
+- **O limite de 120/min existe em memória de um único processo Node.** O próprio arquivo documenta que, com escala horizontal, o limite é silenciosamente derrotado — N instâncias permitem N×120/min — e aponta a troca por Redis/Upstash como solução (`src/lib/rate-limit.ts:9-14`). **Não foi verificado quantas instâncias o deploy real do cliente roda**, nem se o Next empacota o módulo em bundles separados; portanto o limite efetivo em produção é desconhecido.
+- **Chave inválida não é limitada.** O limitador só entra depois que a chave é resolvida com sucesso.
 
-**Webhooks de saída**
+**Sobre os webhooks de saída**
 
-- **Não existe tela.** Nem em Configurações nem em outro lugar: o mapa de painéis (`src/app/(dashboard)/settings/page.tsx:74-88`) e a lista de seções (`src/components/settings/settings-sections.ts:26-40`) não têm entrada de webhooks. Uma busca por `webhook_endpoints|api/v1/webhooks` em `src/` (fora de testes) encontra quatro arquivos: as duas rotas, o entregador, e `src/lib/automations/engine.ts:593`, que é apenas um comentário do passo `send_webhook` das automações, sem acesso à tabela.
-- **Não existe retry.** Uma tentativa por evento, timeout de 5 segundos. Se o endpoint do cliente estiver fora do ar por 30 segundos, os eventos daquele intervalo estão perdidos, ponto. Não prometa reenvio.
-- 15 falhas consecutivas **desativam o endpoint sozinho** e nada o reativa automaticamente (não verifiquei exaustivamente a existência de cron/scheduler no repositório; a única reativação encontrada é manual, via `PATCH /api/v1/webhooks/{id}` com `is_active: true`, que também zera o contador — `src/app/api/v1/webhooks/[id]/route.ts:88-91`).
-- Um endpoint apontando para endereço interno é recusado pela guarda SSRF, e **essa recusa conta como falha**. Um alvo mal configurado acaba se autodesativando depois de 15 eventos.
-- Trocar `ENCRYPTION_KEY` quebra todos os endpoints registrados: o decrypt falha, cada evento vira falha e em 15 eventos o endpoint é desativado.
-- A guarda SSRF **não** protege contra DNS rebinding — o IP resolvido não é fixado no socket; o próprio arquivo declara isso como risco residual (`src/lib/webhooks/ssrf.ts:16-18`).
-- O evento `conversation.reopened` existe no código e é disparado, mas **não está documentado** em `docs/public-api.md` (a tabela de eventos em `:369-373` lista só os outros três) nem no CHANGELOG.
-- Os comentários do entregador se contradizem sobre a semântica: o cabeçalho diz "at-most-once, single attempt" e o comentário do payload diz "at-least-once and may repeat" (`deliver.ts:11` contra `:64-65`). O código implementa **uma tentativa única**.
-- `GET /api/v1/webhooks` devolve a lista inteira e `next_cursor` é sempre `null` (`webhooks/route.ts:38-43`). Não paginar aqui é intencional.
+- **Não existe tela de webhooks.** Não há entrada no mapa de painéis de Configurações (`src/app/(dashboard)/settings/page.tsx:74-88`) nem na lista de seções (`src/components/settings/settings-sections.ts`). A única forma de criar, listar, editar ou apagar endpoint é chamando `/api/v1/webhooks` com uma chave que tenha `webhooks:manage`. Um tutorial que mande o cliente "ir em Configurações → Webhooks" está errado. (A busca por `webhook_endpoints|api/v1/webhooks` em `src/` também acha `src/lib/automations/engine.ts:593`, mas ali é apenas um comentário do passo `send_webhook` das automações — não toca na tabela.)
+- **Não existe retry.** É **uma tentativa por evento**. Se o seu servidor estiver fora do ar por 30 segundos, os eventos daquele intervalo são perdidos — não voltam. Não há fila, não há reenvio manual, não há histórico de entregas armazenado.
+- **Timeout curto**: 5 segundos. Um endpoint que processa de forma síncrona e demora mais é contabilizado como falha mesmo que tenha recebido tudo. Responda 200 rápido e processe depois.
+- **Redirect conta como falha.** Se a URL registrada responde 301/302 (por exemplo, de `dominio.com` para `www.dominio.com`), a entrega falha. Registre a URL final.
+- **15 falhas consecutivas desativam o endpoint sozinho**, e nada o reativa automaticamente. A reativação é manual, por `PATCH /api/v1/webhooks/{id}` com `is_active: true` — o que também zera o contador de falhas (`src/app/api/v1/webhooks/[id]/route.ts:88-91`). Não foi verificado exaustivamente se existe algum cron que reative endpoints; a única reativação encontrada é essa, manual.
+- **Alvo interno derruba o endpoint.** A recusa da guarda SSRF conta como falha de entrega. Apontar o webhook para um endereço de rede interna ou `localhost` não dá erro no cadastro — dá 15 falhas silenciosas e o endpoint desativado.
+- **Trocar `ENCRYPTION_KEY` quebra todos os webhooks registrados.** O segredo deixa de ser decifrável, cada entrega vira falha, e 15 falhas desativam o endpoint (`deliver.ts:103-111`).
+- **`http://` é recusado no cadastro** com 400. Só `https://`.
+- **O evento `conversation.reopened` existe e é disparado, mas não está documentado** em `docs/public-api.md` nem no CHANGELOG (a tabela de eventos em `docs/public-api.md:369-373` lista apenas três). Quem escrever tutorial deve incluir os quatro.
+- **O comentário do código se contradiz sobre a semântica de entrega**: o cabeçalho diz "at-most-once, single attempt" e o comentário do payload diz "at-least-once and may repeat" (`deliver.ts:11` contra `:64-65`). **O código implementa uma tentativa única (at-most-once).** Ainda assim, tratar o campo `id` do payload como chave de idempotência é a prática correta do lado de quem recebe.
+- **Só a Meta gera evento.** Uma mensagem enviada pelo dashboard ou pela própria API não dispara `message.received` — esse evento é só para mensagem **recebida** do cliente. **Não foi verificado até o fim** se algum caminho do webhook de entrada (por exemplo, o gate de cobrança manual perto da linha 780) suprime a emissão de `message.received` em alguma situação.
 
-**Rotas de dados**
+**Sobre as demais rotas**
 
-- `POST /api/v1/broadcasts` responde **202 imediatamente** e faz o fan-out dentro de `after()`, com `maxDuration = 60` (`broadcasts/route.ts:37,80`). Uma audiência perto do teto de 1000 (`src/lib/whatsapp/broadcast-core.ts:77,104`) pode passar de 60 segundos e ser **cortada no meio**, deixando destinatários pendentes e o broadcast preso em "sending". O próprio comentário da rota admite isso e recomenda dividir envios muito grandes em várias chamadas.
-- `PATCH /api/v1/appointments/{id}` exige `starts_at` e `ends_at` **juntos** para remarcar (`[id]/route.ts:73-80`). **Não existe DELETE de agendamento**: cancelar é `PATCH` com `{"status":"cancelled"}`.
-- Agendamento criado pela API recebe `created_via = 'n8n'` por padrão; a única alternativa aceita é `'native'`. **Nunca** `'manual'` (`appointments/route.ts:173`).
-- Três índices únicos parciais geram 409 com mensagens distintas: horário já ocupado, contato já tem agendamento marcado, evento do Google já registrado (`appointments/route.ts:188-205`).
-- `parseSlot` recusa data malformada, fim antes do início, duração acima de 8 horas e início no passado (`src/lib/api/v1/appointments.ts:97-131`). A API **não consulta disponibilidade** — isso é do Google Calendar; ela só registra.
-- `POST /api/v1/conversations/{id}/handoff` **não manda mensagem ao cliente**. Ele muda o status para `pending`, desliga o auto-reply da IA naquela conversa, grava a nota (`reason`, obrigatório, truncado em 500 caracteres) e opcionalmente atribui a alguém via `assign_to`. Avisar o cliente que "já vou chamar alguém" é trabalho de quem chamou a rota. Vale contrastar: responder pelo inbox **não** assume a conversa nem cala a IA; esta rota da API, sim, desliga o auto-reply da thread.
-- `POST /api/v1/contacts` é find-or-create por telefone: 200 se já existia, 201 se criou (`contacts/route.ts:138`). O campo `tags` do `PATCH` **substitui** o conjunto de etiquetas, não adiciona.
-- O filtro `?tag=` da listagem de contatos é por **id** da etiqueta (`contacts/route.ts:62`), enquanto o campo `tags` do POST/PATCH é por **nome**. É fácil errar isso.
-- Nenhuma rota `/api/v1` declara `export const runtime` ou `export const dynamic`; a única configuração de segmento do subsistema é o `maxDuration` do broadcast.
+- **`POST /api/v1/messages` cria contato e conversa se não existirem.** Um número digitado errado gera um contato novo na base. A validação do formato da mensagem acontece **antes** disso (`messages/route.ts:90-96`), então payload inválido não deixa contato órfão — mas número válido e errado, deixa.
+- **`POST /api/v1/contacts` é find-or-create**: 200 quando o contato já existia, 201 quando foi criado. Quem consome precisa olhar o status para saber o que aconteceu.
+- **`PATCH /api/v1/contacts/{id}` com `tags` substitui o conjunto inteiro de etiquetas**, não adiciona. Mandar `tags: []` remove todas.
+- **`POST /api/v1/broadcasts` responde 202 imediatamente** e faz o disparo real em segundo plano, com `maxDuration = 60` (`broadcasts/route.ts:37,80`). O teto é 1000 destinatários (`src/lib/whatsapp/broadcast-core.ts:77,104`), e o próprio comentário do código admite que uma audiência perto do teto pode passar de 60 segundos e **ser cortada no meio** — deixando destinatários pendentes e a campanha travada em "enviando". Divida audiências grandes em várias chamadas.
+- **Agendamentos criados pela API recebem `created_via = 'n8n'` por padrão**; a única alternativa aceita é `'native'`. Nunca `'manual'` (`appointments/route.ts:173`). Relatórios que separam "manual" de "automático" vão contar tudo que veio da API como automático.
+- **Três índices únicos parciais produzem 409 no agendamento**, com mensagens distintas: horário já ocupado na conta, contato que já tem um agendamento ativo, e evento do Google já registrado (`appointments/route.ts:188-205`). Um workflow que repete a mesma chamada vai receber 409 — é o caso esperado, não um defeito.
+- **Não existe DELETE de agendamento.** Cancelar é `PATCH` com `{"status": "cancelled"}`.
+- **Remarcar exige `starts_at` e `ends_at` juntos**; mandar um só dá 400 (`appointments/[id]/route.ts:73-80`). A duração máxima aceita é 8 horas e o início não pode estar no passado (`src/lib/api/v1/appointments.ts:125-131`).
+- **O handoff pela API não manda mensagem ao cliente.** Ele muda o status para pendente, desliga a resposta automática da IA naquela conversa, grava a nota (prefixada com um marcador de robô) e, se `assign_to` for informado, atribui o atendente. Avisar o cliente que "já vou chamar alguém" é responsabilidade de quem chama a API. `reason` é obrigatório e é truncado em 500 caracteres.
+- **Este handoff, sim, cala a IA na conversa** (`ai_autoreply_disabled`) — diferente do que acontece quando um atendente simplesmente responde pelo inbox, que **não** assume a conversa nem cala a IA (só "Atribuir"/"Assumir" fazem isso, `send-message.ts:483-504`), e diferente do nó de handoff dos **fluxos**, que não desliga a IA.
+- **404, nunca 403, para recurso de outra conta.** Quem depura integração não deve interpretar 404 como "o registro não existe" — pode ser "não é seu".
+- **401 é indistinguível** entre chave inexistente, revogada e expirada. Na hora de investigar, olhe a tela **Chaves de API**: o selo (Revogada / Expirada) e a data de última utilização dizem o que o 401 não diz.
+- **`GET /api/v1/webhooks` não pagina**: devolve a lista inteira e `next_cursor` sempre `null` (`webhooks/route.ts:38-43`).
+- **Nenhuma rota `/api/v1` foi testada em execução** durante o mapeamento — toda a descrição acima vem de leitura de código.
 
-**Servidor MCP**
+**Sobre o banco**
 
-`mcp-server/` é um cliente da API pública que acrescenta uma segunda trava, do lado do cliente: por padrão registra só ferramentas de leitura, e as de escrita/broadcast exigem flags de ambiente explícitos (`mcp-server/src/config.ts:49-56`). Não foi confirmado se ele é efetivamente distribuído ao cliente ou se é apenas um extra do repositório.
+- Todo o texto de RLS deste documento é o que os arquivos de migração **declaram**, não o estado verificado do catálogo do Postgres na instância do cliente. Não foi confirmado se as migrações 026, 028, 041 e 043 foram efetivamente aplicadas, nem se alguém alterou policies ou colunas manualmente.
+- Na prática, as policies de `api_keys` e `webhook_endpoints` quase não atuam no caminho da API pública: ele usa service-role, que ignora RLS. Elas valem para o caminho do dashboard.
 
-**Limites do que foi verificado**
-
-- Nada disto foi testado em execução: nenhuma requisição real foi emitida contra `/api/v1`.
-- O texto de RLS abaixo é o que os arquivos de migração declaram. Não foi verificado se 026, 028 e 041/043 estão de fato aplicadas na instância do cliente, nem se alguém alterou policies ou colunas por fora das migrações.
-- Não foi lido o corpo completo de `src/app/api/whatsapp/webhook/route.ts` (mais de 1000 linhas) — só os quatro trechos ao redor das chamadas a `dispatchWebhookEvent`. Pode existir caminho (por exemplo, um gate de cobrança manual visto perto da linha 780) em que um evento deixe de ser emitido; isso não foi seguido até o fim.
-- Não foi procurado se existe um modo sandbox com prefixo `wacrm_test_`; a busca cobriu apenas `wacrm_live_`.
-- O comportamento de `api_keys` e `webhook_endpoints` na exclusão de conta não foi auditado além do que a DDL declara (`ON DELETE CASCADE` em `account_id`).
+---
 
 ## Referência
 
 ### Tabelas
 
-| Tabela | Migração de origem | Papel |
-| --- | --- | --- |
-| `api_keys` | `supabase/migrations/026_api_keys.sql` | Credencial de máquina do `/api/v1`. Colunas notáveis: `account_id` (026:43), `created_by` (026:44, só auditoria), `name` (026:45), `key_prefix` (026:46), `key_hash` UNIQUE (026:47), `scopes text[]` (026:48), `last_used_at` (026:49), `expires_at` (026:50, NULL = nunca expira), `revoked_at` (026:51, NULL = ativa), `created_at` (026:52). Índices: `api_keys_account_id_idx` (026:56), `api_keys_key_hash_idx` (026:61). Nenhuma migração posterior a 026 altera esta tabela |
-| `webhook_endpoints` | `supabase/migrations/028_webhook_endpoints.sql` | Endpoints HTTPS que recebem os eventos. Colunas: `account_id` (028:44), `created_by` (028:45), `url` (028:46), `secret` cifrado AES-256-GCM (028:47), `events text[]` (028:48), `is_active` (028:49), `last_delivery_at` (028:50), `failure_count` de falhas **consecutivas** (028:51), `created_at` (028:52). Índice `webhook_endpoints_account_id_idx` (028:56-57). A migração também cria `public.record_webhook_failure(endpoint_id uuid, max_failures int)`, `SECURITY DEFINER`, que incrementa e desativa em um único UPDATE (028:91-103). Nenhuma migração posterior altera a tabela |
-| `appointments` | `supabase/migrations/041_appointments.sql`, alterada por `supabase/migrations/043_google_calendar.sql` | Registro CRM da reserva, tocado por `/api/v1/appointments`. Colunas: `account_id` (041:34), `contact_id` ON DELETE CASCADE (041:35), `conversation_id` ON DELETE SET NULL (041:39), `starts_at`/`ends_at` (041:41-42), `status` (041:43), `google_event_id`/`google_calendar_id` (041:49-50), `created_via` CHECK IN ('manual','n8n','native') (041:55-56), `cancellation_reason text` (043:169). CHECK `appointments_ends_after_starts` (041:61). Três índices únicos parciais que geram os 409: `idx_appointments_one_per_slot` (041:74-76), `idx_appointments_one_live_per_contact` (041:81-83), `idx_appointments_google_event` (041:87-89). 043 é a última migração que altera a tabela |
+| Tabela | Migração de origem | Para que serve |
+|---|---|---|
+| `api_keys` | `supabase/migrations/026_api_keys.sql` | Credencial de máquina do `/api/v1` |
+| `webhook_endpoints` | `supabase/migrations/028_webhook_endpoints.sql` | Endereços HTTPS que recebem os eventos de saída |
+| `appointments` | `supabase/migrations/041_appointments.sql`, alterada por `043_google_calendar.sql` | Registro CRM de agendamento, tocado por `/api/v1/appointments` |
 
-RLS declarada nas migrações:
+**`api_keys`** (`026_api_keys.sql`)
 
-| Tabela | SELECT | INSERT | UPDATE | DELETE |
-| --- | --- | --- | --- | --- |
-| `api_keys` | `is_account_member(account_id)` — qualquer membro (026:68-69) | admin+ (026:75-76) | admin+ (026:79-80) | admin+ (026:83-84) |
-| `webhook_endpoints` | qualquer membro (028:63-64) | admin+ (028:68-69) | admin+ (028:72-73) | admin+ (028:76-77) |
-| `appointments` | qualquer membro (041:99-100) | agent+ (041:103-104) | agent+ (041:107-109) | admin+ (041:112-113) |
+| Coluna | Notas |
+|---|---|
+| `id uuid` | PK |
+| `account_id uuid NOT NULL` | REFERENCES `accounts(id)` ON DELETE CASCADE (`026:43`) |
+| `created_by uuid` | REFERENCES `auth.users(id)` ON DELETE SET NULL — só auditoria (`026:44`) |
+| `name text NOT NULL` | Rótulo exibido (`026:45`) |
+| `key_prefix text NOT NULL` | Só exibição, ex. `wacrm_live_a1b2c3d4` (`026:46`) |
+| `key_hash text NOT NULL UNIQUE` | SHA-256 hex do texto completo (`026:47`) |
+| `scopes text[] NOT NULL DEFAULT '{}'` | Vocabulário **não** restringido pelo banco (`026:48`) |
+| `last_used_at timestamptz` | Atualizado fire-and-forget (`026:49`) |
+| `expires_at timestamptz` | NULL = nunca expira (`026:50`) |
+| `revoked_at timestamptz` | NULL = ativa (`026:51`) |
+| `created_at timestamptz NOT NULL DEFAULT now()` | (`026:52`) |
 
-`is_account_member` é `SECURITY DEFINER` e compara `auth.uid()` contra `profiles`, com hierarquia owner > admin > agent > viewer (`017_account_sharing.sql:136-164`). **Atenção:** o caminho da API pública não passa por essas policies — lê e escreve com o cliente service-role, que ignora RLS, e escopa por `account_id` na própria query. As policies só valem para as telas e para as rotas de sessão.
+Índices: `api_keys_account_id_idx` (`026:56`), `api_keys_key_hash_idx` (`026:61`). RLS habilitada (`026:63`): SELECT para qualquer membro (`026:68-69`); INSERT, UPDATE e DELETE exigem `is_account_member(account_id, 'admin')` (`026:75-76`, `:79-80`, `:83-84`). `is_account_member` é `SECURITY DEFINER` e compara `auth.uid()` com hierarquia owner > admin > agent > viewer (`017_account_sharing.sql:136-164`). Nenhuma migração posterior a 026 altera esta tabela.
 
-### Escopos (`src/lib/api-keys/scopes.ts:16-27`)
+**`webhook_endpoints`** (`028_webhook_endpoints.sql`)
 
-| Escopo | O que libera | Rotas |
-| --- | --- | --- |
-| `messages:send` | Enviar mensagens WhatsApp | `POST /api/v1/messages` |
-| `messages:read` | Ler mensagens e status de entrega | `GET /api/v1/conversations/{id}/messages` |
-| `contacts:read` | Listar e ler contatos | `GET /api/v1/contacts`, `GET /api/v1/contacts/{id}` |
-| `contacts:write` | Criar e atualizar contatos | `POST /api/v1/contacts`, `PATCH /api/v1/contacts/{id}` |
-| `conversations:read` | Listar e ler conversas | `GET /api/v1/conversations`, `GET /api/v1/conversations/{id}` |
-| `conversations:handoff` | Passar conversa a um humano | `POST /api/v1/conversations/{id}/handoff` |
-| `appointments:read` | Listar e ler agendamentos | `GET /api/v1/appointments`, `GET /api/v1/appointments/{id}` |
-| `appointments:write` | Criar, remarcar e cancelar agendamentos | `POST /api/v1/appointments`, `PATCH /api/v1/appointments/{id}` |
-| `broadcasts:send` | Disparar campanhas | `POST /api/v1/broadcasts`, `GET /api/v1/broadcasts/{id}` |
-| `webhooks:manage` | Registrar e gerenciar webhooks de saída | todas as rotas `/api/v1/webhooks` |
+| Coluna | Notas |
+|---|---|
+| `id uuid` | PK |
+| `account_id uuid NOT NULL` | ON DELETE CASCADE (`028:44`) |
+| `created_by uuid` | ON DELETE SET NULL (`028:45`) |
+| `url text NOT NULL` | Endpoint HTTPS (`028:46`) |
+| `secret text NOT NULL` | Segredo HMAC **cifrado** AES-256-GCM, não hash (`028:47`) |
+| `events text[] NOT NULL DEFAULT '{}'` | Validado só na aplicação (`028:48`) |
+| `is_active boolean NOT NULL DEFAULT true` | (`028:49`) |
+| `last_delivery_at timestamptz` | Última entrega bem-sucedida (`028:50`) |
+| `failure_count integer NOT NULL DEFAULT 0` | Falhas **consecutivas**; zerado no sucesso (`028:51`) |
+| `created_at timestamptz NOT NULL DEFAULT now()` | (`028:52`) |
 
-### Rotas da API pública (`/api/v1`)
+Índice: `webhook_endpoints_account_id_idx` (`028:56-57`). RLS habilitada (`028:59`): SELECT para qualquer membro (`028:63-64`); INSERT/UPDATE/DELETE exigem admin (`028:68-69`, `:72-73`, `:76-77`). A migração também cria `public.record_webhook_failure(endpoint_id uuid, max_failures int)`, `LANGUAGE sql SECURITY DEFINER`, que incrementa `failure_count` e desativa o endpoint no mesmo UPDATE quando o novo valor atinge `max_failures` (`028:91-103`). Nenhuma migração posterior altera esta tabela.
 
-Todas exigem `Authorization: Bearer wacrm_live_…`. O "papel exigido" não se aplica: a autorização é por escopo, não por papel do usuário.
+**`appointments`** (`041_appointments.sql`, com acréscimo em `043_google_calendar.sql`)
 
-| Método | Caminho | Escopo exigido | Arquivo | O que faz |
-| --- | --- | --- | --- | --- |
-| GET | `/api/v1/me` | nenhum | `src/app/api/v1/me/route.ts` | Sonda de identidade: `{ account: {id, name}, key: {id, scopes} }` (`me/route.ts:22-27`) |
-| POST | `/api/v1/messages` | `messages:send` | `src/app/api/v1/messages/route.ts` | Envia mensagem por número E.164; resolve-ou-cria contato e conversa e chama o núcleo compartilhado de envio. Valida o payload **antes** de criar contato (`:90-96`). Responde 201 com `message_id`, `whatsapp_message_id`, `conversation_id`, `contact_id`, `contact_created` |
-| GET | `/api/v1/contacts` | `contacts:read` | `src/app/api/v1/contacts/route.ts` | Lista contatos, keyset. `?search=` (sanitizado, `:31-33`) e `?tag=<id da etiqueta>` (inner join aliasado, `:49-63`) |
-| POST | `/api/v1/contacts` | `contacts:write` | `src/app/api/v1/contacts/route.ts` | Find-or-create por telefone: 200 se já existia, 201 se criou (`:138`). Aceita `tags` por nome |
-| GET | `/api/v1/contacts/{id}` | `contacts:read` | `src/app/api/v1/contacts/[id]/route.ts` | Lê um contato; 404 se for de outra conta (`:28`) |
-| PATCH | `/api/v1/contacts/{id}` | `contacts:write` | `src/app/api/v1/contacts/[id]/route.ts` | Atualiza só os campos presentes (`name`/`email`/`company`); tipo inválido vira 400 (`:60-68`). `tags` **substitui** o conjunto |
-| GET | `/api/v1/conversations` | `conversations:read` | `src/app/api/v1/conversations/route.ts` | Lista conversas; `?status=` e `?contact_id=` (`:36-37`) |
-| GET | `/api/v1/conversations/{id}` | `conversations:read` | `src/app/api/v1/conversations/[id]/route.ts` | Lê uma conversa; 404 fora da conta (`:34`) |
-| GET | `/api/v1/conversations/{id}/messages` | `messages:read` | `src/app/api/v1/conversations/[id]/messages/route.ts` | Mensagens da conversa, mais novas primeiro, paginado. Confere a posse da conversa antes de devolver qualquer mensagem (`:29-35`) |
-| POST | `/api/v1/conversations/{id}/handoff` | `conversations:handoff` | `src/app/api/v1/conversations/[id]/handoff/route.ts` | Status → `pending`, desliga o auto-reply da IA na thread, grava a nota; `reason` obrigatório e truncado em 500 (`:35,54-57`), `assign_to` opcional. Não envia mensagem ao cliente |
-| GET | `/api/v1/appointments` | `appointments:read` | `src/app/api/v1/appointments/route.ts` | Lista agendamentos; `?contact_id=`, `?status=`, `?from=`, `?to=` sobre `starts_at` (`:47-73`) |
-| POST | `/api/v1/appointments` | `appointments:write` | `src/app/api/v1/appointments/route.ts` | Cria agendamento; confere que `contact_id` e `conversation_id` são da conta (`:121-149`); colisões de índice único viram 409 com mensagens distintas (`:188-205`) |
-| GET | `/api/v1/appointments/{id}` | `appointments:read` | `src/app/api/v1/appointments/[id]/route.ts` | Lê um agendamento; 404 fora da conta (`:46`) |
-| PATCH | `/api/v1/appointments/{id}` | `appointments:write` | `src/app/api/v1/appointments/[id]/route.ts` | Remarca (`starts_at` e `ends_at` juntos, senão 400 — `:73-80`) ou cancela. Não existe DELETE |
-| POST | `/api/v1/broadcasts` | `broadcasts:send` | `src/app/api/v1/broadcasts/route.ts` | Cria broadcast e destinatários sincronamente e dispara o fan-out em `after()` (`:80`). Responde 202. `maxDuration = 60` (`:37`). Teto de 1000 destinatários (`src/lib/whatsapp/broadcast-core.ts:77,104`) |
-| GET | `/api/v1/broadcasts/{id}` | `broadcasts:send` | `src/app/api/v1/broadcasts/[id]/route.ts` | Status e contadores do broadcast; 404 fora da conta (`:35`) |
-| GET | `/api/v1/webhooks` | `webhooks:manage` | `src/app/api/v1/webhooks/route.ts` | Lista endpoints da conta com `WEBHOOK_PUBLIC_COLUMNS`, que não inclui `secret` (`:27`; `endpoints.ts:18-19`). `next_cursor` sempre null (`:38-43`) |
-| POST | `/api/v1/webhooks` | `webhooks:manage` | `src/app/api/v1/webhooks/route.ts` | Registra endpoint. Valida `https://` e a lista de eventos; gera o segredo, grava cifrado e devolve o texto puro uma única vez no 201 (`:75,83,95-98`) |
-| GET | `/api/v1/webhooks/{id}` | `webhooks:manage` | `src/app/api/v1/webhooks/[id]/route.ts` | Lê um endpoint, sem o segredo; 404 fora da conta (`:38`) |
-| PATCH | `/api/v1/webhooks/{id}` | `webhooks:manage` | `src/app/api/v1/webhooks/[id]/route.ts` | Atualiza `url` / `events` / `is_active`. Reativar zera `failure_count` (`:91`). Corpo sem campo atualizável → 400 (`:94-96`) |
-| DELETE | `/api/v1/webhooks/{id}` | `webhooks:manage` | `src/app/api/v1/webhooks/[id]/route.ts` | Remove o endpoint; 404 fora da conta (`:140`) |
+| Coluna | Notas |
+|---|---|
+| `account_id uuid NOT NULL` | (`041:34`) |
+| `contact_id uuid NOT NULL` | ON DELETE CASCADE (`041:35`) |
+| `conversation_id uuid` | ON DELETE SET NULL (`041:39`) |
+| `starts_at` / `ends_at timestamptz NOT NULL` | (`041:41-42`) |
+| `status appointment_status_enum DEFAULT 'scheduled'` | Valores aceitos pela API: `scheduled`, `completed`, `no_show`, `cancelled` (`src/lib/api/v1/appointments.ts:11-16`) |
+| `google_event_id` / `google_calendar_id text` | (`041:49-50`) |
+| `created_via text NOT NULL DEFAULT 'manual'` | CHECK IN (`manual`, `n8n`, `native`) (`041:55-56`) |
+| `cancellation_reason text` | Acrescentada por `043_google_calendar.sql:169` |
 
-### Rotas de gestão de chave (sessão do painel, não API pública)
+Constraint `appointments_ends_after_starts CHECK (ends_at > starts_at)` (`041:61`). Três índices únicos parciais, que são a origem dos 409 da API: `idx_appointments_one_per_slot (account_id, starts_at) WHERE status='scheduled'` (`041:74-76`); `idx_appointments_one_live_per_contact (contact_id) WHERE status='scheduled'` (`041:81-83`); `idx_appointments_google_event (google_event_id) WHERE NOT NULL` (`041:87-89`). RLS habilitada (`041:91`): SELECT para membro (`041:99-100`), INSERT e UPDATE exigem `agent`+ (`041:103-104`, `:107-109`), DELETE exige admin (`041:112-113`). `043` é a última migração que altera esta tabela; índices, constraints e policies de `041` continuam válidos.
 
-| Método | Caminho | Papel exigido | Arquivo | O que faz |
-| --- | --- | --- | --- | --- |
-| GET | `/api/account/api-keys` | qualquer membro (sessão por cookie, cliente SSR com RLS) | `src/app/api/account/api-keys/route.ts` | Lista as chaves com `SAFE_COLUMNS`; `key_hash` é deliberadamente omitido (`:42-43,49-55`) |
-| POST | `/api/account/api-keys` | **admin ou dono** (`requireRole('admin')`, `:73`) + policy `api_keys_insert` | `src/app/api/account/api-keys/route.ts` | Cria a chave e devolve o texto puro uma única vez (`:124-155`). Rate limit `adminAction` 30/min por usuário (`:75-79`). Nome ≤ 80 caracteres; `expiresInDays` clampado em 365 (`:35,38,118`) |
-| DELETE | `/api/account/api-keys/{id}` | **admin ou dono** (`requireRole('admin')`, `:29`) + policy `api_keys_update` | `src/app/api/account/api-keys/[id]/route.ts` | Revogação soft: seta `revoked_at` filtrando por conta e `revoked_at IS NULL`; zero linhas → 404 (`:43-65`) |
+### Escopos (10)
 
-### Origem dos eventos de saída
+| Escopo | Permite |
+|---|---|
+| `messages:send` | Enviar mensagens de WhatsApp |
+| `messages:read` | Ler mensagens e seu status de entrega |
+| `contacts:read` | Listar e ler contatos |
+| `contacts:write` | Criar e atualizar contatos |
+| `conversations:read` | Listar e ler conversas |
+| `conversations:handoff` | Passar uma conversa para um atendente humano |
+| `appointments:read` | Listar e ler agendamentos |
+| `appointments:write` | Criar, remarcar e cancelar agendamentos |
+| `broadcasts:send` | Disparar campanhas em massa |
+| `webhooks:manage` | Registrar e gerenciar webhooks de saída |
 
-| Método | Caminho | Autenticação | Arquivo | O que faz |
-| --- | --- | --- | --- | --- |
-| POST/GET | `/api/whatsapp/webhook` | webhook da Meta (fora deste subsistema) | `src/app/api/whatsapp/webhook/route.ts` | Única origem dos eventos de saída. Chama `dispatchWebhookEvent` em quatro pontos: `message.status_updated` (`:460`), `conversation.created` (`:634`), `conversation.reopened` (`:770`), `message.received` (`:966`) |
+Fonte: `src/lib/api-keys/scopes.ts:16-27` (lista) e `:32-43` (descrições exibidas na tela).
 
-### Eventos de webhook (`src/lib/webhooks/events.ts:10-15`)
+### Eventos de webhook (4)
 
-| Evento | Quando dispara |
-| --- | --- |
-| `message.received` | Chegou uma mensagem do contato |
-| `message.status_updated` | Uma mensagem enviada mudou de status (enviada/entregue/lida/falhou) |
-| `conversation.created` | Uma nova conversa foi aberta para um contato |
-| `conversation.reopened` | Uma conversa fechada voltou a receber mensagem do cliente. Existe no código, é disparado, mas não está em `docs/public-api.md` |
+| Evento | Quando dispara | Origem |
+|---|---|---|
+| `message.received` | Chegou mensagem do cliente | `src/app/api/whatsapp/webhook/route.ts:966` |
+| `message.status_updated` | Mensagem enviada mudou de status (enviada/entregue/lida/falhou) | `webhook/route.ts:460` |
+| `conversation.created` | Nova conversa aberta para um contato | `webhook/route.ts:634` |
+| `conversation.reopened` | Conversa fechada voltou porque o cliente escreveu de novo. **Não documentado em `docs/public-api.md`** | `webhook/route.ts:770` |
+
+Vocabulário em `src/lib/webhooks/events.ts:11-14`.
+
+### Rotas da API pública (`/api/v1`) — autenticação por chave
+
+| Método | Rota | Escopo exigido | O que faz | Arquivo |
+|---|---|---|---|---|
+| GET | `/api/v1/me` | **nenhum** (só chave válida) | Devolve `{ account: {id, name}, key: {id, scopes} }`. Sonda de identidade | `src/app/api/v1/me/route.ts:22-27` |
+| POST | `/api/v1/messages` | `messages:send` | Envia mensagem por número E.164; resolve-ou-cria contato e conversa; 201. Aceita `type` text/template/image/video/document/audio, `text`, `media_url`, `filename`, `template{name,language,params}`, `reply_to_message_id`, `name` | `src/app/api/v1/messages/route.ts:46`, validação em `:90-96` |
+| GET | `/api/v1/contacts` | `contacts:read` | Lista contatos, paginação keyset, filtros `?search=` (sanitizado, `:31-33`) e `?tag=` (inner join aliasado, `:49-63`) | `src/app/api/v1/contacts/route.ts:37` |
+| POST | `/api/v1/contacts` | `contacts:write` | Find-or-create por telefone: 200 se já existia, 201 se criou. Aceita `name`, `email`, `company`, `tags` (por nome) | `src/app/api/v1/contacts/route.ts:98`, status em `:138` |
+| GET | `/api/v1/contacts/{id}` | `contacts:read` | Lê um contato; 404 fora da conta | `src/app/api/v1/contacts/[id]/route.ts:25,28` |
+| PATCH | `/api/v1/contacts/{id}` | `contacts:write` | Atualiza só os campos presentes (`name`/`email`/`company`); tipo inválido vira 400. `tags` **substitui** o conjunto | `src/app/api/v1/contacts/[id]/route.ts:40,60-68` |
+| GET | `/api/v1/conversations` | `conversations:read` | Lista conversas paginadas; filtros `?status=` e `?contact_id=` | `src/app/api/v1/conversations/route.ts:25,36-37` |
+| GET | `/api/v1/conversations/{id}` | `conversations:read` | Lê uma conversa; 404 fora da conta | `src/app/api/v1/conversations/[id]/route.ts:20,34` |
+| GET | `/api/v1/conversations/{id}/messages` | `messages:read` | Lista mensagens da conversa, mais novas primeiro, paginado. Verifica a posse da conversa antes de devolver qualquer mensagem | `src/app/api/v1/conversations/[id]/messages/route.ts:24,29-35` |
+| POST | `/api/v1/conversations/{id}/handoff` | `conversations:handoff` | Status → `pending`, desliga a resposta automática da IA na thread, grava a nota, atribui `assign_to` se informado. `reason` obrigatório, truncado em 500. Não manda mensagem ao cliente | `src/app/api/v1/conversations/[id]/handoff/route.ts:42,35,54-57` |
+| GET | `/api/v1/appointments` | `appointments:read` | Lista agendamentos; filtros `?contact_id=`, `?status=`, `?from=`, `?to=` (sobre `starts_at`) | `src/app/api/v1/appointments/route.ts:38,47-73` |
+| POST | `/api/v1/appointments` | `appointments:write` | Cria agendamento. Confere que `contact_id` e `conversation_id` são da conta; colisões de índice único viram 409 com mensagens distintas | `src/app/api/v1/appointments/route.ts:101,121-149,188-205` |
+| GET | `/api/v1/appointments/{id}` | `appointments:read` | Lê um agendamento; 404 fora da conta | `src/app/api/v1/appointments/[id]/route.ts:32,46` |
+| PATCH | `/api/v1/appointments/{id}` | `appointments:write` | Remarca (`starts_at` **e** `ends_at` juntos, senão 400) ou cancela (`{"status":"cancelled"}`). Não existe DELETE | `src/app/api/v1/appointments/[id]/route.ts:59,73-80` |
+| POST | `/api/v1/broadcasts` | `broadcasts:send` | Cria campanha + destinatários sincronamente e faz o fan-out em `after()`; responde 202. `maxDuration = 60`. Teto de 1000 destinatários | `src/app/api/v1/broadcasts/route.ts:48,80,37`; teto em `src/lib/whatsapp/broadcast-core.ts:77,104` |
+| GET | `/api/v1/broadcasts/{id}` | `broadcasts:send` | Status e contadores da campanha; 404 fora da conta | `src/app/api/v1/broadcasts/[id]/route.ts:19,35` |
+| GET | `/api/v1/webhooks` | `webhooks:manage` | Lista os endpoints da conta, sem o segredo; `next_cursor` sempre `null` | `src/app/api/v1/webhooks/route.ts:23,27,38-43` |
+| POST | `/api/v1/webhooks` | `webhooks:manage` | Registra endpoint. Valida `url` https e `events`; gera o segredo, grava cifrado e devolve o texto puro **uma única vez** no 201 | `src/app/api/v1/webhooks/route.ts:51,75,83,95-98` |
+| GET | `/api/v1/webhooks/{id}` | `webhooks:manage` | Lê um endpoint (sem o segredo); 404 fora da conta | `src/app/api/v1/webhooks/[id]/route.ts:24,38` |
+| PATCH | `/api/v1/webhooks/{id}` | `webhooks:manage` | Atualiza `url` / `events` / `is_active`. Reativar zera `failure_count`. Corpo sem campo atualizável → 400 | `src/app/api/v1/webhooks/[id]/route.ts:51,91,94-96` |
+| DELETE | `/api/v1/webhooks/{id}` | `webhooks:manage` | Remove o endpoint; 404 fora da conta | `src/app/api/v1/webhooks/[id]/route.ts:125,140` |
+
+### Rotas de gestão de chave e origem dos eventos — autenticação por sessão
+
+| Método | Rota | Papel exigido | O que faz | Arquivo |
+|---|---|---|---|---|
+| GET | `/api/account/api-keys` | Qualquer membro (sessão por cookie, cliente com RLS) | Lista as chaves com `SAFE_COLUMNS`; `key_hash` deliberadamente omitido | `src/app/api/account/api-keys/route.ts:42-43,49-55` |
+| POST | `/api/account/api-keys` | **admin** (`requireRole('admin')` + policy `api_keys_insert`) | Cria a chave e devolve o texto puro uma única vez. Rate limit 30/min por usuário. Nome ≤ 80 caracteres; `expiresInDays` clampado em 365 | `src/app/api/account/api-keys/route.ts:73,75-79,35,38,118,124-155` |
+| DELETE | `/api/account/api-keys/{id}` | **admin** (`requireRole('admin')` + policy `api_keys_update`) | Revogação soft: seta `revoked_at` filtrando por conta e `revoked_at IS NULL`; zero linhas → 404 "not found or already revoked" | `src/app/api/account/api-keys/[id]/route.ts:29,43-65` |
+| POST/GET | `/api/whatsapp/webhook` | Webhook da Meta (fora deste subsistema) | Única origem dos eventos de saída: chama `dispatchWebhookEvent` em quatro pontos | `src/app/api/whatsapp/webhook/route.ts:460,634,770,966` |
 
 ### Telas
 
-| Tela (nome no menu) | Rota | Arquivo | Observações |
-| --- | --- | --- | --- |
-| Configurações → Espaço de trabalho → **Chaves de API** | `/settings?tab=api` | `src/components/settings/api-keys-settings.tsx` | Única tela do subsistema. Lista nome, prefixo, escopos como etiquetas, criada em / última vez usada / expira em, selos "Revogada" e "Expirada". Botões "Nova chave de API" e "Revogar" ficam dentro de `<RequireRole min="admin">` (`:146-151, :243-258`). O diálogo tem nome (maxLength 80) e checkboxes de escopo montados a partir de `API_SCOPES` (`:423-444`), e depois troca para a visão de revelação única com botão "Copiar" (`:357-393`) |
-| Configurações (roteador de painéis) | `/settings` | `src/app/(dashboard)/settings/page.tsx` | Mapeia a seção `api` para `<ApiKeysSettings />` (`page.tsx:87`). O mapa de painéis (`page.tsx:74-88`) não tem nenhuma entrada de webhooks |
-| Configurações (trilho lateral) | `/settings` | `src/components/settings/settings-sections.ts` | Registra a seção `api` no grupo `workspace` com ícone `KeyRound` (`settings-sections.ts:39,71`); rótulo pt-BR "Chaves de API". Não existe seção de webhooks |
+| Tela (nome no menu) | Rota | Arquivo | O que tem |
+|---|---|---|---|
+| Configurações → **Chaves de API** | `/settings?tab=api` | `src/components/settings/api-keys-settings.tsx` | Lista das chaves (nome, prefixo, escopos como etiquetas, criada em / última utilização / expira em, selos **Revogada** e **Expirada**), botão **Nova chave de API** e botão **Revogar**, ambos dentro de `<RequireRole min="admin">` (`:146-151`, `:243-258`). Diálogo de criação com Nome (máx. 80) e checkboxes montados a partir de `API_SCOPES` (`:423-444`), seguido da visão de revelação única com botão **Copiar** (`:357-393`) |
+| Configurações (roteador de painéis) | `/settings` | `src/app/(dashboard)/settings/page.tsx` | Mapeia a seção `api` para `<ApiKeysSettings />` (`page.tsx:87`); o mapa de painéis vai de `page.tsx:74` a `:88` e **não tem nenhuma entrada de webhooks** |
+| Configurações (trilho lateral) | `/settings` | `src/components/settings/settings-sections.ts` | Registra a seção `api` no grupo **Espaço de trabalho** com ícone `KeyRound`. **Não existe seção de webhooks** |
 
 ### Arquivos-chave
 
 | Arquivo | Papel |
-| --- | --- |
+|---|---|
 | `src/lib/api-keys/keys.ts` | Geração, hashing e checagem estrutural da chave. Puro, sem I/O |
 | `src/lib/api-keys/store.ts` | Acesso a dados do caminho de auth (service-role): `findActiveKeyByHash`, `getAccountName`, `touchLastUsed` |
-| `src/lib/api-keys/scopes.ts` | Os 10 escopos, descrições da UI, `normalizeScopes` e `hasScope` |
-| `src/lib/auth/api-context.ts` | `requireApiKey`: bearer, formato, hash, rate limit, escopo, contexto com cliente service-role |
+| `src/lib/api-keys/scopes.ts` | Vocabulário dos 10 escopos, descrições da tela, `normalizeScopes`, `hasScope` |
+| `src/lib/auth/api-context.ts` | `requireApiKey`: extrai o portador, valida formato, resolve o hash, aplica rate limit, checa escopo, devolve o contexto |
 | `src/lib/api/v1/respond.ts` | Envelope público: `ApiError`, `ok`/`okList`/`fail`, `unauthorized`/`forbidden`/`badRequest`/`rateLimited`, `toApiErrorResponse` |
-| `src/lib/api/v1/pagination.ts` | Keyset: `parseListParams`, `encodeCursor`/`decodeCursor` (com validação anti-injeção), `keysetFilter`, `buildPage` |
+| `src/lib/api/v1/pagination.ts` | Paginação keyset: `parseListParams`, `encodeCursor`/`decodeCursor` (com validação anti-injeção), `keysetFilter`, `buildPage` |
 | `src/lib/api/v1/contacts.ts` | Serializador de contato, `resolveAuditUserId`, `findOrCreateContact`, `setContactTags` |
 | `src/lib/api/v1/conversations.ts` | Serializadores públicos de conversa e mensagem (renomeia `message_id` → `whatsapp_message_id`) |
 | `src/lib/api/v1/appointments.ts` | Serializador, status válidos, `parseSlot` e `SLOT_ERROR_MESSAGE` |
 | `src/lib/rate-limit.ts` | Limitador de janela fixa em memória + `rateLimitResponse` + catálogo `RATE_LIMITS` |
-| `src/lib/webhooks/deliver.ts` | `dispatchWebhookEvent` / `deliverOne`: seleção, assinatura, POST único com timeout, contabilidade de falha |
+| `src/lib/webhooks/deliver.ts` | `dispatchWebhookEvent` / `deliverOne`: seleção de endpoints, assinatura, POST único com timeout, contabilidade de falha |
 | `src/lib/webhooks/sign.ts` | `buildSignatureHeader` e `verifySignatureHeader` (esquema `t=…,v1=…`) |
-| `src/lib/webhooks/ssrf.ts` | `isDeliverableUrl` / `isPrivateOrReservedIp` |
+| `src/lib/webhooks/ssrf.ts` | `isDeliverableUrl` / `isPrivateOrReservedIp` — guarda SSRF do alvo de entrega |
 | `src/lib/webhooks/events.ts` | Vocabulário dos 4 eventos + `normalizeEvents` |
 | `src/lib/webhooks/endpoints.ts` | `generateWebhookSecret`, `WEBHOOK_PUBLIC_COLUMNS`, `serializeWebhookEndpoint`, `normalizeWebhookUrl` |
-| `src/lib/whatsapp/encryption.ts` | `encrypt`/`decrypt` AES-256-GCM do segredo do webhook; lê `process.env.ENCRYPTION_KEY` (`:29`) |
+| `src/lib/whatsapp/encryption.ts` | `encrypt`/`decrypt` AES-256-GCM do segredo do webhook; lê `process.env.ENCRYPTION_KEY` em `:29`, algoritmo em `:40` |
 | `src/lib/flows/admin-client.ts` | `supabaseAdmin()` — cliente service-role usado por todo o caminho da API pública |
-| `src/middleware.ts` | Relevante por omissão: não bloqueia `/api/v1` (`:73,81`) |
-| `docs/public-api.md` | Documentação voltada ao integrador (460 linhas). Confere no rate limit (`:86`) e no esquema de assinatura (`:423-424`); não menciona `conversation.reopened` |
-| `mcp-server/src/config.ts` | Servidor MCP consumidor da API: `WACRM_BASE_URL`, `WACRM_API_KEY` e os dois flags de opt-in para escrita |
-| `mcp-server/src/client.ts` | Cliente HTTP fino do `/api/v1` usado pelo servidor MCP |
-| `supabase/migrations/026_api_keys.sql` | DDL e RLS de `api_keys` |
-| `supabase/migrations/028_webhook_endpoints.sql` | DDL e RLS de `webhook_endpoints` e a função `record_webhook_failure` |
+| `src/middleware.ts` | Middleware global; relevante por omissão: **não** cobre `/api/v1` |
+| `docs/public-api.md` | Documentação voltada ao integrador (460 linhas). Confere no rate limit e no esquema de assinatura; **não** lista `conversation.reopened` |
+| `mcp-server/src/config.ts` / `client.ts` | Servidor MCP do repositório, consumidor desta API. Por padrão só registra ferramentas de leitura; escrita e broadcast exigem `WACRM_ENABLE_WRITES` e `WACRM_ENABLE_BROADCASTS` (`config.ts:49-56`) |
+
+### O que não foi verificado
+
+- O estado real do banco na instância do cliente: se as migrações 026, 028, 041 e 043 foram aplicadas e se policies ou colunas foram alteradas por fora.
+- Quantas instâncias o deploy real roda — o que decide se o rate limit de 120/min tem algum efeito prático.
+- Nenhuma rota `/api/v1` foi exercitada em execução; tudo aqui vem de leitura de código.
+- Se existe um modo sandbox com prefixo `wacrm_test_`: só o prefixo `wacrm_live_` foi procurado.
+- Se algum cron reativa endpoints de webhook auto-desativados (a única reativação encontrada é o PATCH manual).
+- O que acontece com `api_keys` e `webhook_endpoints` na exclusão de uma conta, além do `ON DELETE CASCADE` declarado na DDL.
+- Se algum caminho do webhook de entrada da Meta (por exemplo o gate de cobrança manual, perto da linha 780) suprime a emissão de `message.received`.
+- Se há rota `/api/v1` adicionada ou removida por reescrita em `next.config.ts` (o arquivo não foi aberto).
+- As policies de RLS das demais tabelas tocadas pelas rotas `/api/v1` (`contacts`, `conversations`, `messages`, `broadcasts`, `broadcast_recipients`) — irrelevantes neste caminho, que usa service-role, mas não transcritas.

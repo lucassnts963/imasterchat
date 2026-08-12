@@ -19,7 +19,7 @@ O dono do negócio e a equipe dele conseguem:
 - **Assumir uma conversa do robô** com um clique: o assistente de IA para de responder naquela conversa e ela passa a ser sua.
 - **Devolver a conversa para o robô** com o botão Retomar IA.
 - **Saber quando o robô desistiu e por quê**: quando a IA transfere para uma pessoa, a conversa vira Pendente e a tarja acima da caixa de escrita mostra a nota de transferência escrita pelo próprio robô.
-- **Ser avisado quando alguém te atribui uma conversa**, na tela Notificações (e por aviso no celular, se o navegador estiver inscrito).
+- **Ser avisado quando alguém te atribui uma conversa**, na tela Notificações. **Só na tela Notificações**: atribuição **não** gera aviso no celular. Os únicos dois eventos que disparam push são mensagem nova do cliente e transferência do robô para uma pessoa (`webhook/route.ts:912` e `handoff.ts:139` são os dois únicos chamadores de `sendPushToAccount`).
 - **Reagir a mensagens com emoji, responder citando uma mensagem e copiar o texto dela.**
 - **Ver a ficha do contato ao lado da conversa**: telefone, etiquetas, negócios e notas.
 
