@@ -18,7 +18,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { sendTemplateMessage } from '@/lib/whatsapp/meta-api';
+import { MetaError, sendTemplateMessage } from '@/lib/whatsapp/meta-api';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import {
   sanitizePhoneForMeta,
@@ -75,6 +75,19 @@ export interface BroadcastPlan {
 }
 
 const MAX_RECIPIENTS = 1000;
+
+/**
+ * Pausa antes de tentar de novo depois de um 130429.
+ *
+ * A Meta aceita 80 msg/s por número; dois segundos são muito mais que o
+ * necessário para a janela passar, e curtos o bastante para não estourar
+ * o orçamento de tempo de um disparo.
+ */
+const RATE_LIMIT_BACKOFF_MS = 2000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Validate + persist a broadcast, resolving each recipient to a
@@ -287,6 +300,36 @@ export async function deliverBroadcast(
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         lastError = message;
+
+        // Limite de vazão da Meta (130429) não é falha do destinatário:
+        // é "devagar". Antes caía no ramo genérico e o destinatário era
+        // marcado `failed` PARA SEMPRE — alguém que não recebe porque
+        // mandamos rápido demais, e que nenhuma retentativa alcança.
+        //
+        // Uma pausa e uma segunda tentativa resolvem o caso comum. Se
+        // insistir, aí sim é falha registrada — mas registrada com o
+        // motivo certo.
+        if (error instanceof MetaError && error.isRateLimit) {
+          await sleep(RATE_LIMIT_BACKOFF_MS);
+          try {
+            const retry = await sendTemplateMessage({
+              phoneNumberId: plan.phoneNumberId,
+              accessToken: plan.accessToken,
+              to: variant,
+              templateName: plan.templateName,
+              language: plan.templateLanguage,
+              template: plan.templateRow ?? undefined,
+              params: recipient.params,
+            });
+            sentMessageId = retry.messageId;
+            lastError = null;
+            break;
+          } catch (again) {
+            lastError = again instanceof Error ? again.message : message;
+            break;
+          }
+        }
+
         // Only a "recipient not allowed" error is worth another variant.
         if (!isRecipientNotAllowedError(message)) break;
       }

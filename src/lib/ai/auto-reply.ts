@@ -255,6 +255,14 @@ export async function dispatchInboundToAiReply(
       RATE_LIMITS.aiAutoReplyAccount,
     )
     if (!acctLimit.success) {
+      // ESPERA, em vez de ficar sem resposta.
+      //
+      // Antes este ramo devolvia e pronto: a mensagem ficava na caixa
+      // para um humano ver — o que na prática é ninguém, porque nada
+      // avisava. Agora entra na mesma fila do teto de concorrência, e o
+      // relógio de 5 minutos garante que termina em resposta ou em
+      // transferência.
+      await markPending(db, conversationId)
       await recordEvent({
         accountId,
         conversationId,
@@ -262,7 +270,7 @@ export async function dispatchInboundToAiReply(
         code: 'account_rate_limited',
         severity: 'warning',
         message:
-          'Limite de respostas por minuto da conta atingido — este inbound ficou sem resposta automática.',
+          'Limite de respostas por minuto da conta atingido — a conversa entrou na fila.',
         context: { limit: RATE_LIMITS.aiAutoReplyAccount.limit },
       })
       return
@@ -451,6 +459,17 @@ export async function dispatchInboundToAiReply(
         : err instanceof Error && err.name === 'GoogleError'
           ? 'google_error'
           : 'dispatch_failed'
+
+    // 429 do provedor não é fim de linha: é "tente daqui a pouco".
+    //
+    // Tanto a OpenAI quanto a Anthropic mandam `Retry-After`, e a
+    // Anthropic avisa que um pico dispara 429 mesmo abaixo do teto do
+    // plano — ou seja, acontece justamente quando ninguém pode ficar sem
+    // resposta. Entrar na fila é o que transforma isso em atraso em vez
+    // de perda; o relógio de 5 minutos fecha o resto.
+    if (code === 'rate_limited') {
+      await markPending(supabaseAdmin(), conversationId)
+    }
 
     await recordEvent({
       accountId,

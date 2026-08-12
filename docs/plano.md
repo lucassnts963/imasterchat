@@ -351,21 +351,35 @@ tela de Ferramentas descreve as duas mesmo ausentes, dizendo qual é o
 pré-requisito: "não existe fila" e "alguém desligou" parecem idênticos
 de fora e se resolvem em telas diferentes.
 
-## Onda 5 — sobrecarga de verdade
+## Onda 5 — sobrecarga (4 de 5 CONCLUÍDAS em 12/08/2026)
 
-Aqui mora o cliente das 3.000 mensagens. É a onda cara e a de maior
-risco: é o caminho por onde toda mensagem entra, e a falha é silenciosa.
+| # | entrega | estado |
+|---|---|---|
+| 5.1 | Persistir antes de confirmar, idempotência `(phone_number_id, dedupe_key)` | ✅ migração 068 |
+| 5.2 | Teto de concorrência da IA + fila de espera com prazo | ✅ migração 069 |
+| 5.3 | `Retry-After` do provedor; 130429 da Meta reconhecido | ✅ |
+| 5.5 | `monthly_budget_usd` aplicado | ✅ migração 069 |
+| 5.4 | Disparo no servidor, em lotes retomáveis | ⬜ **pendente** |
 
-| # | entrega |
-|---|---|
-| 5.1 | **Persistir antes de confirmar**, idempotência `(phone_number_id, wamid)` — `pendencias.md` item 1 |
-| 5.2 | **Teto de concorrência da IA ancorado na fila da IA** (`concurrency_limit`) |
-| 5.3 | Retentativa com backoff lendo `Retry-After`; reconhecer o 130429 da Meta |
-| 5.4 | Disparo no servidor, em lotes retomáveis |
-| 5.5 | Aplicar `monthly_budget_usd`, que hoje é só exibido |
+**A chave de idempotência não é o wamid.** A 009 já registrava que os
+ids da Meta não são únicos entre números; e `(phone_number_id, wamid)`
+também não serve, porque uma mesma mensagem gera `sent` → `delivered` →
+`read` com o mesmo id — essa chave colapsaria os três e a mensagem
+ficaria eternamente "enviada". Ficou `(phone_number_id, dedupe_key)`,
+com `msg:<wamid>` e `st:<wamid>:<status>`.
 
-5.2 fica quase de graça depois de 3.1 — é o argumento a favor de fazer
-as filas antes.
+**A promessa do 5.2, nas palavras de quem opera:** *"melhor uma mensagem
+que demorou a ser respondida do que alguém que ficou sem resposta"*. O
+portão tem três saídas — responde, espera, ou transfere — e nenhuma
+delas é desistir. Padrões: 5 simultâneas, 5 minutos de espera máxima.
+
+De carona, dois pontos que **perdiam mensagem em silêncio** passaram a
+entrar na fila em vez de sumir: o limite por minuto da conta e o 429 do
+provedor.
+
+**Verificação em produção:** Fase 16b do
+[`checklist-producao.md`](./checklist-producao.md), com o comando pronto
+do teste de reentrega.
 
 ## Onda 6 — o que só faz sentido depois
 

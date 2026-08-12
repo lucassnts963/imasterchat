@@ -150,6 +150,15 @@ export interface GenerateResult {
 export class AiError extends Error {
   readonly code: string
   readonly status: number
+  /**
+   * Quanto o PROVEDOR pediu para esperar, em ms — o `Retry-After` de um
+   * 429. Mutável porque é preenchido logo após a construção, em
+   * `providerHttpError`, que é quem tem a resposta HTTP em mãos.
+   *
+   * `null` quando ele não disse nada; aí quem tenta de novo escolhe o
+   * próprio intervalo.
+   */
+  retryAfterMs: number | null = null
   constructor(message: string, opts: { code?: string; status?: number } = {}) {
     super(message)
     this.name = 'AiError'

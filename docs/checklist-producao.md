@@ -682,6 +682,107 @@ Público: uma pessoa, com um celular com WhatsApp e acesso ao painel.
 
 ---
 
+## Fase 16b — Fila de entrada, fila da IA e orçamento (ondas 5.1/5.2/5.3/5.5)
+
+São os mecanismos que garantem duas promessas: **nenhuma mensagem se
+perde** e **ninguém fica sem resposta**. Todos falham em SILÊNCIO quando
+quebram — é por isso que estão no checklist e não só nos testes.
+
+Tempo: ~25 min, mais 5 de espera passiva.
+
+### A fila de entrada do webhook (5.1)
+
+- [ ] ⚡ 🌐 **Mensagem normal continua chegando.** Mande uma pelo celular
+      e confira que aparece na caixa de entrada em segundos.
+      *Se falhar:* `select * from webhook_events order by received_at desc limit 5`
+      — se a linha existe com `processed_at` nulo, o dreno parou; se não
+      existe, o problema é antes (assinatura, ou a Meta não entregou).
+
+- [ ] 🔴 **Reentrega não duplica.** Reenvie o MESMO webhook assinado três
+      vezes (ver o comando no rodapé desta fase) e confira que a conversa
+      tem **uma** mensagem.
+      *Por que importa:* a Meta reentrega por até 7 dias quando acha que
+      falhamos, e para todos os apps inscritos na WABA. Sem isso, a
+      conversa do cliente enche de repetições.
+
+- [ ] **Status não colapsa.** Mande `sent`, `delivered` e `read` do mesmo
+      wamid; devem virar **três** linhas em `webhook_events`.
+      *Se falhar:* a mensagem fica eternamente "enviada" na tela.
+
+- [ ] **Banco fora do ar devolve 500, não 200.** (Só em ambiente de
+      teste.) Com o Postgres parado, o webhook precisa responder **500** —
+      é o que faz a Meta reentregar. Um 200 aqui é mensagem perdida.
+
+- [ ] ⚡ **A ronda de saúde vigia a fila.** Em `/admin`, a verificação
+      `webhook_queue` deve estar `ok`. Ela acusa quando o evento mais
+      antigo passa de 10 minutos.
+      *Por que o critério é idade e não quantidade:* mil eventos de um
+      lote da Meta drenando em segundos é saúde; um evento parado há dez
+      minutos é problema.
+
+### A fila da IA (5.2)
+
+- [ ] **Espera em vez de 429.** Em Agentes, baixe "respostas simultâneas"
+      para **1**. Mande mensagens de dois contatos diferentes ao mesmo
+      tempo. A segunda deve ser respondida em até 5 minutos (o cron a
+      retoma), **não** ficar sem resposta.
+      *Onde olhar:* `select id, ai_pending_since from conversations where ai_pending_since is not null`.
+
+- [ ] 🔴 **Esperou demais vira gente.** Com o teto em 1, baixe a "espera
+      máxima" para **30s** e repita. A segunda conversa deve ser
+      **transferida** com a nota "Sem vaga para responder em X min" — e
+      não ficar em silêncio.
+      *Esta é a promessa inteira:* melhor demorar do que não responder.
+
+- [ ] **A vaga volta depois de um erro.** Force um erro (chave de IA
+      inválida por um minuto) e confira que
+      `select count(*) from ai_inflight` volta a zero.
+      *Se ficar preso:* o teto encolhe a cada falha até a conta emudecer.
+
+### Orçamento (5.5)
+
+- [ ] 🔴 **Estourado, bloqueia e chama alguém.** Ponha o orçamento mensal
+      em um valor abaixo do já gasto no mês. A próxima mensagem deve ser
+      **transferida** com "Orçamento mensal de IA esgotado", e nenhuma
+      chamada nova deve aparecer em `ai_usage_log`.
+
+- [ ] **`notify_only` continua respondendo.** Troque a ação e confirme
+      que o bot volta a responder, com o evento registrado em `/admin`.
+
+- [ ] **O número bate com a tela.** O gasto que dispara o bloqueio usa a
+      mesma fórmula da tela de Custos. Se a tela diz que sobra e o bot
+      parou, é bug — reporte.
+
+### Limite da Meta no disparo (5.3)
+
+- [ ] 🌐 **130429 não mata o destinatário.** Difícil de forçar de
+      propósito; o que dá para verificar é o registro: depois de um
+      disparo grande, nenhum destinatário deve estar `failed` com
+      mensagem contendo `130429`.
+      *Antes desta onda*, esse destinatário era marcado falho para
+      sempre e nunca mais tentado.
+
+### O comando do teste de reentrega
+
+```bash
+# na VPS, dentro de /home/lucas/dev/infra
+SECRET=$(grep '^META_APP_SECRET=' apps/imasterchat/.env | cut -d= -f2-)
+PN=$(docker exec supabase-db psql -U postgres -d postgres -t -A \
+  -c "select phone_number_id from whatsapp_config limit 1")
+BODY='{"entry":[{"id":"w","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"55","phone_number_id":"'"$PN"'"},"contacts":[{"wa_id":"5511999998888","profile":{"name":"Teste"}}],"messages":[{"id":"wamid.TESTE-1","from":"5511999998888","timestamp":"1786000000","type":"text","text":{"body":"teste"}}]}}]}]}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.*= //')
+for i in 1 2 3; do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST https://imasterchat.com.br/api/whatsapp/webhook \
+    -H "Content-Type: application/json" -H "x-hub-signature-256: sha256=$SIG" -d "$BODY"
+done
+# esperado: 200, 200, 200 — e UMA mensagem no banco
+docker exec supabase-db psql -U postgres -d postgres -t -A \
+  -c "select count(*) from messages where message_id='wamid.TESTE-1'"
+```
+
+> **Limpe depois:** o contato e a conversa de teste ficam na base do
+> cliente se você não apagar. O comando está no fim da Fase 17.
+
 ## Fase 17 — Limpeza (não pule)
 
 **~10 min.**

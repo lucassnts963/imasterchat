@@ -96,12 +96,62 @@ export async function providerHttpError(
         ? `${provider} rate limit reached`
         : `${provider} API error (${status})`
 
-  return new AiError(detail ? `${base}: ${detail}` : base, {
+  const error = new AiError(detail ? `${base}: ${detail}` : base, {
     code,
     // Surface an auth failure as 401 so the settings "Test key" button
     // can show "invalid key"; everything else is an upstream 502.
     status: code === 'invalid_key' ? 401 : 502,
   })
+
+  // Quanto esperar, quando o provedor diz.
+  //
+  // Tanto a OpenAI quanto a Anthropic mandam `Retry-After` num 429 — e
+  // nós descartávamos. O 429 virava erro tipado e a resposta era
+  // PERDIDA, não adiada: um cliente sem resposta porque o provedor
+  // pediu para esperar dois segundos.
+  //
+  // A Anthropic ainda avisa que um aumento brusco de tráfego dispara 429
+  // de "acceleration limit" MESMO abaixo do teto do plano — ou seja,
+  // acontece justamente no pico, que é quando ninguém pode ficar sem
+  // resposta.
+  // Leitura defensiva: nem toda coisa que chega aqui é um `Response`
+  // completo — um mock, ou um cliente HTTP que devolva outra forma,
+  // deixaria `headers` indefinido. Estourar aqui trocaria um erro claro
+  // ("chave inválida") por um TypeError sem diagnóstico, que é
+  // exatamente o oposto do que esta função existe para fazer.
+  error.retryAfterMs = parseRetryAfter(
+    res.headers?.get?.('retry-after') ?? null,
+  )
+  return error
+}
+
+/**
+ * `Retry-After` em milissegundos, ou `null`.
+ *
+ * O cabeçalho aceita duas formas: segundos ("2") ou uma data HTTP. As
+ * duas aparecem na prática, e tratar só a primeira faria a segunda virar
+ * `NaN` — que somado a um `Date.now()` produz uma espera de tempo
+ * indeterminado, pior que não esperar.
+ *
+ * Teto de 60s: um provedor pedindo mais que isso não cabe no orçamento
+ * de 60s da rota do webhook, e nesse caso é melhor a conversa ir para a
+ * fila de espera da IA, onde o relógio de 5 minutos vale.
+ */
+export function parseRetryAfter(header: string | null): number | null {
+  if (!header) return null
+  const trimmed = header.trim()
+
+  const seconds = Number(trimmed)
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(seconds * 1000, 60_000)
+  }
+
+  const when = Date.parse(trimmed)
+  if (!Number.isNaN(when)) {
+    return Math.min(Math.max(0, when - Date.now()), 60_000)
+  }
+
+  return null
 }
 
 /**

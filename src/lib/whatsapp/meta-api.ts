@@ -60,15 +60,41 @@ interface MetaErrorResponse {
   error?: { message?: string; code?: number; type?: string }
 }
 
+/**
+ * Erro da Meta que é limite de vazão, e não falha de verdade.
+ *
+ * 130429 é o código dela para "passou dos 80 msg/s deste número". Ele
+ * NÃO era reconhecido em lugar nenhum: virava erro genérico, e no
+ * disparo o destinatário era marcado `failed` e NUNCA MAIS tentado — um
+ * cliente que não recebe porque mandamos rápido demais.
+ *
+ * `code` fica na exceção para quem chama poder distinguir "não deu" de
+ * "não deu AGORA".
+ */
+export class MetaError extends Error {
+  readonly code: number | null
+  constructor(message: string, code: number | null) {
+    super(message)
+    this.name = 'MetaError'
+    this.code = code
+  }
+  /** Limite de vazão: dá para tentar de novo. */
+  get isRateLimit(): boolean {
+    return this.code === 130429 || this.code === 4 || this.code === 80007
+  }
+}
+
 async function throwMetaError(response: Response, fallback: string): Promise<never> {
   let message = fallback
+  let code: number | null = null
   try {
     const data = (await response.json()) as MetaErrorResponse
     if (data.error?.message) message = data.error.message
+    if (typeof data.error?.code === 'number') code = data.error.code
   } catch {
     // response body wasn't JSON — keep the fallback
   }
-  throw new Error(message)
+  throw new MetaError(message, code)
 }
 
 // ============================================================
