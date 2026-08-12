@@ -170,7 +170,8 @@ O 429 devolve `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-R
 - **`http://` é recusado no cadastro** com 400. Só `https://`.
 - **O evento `conversation.reopened` existe e é disparado, mas não está documentado** em `docs/public-api.md` nem no CHANGELOG (a tabela de eventos em `docs/public-api.md:369-373` lista apenas três). Quem escrever tutorial deve incluir os quatro.
 - **O comentário do código se contradiz sobre a semântica de entrega**: o cabeçalho diz "at-most-once, single attempt" e o comentário do payload diz "at-least-once and may repeat" (`deliver.ts:11` contra `:64-65`). **O código implementa uma tentativa única (at-most-once).** Ainda assim, tratar o campo `id` do payload como chave de idempotência é a prática correta do lado de quem recebe.
-- **Só a Meta gera evento.** Uma mensagem enviada pelo dashboard ou pela própria API não dispara `message.received` — esse evento é só para mensagem **recebida** do cliente. **Não foi verificado até o fim** se algum caminho do webhook de entrada (por exemplo, o gate de cobrança manual perto da linha 780) suprime a emissão de `message.received` em alguma situação.
+- **Só a Meta gera evento.** Uma mensagem enviada pelo dashboard ou pela própria API não dispara `message.received` — esse evento é só para mensagem **recebida** do cliente.
+- **O gate de cobrança não suprime os eventos.** O portão que trava conta `pending`/`blocked` (`webhook/route.ts:797`) desliga fluxos, automações, IA, push e a política de áudio, mas o despacho dos webhooks de saída fica **de fora, por decisão explícita** — o comentário em `webhook/route.ts:792-795` diz que silenciá-los criaria um buraco inexplicado no fluxo de eventos do operador. Uma conta bloqueada continua entregando `message.received`, `conversation.created`, `conversation.reopened` e `message.status_updated`.
 
 **Sobre as demais rotas**
 
@@ -360,6 +361,5 @@ Vocabulário em `src/lib/webhooks/events.ts:11-14`.
 - Se existe um modo sandbox com prefixo `wacrm_test_`: só o prefixo `wacrm_live_` foi procurado.
 - Se algum cron reativa endpoints de webhook auto-desativados (a única reativação encontrada é o PATCH manual).
 - O que acontece com `api_keys` e `webhook_endpoints` na exclusão de uma conta, além do `ON DELETE CASCADE` declarado na DDL.
-- Se algum caminho do webhook de entrada da Meta (por exemplo o gate de cobrança manual, perto da linha 780) suprime a emissão de `message.received`.
 - Se há rota `/api/v1` adicionada ou removida por reescrita em `next.config.ts` (o arquivo não foi aberto).
 - As policies de RLS das demais tabelas tocadas pelas rotas `/api/v1` (`contacts`, `conversations`, `messages`, `broadcasts`, `broadcast_recipients`) — irrelevantes neste caminho, que usa service-role, mas não transcritas.

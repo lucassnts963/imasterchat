@@ -166,7 +166,9 @@ Na interface, `embedded-signup-button.tsx` carrega o SDK do Facebook sob demanda
 
 `POST /api/whatsapp/broadcast` (painel) **não escreve nada no banco** (`:66-74`): lê a configuração e a linha do modelo, chama a Meta em loop com retry por variantes de telefone (`:187-212`) e devolve `results[]` por telefone. Aceita a forma nova `recipients:[{phone, params, messageParams}]` e a legada `phone_numbers[] + template_params[]` (`:96-114`).
 
-`POST /api/v1/broadcasts` (API pública) usa `src/lib/whatsapp/broadcast-core.ts`: `createBroadcast` valida, aplica o teto de 1000 destinatários, deduplica por contato e grava `broadcasts` + `broadcast_recipients` como `pending`, escrevendo `total_recipients` à mão (`:205`); `deliverBroadcast` faz o fan-out e carimba `whatsapp_message_id` em cada linha (`:295-305`) — é isso que faz o webhook de status atualizar delivered/read dessas campanhas. As cinco colunas de contagem em `broadcasts` são derivadas pelo trigger, nunca escritas pelo código.
+Quem grava, nesse caminho, é o **navegador**: `src/hooks/use-broadcast-sending.ts` insere a linha de `broadcasts` (`:356-380`), insere os `broadcast_recipients` como `pending` em lotes de 200 (`:394-399`) e, a cada lote respondido, carimba `status`, `sent_at` e `whatsapp_message_id` em cada destinatário (`:505-541`). Detalhe completo em "Disparos em massa, modelos de mensagem e avisos".
+
+`POST /api/v1/broadcasts` (API pública) usa `src/lib/whatsapp/broadcast-core.ts`: `createBroadcast` valida, aplica o teto de 1000 destinatários, deduplica por contato e grava `broadcasts` + `broadcast_recipients` como `pending`, escrevendo `total_recipients` à mão (`:205`); `deliverBroadcast` faz o fan-out e carimba `whatsapp_message_id` em cada linha (`:295-305`) — é isso que faz o webhook de status atualizar delivered/read dessas campanhas. As cinco colunas de contagem em `broadcasts` são derivadas pelo trigger (`005_broadcast_counts_incremental.sql:62-99`), com **uma exceção**: o caminho do painel semeia as cinco em zero no INSERT e, quando um lote de destinatários falha ao ser inserido, escreve `failed_count` à mão e marca a campanha como `failed` (`use-broadcast-sending.ts:371-376`, `:405-412`).
 
 ## Limites e pegadinhas
 
@@ -224,7 +226,7 @@ Na interface, `embedded-signup-button.tsx` carrega o SDK do Facebook sob demanda
 
 **Trocar `ENCRYPTION_KEY` órfã todos os tokens salvos.** O sintoma é `token_corrupted` com `needs_reset: true` no health check (`config/route.ts:78-151`) e `credentials_unreadable` no monitoramento (`src/lib/observability/health.ts:157-181`); a saída é "Redefinir configuração" e digitar as credenciais de novo.
 
-**A campanha disparada pelo painel não escreve destinatários no banco** (`broadcast/route.ts:66-74`). Como o casamento do webhook de status é por `whatsapp_message_id` gravado em `broadcast_recipients`, o caminho da API pública é o que produz o acompanhamento completo de entregue/lido.
+**A *rota* de campanha do painel não escreve nada no banco** (`broadcast/route.ts:66-74`) — mas a campanha, sim: quem grava `broadcasts` e `broadcast_recipients` nesse caminho é o navegador (`src/hooks/use-broadcast-sending.ts`), inclusive o `whatsapp_message_id` de cada destinatário (`:520`). Ou seja, o acompanhamento de entregue/lido funciona nos dois caminhos. O que muda é o **orquestrador**: no painel é a aba aberta, então fechar a aba deixa destinatários presos em `pending`; na API pública o servidor entrega em `after()`, com teto de 60 s.
 
 O que **não existe** neste subsistema: dois números por conta; seleção de versão da Graph API pela interface; renovação automática do token do Embedded Signup (não há código de refresh no repositório); bloqueio no servidor para envio fora da janela de 24h; verificação de posse do `mediaId`; exclusão automática, no sync, de modelos que sumiram da Meta.
 
@@ -239,7 +241,6 @@ Estes pontos não foram confirmados e não devem virar afirmação em tutorial:
 - Se o índice único de `message_templates` continua por `user_id` em todas as migrações posteriores (o TODO no código diz que sim, mas não houve varredura exaustiva do DDL).
 - Se um usuário com papel agent ou viewer consegue de fato disparar a edição/exclusão na Meta antes de a RLS barrar o update local — a ordem do código indica que sim, mas não foi testado em execução.
 - Se existe alguma checagem de posse do `mediaId` em middleware global — `src/middleware.ts` não foi lido.
-- O que exatamente a tela de campanhas grava em `broadcasts`/`broadcast_recipients` no caminho do painel, já que a rota não grava nada — a escrita tem que estar em `src/hooks/use-broadcast-sending.ts`, lido só parcialmente.
 - Se a coluna `messages.ai_generated` existe (é escrita por `src/lib/flows/meta-send.ts`); a migração que a cria não foi localizada.
 - Se o endereço usado como `header_media_url` de modelo é publicamente acessível pela Meta — o código só garante que não é endereço privado e que responde 2xx.
 
