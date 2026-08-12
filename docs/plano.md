@@ -266,15 +266,25 @@ interruptor, e a que não gasta a chave da ElevenLabs de quem acha que
 parou o sistema. Quem quiser transcrição sem resposta automática tem o
 caminho certo: agente ligado, resposta automática desligada.
 
-## Onda 3 — as filas (fundação PRONTA, telas pendentes)
+## Onda 3 — CONCLUÍDA (12/08/2026)
 
 | # | entrega | estado |
 |---|---|---|
 | 3.1 | `queues`, `queue_members`, `conversation_queue_stays`, `conversations.queue_id` | ✅ migração 065, aplicada |
 | 3.2 | Fila padrão `attended_by='ai'` por conta + backfill | ✅ 065 |
+| 3.3 | Tela **Configurações → Filas** | ✅ `queues-settings.tsx` |
+| 3.4 | Filtro de fila no inbox | ✅ `conversation-list.tsx` |
 | 3.5 | Registro das passagens em todo caminho | ✅ migração 066, aplicada |
-| 3.3 | Tela **Configurações → Filas** | ⬜ pendente |
-| 3.4 | Filtro de fila no inbox + a fila no item da lista | ⬜ pendente |
+
+Na tela de filas, o campo que mais importa é o menos óbvio: a
+**descrição**. Ela não é anotação interna — é o texto que o agente vai
+ler para decidir o encaminhamento (onda 4). O formulário diz isso, com
+exemplo, porque quem escrever "setor 2" vai ter encaminhamento ruim e
+não vai saber por quê.
+
+A fila do robô não mostra responsável nem atribuição automática: quem
+atende ali é o assistente, e oferecer os dois campos seria oferecer uma
+configuração sem efeito.
 
 ### O 3.5 mudou de lugar: saiu do TypeScript e foi para o banco
 

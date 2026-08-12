@@ -79,6 +79,9 @@ export function ConversationList({
   // Broadcast audience filtering. Company is an exact match on the field.
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  /** Filtro por fila. `null` = todas. */
+  const [selectedQueueId, setSelectedQueueId] = useState<string | null>(null);
+  const [queues, setQueues] = useState<{ id: string; name: string }[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
 
   // Keep the latest callback in a ref so the fetch effect below can
@@ -166,6 +169,24 @@ export function ConversationList({
     return m;
   }, [tags]);
 
+  // As filas da conta, para o filtro e para o rótulo no item. A RLS já
+  // recorta por conta; uma consulta só, e as filas mudam raramente.
+  useEffect(() => {
+    const supabase = createClient();
+    void supabase
+      .from("queues")
+      .select("id, name")
+      .eq("active", true)
+      .order("position")
+      .then(({ data }) => setQueues(data ?? []));
+  }, []);
+
+  const queueNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const q of queues) m.set(q.id, q.name);
+    return m;
+  }, [queues]);
+
   const filtered = useMemo(() => {
     let result = conversations;
 
@@ -179,6 +200,10 @@ export function ConversationList({
         : [];
     } else if (filter !== "all") {
       result = result.filter((c) => c.status === filter);
+    }
+
+    if (selectedQueueId) {
+      result = result.filter((c) => c.queue_id === selectedQueueId);
     }
 
     // Contact-based filters (tags via OR logic, exact company match).
@@ -202,7 +227,7 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, search, selectedTagIds, selectedCompany, user?.id]);
+  }, [conversations, filter, search, selectedTagIds, selectedCompany, user?.id, selectedQueueId]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -276,6 +301,54 @@ export function ConversationList({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {queues.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-muted",
+                  selectedQueueId
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {selectedQueueId
+                  ? queueNameById.get(selectedQueueId) ?? t("queues")
+                  : t("queues")}
+                <ChevronDown className="h-3 w-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="max-h-64 w-56 border-border bg-popover"
+              >
+                <DropdownMenuItem
+                  onClick={() => setSelectedQueueId(null)}
+                  className={cn(
+                    "text-sm",
+                    selectedQueueId === null
+                      ? "text-primary"
+                      : "text-popover-foreground"
+                  )}
+                >
+                  {t("allQueues")}
+                </DropdownMenuItem>
+                {queues.map((q) => (
+                  <DropdownMenuItem
+                    key={q.id}
+                    onClick={() => setSelectedQueueId(q.id)}
+                    className={cn(
+                      "text-sm",
+                      selectedQueueId === q.id
+                        ? "text-primary"
+                        : "text-popover-foreground"
+                    )}
+                  >
+                    {q.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {tags.length > 0 && (
             <DropdownMenu>

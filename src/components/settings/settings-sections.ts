@@ -1,6 +1,7 @@
 import {
   Bell,
   CalendarClock,
+  ListOrdered,
   Coins,
   FileText,
   KeyRound,
@@ -33,6 +34,7 @@ export const SETTINGS_SECTIONS = [
   'templates',
   'quick-replies',
   'scheduling',
+  'queues',
   'fields',
   'deals',
   'members',
@@ -65,6 +67,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   templates: { id: 'templates', labelKey: 'sections.templates', icon: FileText, group: 'workspace' },
   'quick-replies': { id: 'quick-replies', labelKey: 'sections.quick-replies', icon: Zap, group: 'workspace' },
   scheduling: { id: 'scheduling', labelKey: 'sections.scheduling', icon: CalendarClock, group: 'workspace' },
+  queues: { id: 'queues', labelKey: 'sections.queues', icon: ListOrdered, group: 'workspace' },
   fields: { id: 'fields', labelKey: 'sections.fields', icon: Tags, group: 'workspace' },
   deals: { id: 'deals', labelKey: 'sections.deals', icon: Coins, group: 'workspace' },
   members: { id: 'members', labelKey: 'sections.members', icon: UsersRound, group: 'workspace' },

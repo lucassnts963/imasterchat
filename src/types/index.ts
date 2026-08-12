@@ -170,6 +170,15 @@ export interface Conversation {
   updated_at: string;
   contact?: Contact;
   /**
+   * Em qual fila a conversa está (migração 065).
+   *
+   * Toda conversa está sempre em exatamente uma — o gatilho da 066 põe
+   * a fila padrão da conta nas que chegam sem. Fica opcional no tipo
+   * porque conta criada antes da 065 e não migrada pode não ter fila
+   * nenhuma, e a interface degrada para "sem fila" em vez de quebrar.
+   */
+  queue_id?: string | null;
+  /**
    * AI auto-reply state for this thread (migration 029 + 033):
    *  - `ai_autoreply_disabled` — the bot is paused here (a human took
    *    over, or the model handed off). Sticky until re-enabled.

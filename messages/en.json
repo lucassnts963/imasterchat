@@ -160,7 +160,9 @@
       "noConversations": "No conversations found",
       "noMessagesYet": "No messages yet",
       "unknown": "Unknown",
-      "filterMine": "Mine"
+      "filterMine": "Mine",
+      "queues": "Queue",
+      "allQueues": "All queues"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -1577,7 +1579,8 @@
       "members": "Team members",
       "api": "API keys",
       "scheduling": "Scheduling",
-      "push": "Device alerts"
+      "push": "Device alerts",
+      "queues": "Queues"
     },
     "groups": {
       "account": "Account",
@@ -1878,6 +1881,31 @@
       "modeAll": "Every message",
       "modeAllHint": "Alerts on every customer message. In a busy shop that is all day.",
       "iosNote": "On iPhone the app must be installed to the home screen before notifications work (iOS 16.4 or newer)."
+    },
+    "queues": {
+      "title": "Attendance queues",
+      "description": "Every conversation is always in one queue, and the queue says who attends it: the assistant or a team.",
+      "loading": "Loading queues…",
+      "badgeDefault": "Default",
+      "descriptionLabel": "Description",
+      "descriptionHint": "This is the text the assistant reads to decide where to route. Use the words your customers use.",
+      "responsibleLabel": "Responsible",
+      "responsibleHint": "Who answers for this queue. One person can answer for several.",
+      "noResponsible": "Nobody (shared waiting room)",
+      "autoAssignLabel": "Assign to the responsible",
+      "autoAssignOn": "On",
+      "autoAssignOff": "Off",
+      "autoAssignHint": "When on, the conversation becomes theirs on arrival — and the assistant stops replying in it.",
+      "newTitle": "New queue",
+      "newNamePlaceholder": "Billing",
+      "newDescriptionPlaceholder": "Invoice, second copy, payment, installments",
+      "newHint": "Start with three or four. An unused queue confuses the assistant and costs tokens on every reply.",
+      "create": "Create queue",
+      "created": "Queue created",
+      "deleted": "Queue removed",
+      "delete": "Remove queue",
+      "confirmDelete": "Remove the \"{name}\" queue? Conversations in it are left without a queue; history is preserved.",
+      "errorDuplicate": "A queue with that name already exists."
     }
   },
   "SignupPage": {

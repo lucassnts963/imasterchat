@@ -160,7 +160,9 @@
       "noConversations": "Nenhuma conversa encontrada",
       "noMessagesYet": "Nenhuma mensagem ainda",
       "unknown": "Desconhecido",
-      "filterMine": "Minhas"
+      "filterMine": "Minhas",
+      "queues": "Fila",
+      "allQueues": "Todas as filas"
     },
     "messageThread": {
       "backToConversations": "Voltar às conversas",
@@ -1577,7 +1579,8 @@
       "members": "Membros da equipe",
       "api": "Chaves de API",
       "scheduling": "Agendamento",
-      "push": "Avisos no celular"
+      "push": "Avisos no celular",
+      "queues": "Filas"
     },
     "groups": {
       "account": "Conta",
@@ -1878,6 +1881,31 @@
       "modeAll": "Toda mensagem",
       "modeAllHint": "Avisa a cada mensagem de cliente. Num dia movimentado, isso é o dia inteiro.",
       "iosNote": "No iPhone, é preciso instalar o app na tela de início antes de as notificações funcionarem (iOS 16.4 ou mais novo)."
+    },
+    "queues": {
+      "title": "Filas de atendimento",
+      "description": "Toda conversa está sempre em uma fila, e a fila diz quem atende: o assistente ou um time.",
+      "loading": "Carregando filas…",
+      "badgeDefault": "Padrão",
+      "descriptionLabel": "Descrição",
+      "descriptionHint": "É este texto que o assistente lê para decidir para onde encaminhar. Escreva com as palavras que o cliente usa — \"boleto, segunda via, pagamento\" funciona melhor que \"setor 2\".",
+      "responsibleLabel": "Responsável",
+      "responsibleHint": "Quem responde por esta fila. Uma pessoa pode responder por várias.",
+      "noResponsible": "Ninguém (sala de espera)",
+      "autoAssignLabel": "Atribuir ao responsável",
+      "autoAssignOn": "Ligado",
+      "autoAssignOff": "Desligado",
+      "autoAssignHint": "Ligado, a conversa vira do responsável ao entrar aqui — e o assistente para de responder nela.",
+      "newTitle": "Nova fila",
+      "newNamePlaceholder": "Financeiro",
+      "newDescriptionPlaceholder": "Boleto, segunda via, pagamento, parcelamento",
+      "newHint": "Comece com três ou quatro. Fila que ninguém usa confunde o assistente e custa em toda resposta.",
+      "create": "Criar fila",
+      "created": "Fila criada",
+      "deleted": "Fila removida",
+      "delete": "Remover fila",
+      "confirmDelete": "Remover a fila \"{name}\"? As conversas que estiverem nela ficam sem fila; o histórico é preservado.",
+      "errorDuplicate": "Já existe uma fila com esse nome."
     }
   },
   "SignupPage": {
