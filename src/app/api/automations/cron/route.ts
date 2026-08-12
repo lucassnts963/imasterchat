@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { drainWebhookEvents } from '@/app/api/whatsapp/webhook/route'
+import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { resumePendingExecution } from '@/lib/automations/engine'
 import type { AutomationContext } from '@/lib/automations/engine'
 
@@ -54,6 +55,44 @@ export async function GET(request: Request) {
     console.error('[cron] dreno da fila de webhook falhou:', err)
   }
 
+  // A fila de espera da IA.
+  //
+  // Conversas que não couberam no teto de concorrência estão marcadas
+  // com `ai_pending_since`. Reprocessar é só chamar o mesmo dispatch de
+  // novo: ele relê tudo da conversa, e o portão decide outra vez —
+  // agora talvez com vaga, ou já com espera demais, e aí transfere.
+  //
+  // É esta varredura que transforma "não coube" em "vai ser respondido
+  // de um jeito ou de outro". Sem ela, a marcação seria só um carimbo
+  // bonito numa conversa esquecida.
+  let retried = 0
+  try {
+    const { data: waiting } = await admin
+      .from('conversations')
+      .select('id, account_id, contact_id, user_id')
+      .not('ai_pending_since', 'is', null)
+      .order('ai_pending_since', { ascending: true })
+      .limit(100)
+
+    for (const c of (waiting ?? []) as Array<{
+      id: string
+      account_id: string
+      contact_id: string
+      user_id: string
+    }>) {
+      await dispatchInboundToAiReply({
+        accountId: c.account_id,
+        conversationId: c.id,
+        contactId: c.contact_id,
+        configOwnerUserId: c.user_id,
+      })
+      retried++
+    }
+    if (retried) console.log(`[cron] fila da IA: ${retried} conversa(s) retomada(s)`)
+  } catch (err) {
+    console.error('[cron] varredura da fila da IA falhou:', err)
+  }
+
   const { data: due, error } = await admin
     .from('automation_pending_executions')
     .select('*')
@@ -64,7 +103,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0)
-    return NextResponse.json({ processed: 0, webhook_queue: drained })
+    return NextResponse.json({ processed: 0, webhook_queue: drained, ai_retried: retried })
 
   let processed = 0
   for (const row of due) {

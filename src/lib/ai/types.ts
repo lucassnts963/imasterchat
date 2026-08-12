@@ -43,6 +43,14 @@ export interface AiConfig {
   handoffNoticeEnabled?: boolean
   /** O texto do aviso, nas palavras da conta. Nulo usa o padrão. */
   handoffNoticeText?: string | null
+  /** Teto de gasto do mês, em dólares. Nulo = sem teto. */
+  monthlyBudgetUsd?: number | null
+  /** Quantas respostas a IA gera em paralelo nesta conta. */
+  aiConcurrencyLimit?: number
+  /** Quanto uma conversa pode esperar na fila antes de virar gente. */
+  aiMaxWaitSeconds?: number
+  /** 'block_and_handoff' (padrão) | 'notify_only' */
+  budgetExceededAction?: string
   /** A partir de quantas horas de silêncio um retorno é conversa nova. */
   newSessionHours?: number
   /** Mensagens do histórico enviadas ao modelo. Null cai na variável de

@@ -20,6 +20,13 @@ import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { AiError } from './types'
 import { handOffConversation, DEFAULT_HANDOFF_NOTICE } from '@/lib/conversations/handoff'
+import {
+  clearPending,
+  markPending,
+  monthSpendUsd,
+  passAiGate,
+  releaseAiSlot,
+} from './queue-gate'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { recordEvent } from '@/lib/observability/events'
@@ -114,7 +121,7 @@ export async function dispatchInboundToAiReply(
     const { data: conv, error: convErr } = await db
       .from('conversations')
       .select(
-        'assigned_agent_id, ai_autoreply_disabled, ai_reply_count, ai_reply_total',
+        'assigned_agent_id, ai_autoreply_disabled, ai_reply_count, ai_reply_total, ai_pending_since',
       )
       .eq('id', conversationId)
       .maybeSingle()
@@ -124,6 +131,82 @@ export async function dispatchInboundToAiReply(
     // Cheap early-out; the authoritative cap check is the atomic claim
     // below (this read can race a concurrent inbound).
     if (conv.ai_reply_count >= config.autoReplyMaxPerConversation) return
+
+    // ---------------------------------------------------------------
+    // O portão: cabe agora, espera, ou vira gente?
+    //
+    // Regra de produto: "melhor uma mensagem que demorou a ser
+    // respondida do que alguém que ficou sem resposta". Nenhum caminho
+    // daqui sai em silêncio.
+    // ---------------------------------------------------------------
+    const budgetUsd = config.monthlyBudgetUsd ?? null
+    let budgetExceeded = false
+    if (budgetUsd && budgetUsd > 0) {
+      try {
+        budgetExceeded = (await monthSpendUsd(db, accountId)) >= budgetUsd
+      } catch (err) {
+        // Não sabemos o gasto: seguir é a escolha menos ruim. Barrar por
+        // uma consulta que falhou deixaria o cliente sem resposta por um
+        // problema nosso.
+        console.error('[auto-reply] leitura do gasto do mês falhou:', err)
+      }
+    }
+
+    const pendingSince =
+      (conv as { ai_pending_since?: string | null }).ai_pending_since ?? null
+
+    const gate = await passAiGate({
+      db,
+      accountId,
+      conversationId,
+      concurrencyLimit: config.aiConcurrencyLimit ?? 5,
+      maxWaitSeconds: config.aiMaxWaitSeconds ?? 300,
+      budgetExceeded,
+      budgetAction: config.budgetExceededAction ?? 'block_and_handoff',
+      pendingSince,
+    })
+
+    if (gate.kind === 'wait') {
+      // Entra na fila e sai. O cron tenta de novo; o relógio da espera
+      // já está correndo, e é ele que garante que isto termina.
+      await markPending(db, conversationId)
+      return
+    }
+
+    if (gate.kind === 'handoff') {
+      if (pendingSince) await clearPending(db, conversationId)
+      const why =
+        gate.reason === 'budget'
+          ? 'Orçamento mensal de IA esgotado.'
+          : `Sem vaga para responder em ${Math.round(gate.waitedSeconds / 60)} min.`
+      await handOffConversation({
+        db,
+        accountId,
+        conversationId,
+        summary: `🤖 ${why} Precisa de atendimento humano.`,
+        assignTo: config.handoffAgentId,
+      })
+      void recordEvent({
+        accountId,
+        source: 'ai',
+        code: gate.reason === 'budget' ? 'budget_exceeded' : 'ai_queue_timeout',
+        severity: 'warning',
+        message:
+          gate.reason === 'budget'
+            ? `Orçamento mensal esgotado — a conversa foi transferida para uma pessoa.`
+            : `Conversa esperou ${gate.waitedSeconds}s por uma vaga da IA e foi transferida.`,
+        context: { conversationId },
+      })
+      return
+    }
+
+    // A partir daqui a vaga está reservada e PRECISA ser devolvida.
+    //
+    // A limpeza da marcação só acontece para quem ESTAVA na fila. No
+    // caminho feliz — a esmagadora maioria — não havia marcação, e uma
+    // escrita a mais por mensagem numa rota que já faz de 16 a 35
+    // consultas não é detalhe.
+    if (pendingSince) await clearPending(db, conversationId)
 
     // Resolvido AQUI e não mais abaixo: o catálogo de ferramentas e o
     // bloco de ambiente sempre precisaram dele, e agora a marcação do
@@ -383,5 +466,17 @@ export async function dispatchInboundToAiReply(
       message: err instanceof Error ? err.message : String(err),
       context: { stage: 'dispatch' },
     })
+  } finally {
+    // A vaga volta SEMPRE — sucesso, erro, ou saída antecipada.
+    //
+    // `finally` e não no fim do try: um erro no meio da resposta
+    // deixaria a vaga presa, e o teto da conta encolheria a cada falha
+    // até o bot parar de responder. Uma conta que emudece porque falhou
+    // cinco vezes semana passada é o tipo de defeito que ninguém liga à
+    // causa.
+    //
+    // Soltar uma vaga que nunca foi reivindicada é um DELETE que não
+    // acha nada — barato e inofensivo.
+    await releaseAiSlot(supabaseAdmin(), conversationId)
   }
 }

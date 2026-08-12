@@ -15,6 +15,8 @@ const h = vi.hoisted(() => ({
     updatePayload: null as Record<string, unknown> | null,
     updates: [] as Record<string, unknown>[],
     rpcCalls: [] as { name: string; args: unknown }[],
+    /** Resposta de `claim_ai_slot` — o teto de concorrência por conta. */
+    aiSlot: true,
     inserted: [] as { table: string; rows: unknown }[],
   },
 }))
@@ -81,6 +83,19 @@ vi.mock('./admin-client', () => {
       },
       rpc: (name: string, args: unknown) => {
         h.state.rpcCalls.push({ name, args })
+        // Por NOME. Antes devolvia o mesmo valor para qualquer RPC, o
+        // que passou a ser errado quando o portão de concorrência
+        // entrou: `claim_ai_slot` recebia o resultado destinado ao
+        // orçamento de respostas da conversa, e um teste de "perdeu a
+        // corrida" virava "não coube na fila" — outro caminho, mesmo
+        // resultado aparente. Mock que responde a tudo esconde
+        // justamente o tipo de troca que este arquivo existe para pegar.
+        if (name === 'claim_ai_slot') {
+          return Promise.resolve({ data: h.state.aiSlot, error: null })
+        }
+        if (name === 'release_ai_slot') {
+          return Promise.resolve({ data: null, error: null })
+        }
         return Promise.resolve({ data: h.state.claim, error: null })
       },
     }),
@@ -122,6 +137,7 @@ beforeEach(() => {
   h.state.updatePayload = null
   h.state.updates = []
   h.state.rpcCalls = []
+  h.state.aiSlot = true
   h.state.inserted = []
   h.loadAiConfig.mockResolvedValue(aiConfig())
   h.buildConversationContext.mockResolvedValue([{ role: 'user', content: 'hi' }])
@@ -139,12 +155,15 @@ beforeEach(() => {
 describe('dispatchInboundToAiReply — eligibility gates', () => {
   it('claims a slot and sends on the happy path', async () => {
     await dispatchInboundToAiReply(ARGS)
-    expect(h.state.rpcCalls).toEqual([
-      {
-        name: 'claim_ai_reply_slot',
-        args: { conversation_id: 'conv-1', max_replies: 3 },
-      },
-    ])
+    // `toContainEqual` em vez de `toEqual` na lista inteira: o portão de
+    // concorrência acrescentou chamadas legítimas (reservar e devolver a
+    // vaga), e uma asserção sobre a lista fechada transformaria qualquer
+    // acréscimo futuro em falha — sem que nada tivesse quebrado.
+    expect(h.state.rpcCalls).toContainEqual({
+      name: 'claim_ai_reply_slot',
+      args: { conversation_id: 'conv-1', max_replies: 3 },
+    })
+    expect(h.state.rpcCalls.map((c) => c.name)).toContain('claim_ai_slot')
     expect(h.engineSendText).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: 'conv-1', text: 'Hello!' }),
     )
@@ -168,8 +187,13 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
   it('does not send when the atomic slot claim loses the race', async () => {
     h.state.claim = false
     await dispatchInboundToAiReply(ARGS)
-    // It still attempts the claim, but the send is skipped.
-    expect(h.state.rpcCalls).toHaveLength(1)
+    // Ainda tenta reservar o orçamento de respostas; o envio é que não
+    // acontece. Contamos por NOME e não pelo tamanho da lista: o portão
+    // de concorrência também usa RPC, e amarrar o teste ao total faria
+    // qualquer chamada nova quebrar um teste que nada tem a ver com ela.
+    expect(
+      h.state.rpcCalls.filter((c) => c.name === 'claim_ai_reply_slot'),
+    ).toHaveLength(1)
     expect(h.engineSendText).not.toHaveBeenCalled()
   })
 
@@ -261,7 +285,11 @@ describe('dispatchInboundToAiReply — handoff', () => {
     h.runAgent.mockResolvedValue(sentinelHandoff())
     await dispatchInboundToAiReply(ARGS)
     expect(h.engineSendText).not.toHaveBeenCalled()
-    expect(h.state.rpcCalls).toHaveLength(0)
+    // Handoff não consome orçamento de resposta — é o que este zero
+    // guarda. O portão de concorrência, esse, roda sempre.
+    expect(
+      h.state.rpcCalls.filter((c) => c.name === 'claim_ai_reply_slot'),
+    ).toHaveLength(0)
     expect(h.state.updatePayload).toMatchObject({
       ai_autoreply_disabled: true,
       // Shared with the API v1 route: a handoff lands in the queue the
