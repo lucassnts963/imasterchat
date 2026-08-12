@@ -792,6 +792,37 @@ importa: **fechar a aba não interrompe mais nada.**
 - [ ] **Sem WhatsApp configurado, falha visível.** Um disparo numa conta
       sem conexão deve virar `failed`, e não ficar `sending` para sempre.
 
+### Alerta de conversa parada — SLA de fila (6.1)
+
+A fila da IA já se resolve sozinha (espera, e passando do prazo vira
+gente). Do lado das PESSOAS, uma conversa no Financeiro podia ficar a
+tarde inteira e o sistema estava tecnicamente correto o tempo todo. Este
+é o relógio que faltava.
+
+- [ ] **Sem SLA, sem ruído.** Filas recém-criadas nascem com o campo
+      "Avisar após" **vazio** — e não devem gerar alerta nenhum.
+      *Por quê:* alerta que ninguém pediu treina a equipe a ignorar
+      alerta.
+
+- [ ] 🔴 **O alerta sai.** Em Configurações → Filas, ponha "Avisar após"
+      = **1 minuto** numa fila humana. Encaminhe uma conversa para ela e
+      espere dois ciclos do cron.
+      *Esperado:* um evento `queue/sla_breached` em `/admin` → Eventos,
+      com o tempo de espera, e o aviso no Telegram se estiver
+      configurado.
+
+- [ ] **Não repete.** Deixe a mesma conversa parada por mais 15 minutos.
+      **Não** deve sair um segundo alerta para a mesma espera.
+      *Se repetir:* é assim que uma equipe aprende a ignorar alertas.
+
+- [ ] **Duas passagens, dois avisos.** Atenda a conversa, devolva-a para
+      a fila da IA e encaminhe de novo para a mesma fila humana. Passado
+      o SLA, deve sair um alerta **novo**.
+      *Por que funciona:* o carimbo vive na PASSAGEM, não na conversa.
+
+- [ ] **Atender para o relógio.** Assuma a conversa antes do prazo e
+      confirme que nenhum alerta sai.
+
 ### O comando do teste de reentrega
 
 ```bash

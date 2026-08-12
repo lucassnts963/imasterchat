@@ -1915,7 +1915,10 @@
       "deleted": "Queue removed",
       "delete": "Remove queue",
       "confirmDelete": "Remove the \"{name}\" queue? Conversations in it are left without a queue; history is preserved.",
-      "errorDuplicate": "A queue with that name already exists."
+      "errorDuplicate": "A queue with that name already exists.",
+      "slaLabel": "Alert after (minutes)",
+      "slaPlaceholder": "no alert",
+      "slaHint": "Empty = no alert. Filled in, someone is warned when a conversation waits here longer than this."
     }
   },
   "SignupPage": {

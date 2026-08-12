@@ -25,6 +25,11 @@ export type EventSource =
   | 'cron'
   | 'billing'
   | 'scheduling'
+  // Filas de atendimento: hoje só o alerta de SLA. Fonte própria e não
+  // 'app' porque é o que permite filtrar "problemas de operação" —
+  // conversa parada é assunto de quem atende, não de quem mantém o
+  // sistema, e misturar as duas caixas faz as duas serem ignoradas.
+  | 'queue'
   | 'app'
 
 export type EventSeverity = 'info' | 'warning' | 'error' | 'critical'

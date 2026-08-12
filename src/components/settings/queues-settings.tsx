@@ -42,6 +42,7 @@ interface QueueRow {
   attended_by: "ai" | "humans";
   responsible_user_id: string | null;
   auto_assign: boolean;
+  sla_seconds: number | null;
   is_default: boolean;
   position: number;
 }
@@ -71,7 +72,7 @@ export function QueuesSettings() {
       supabase
         .from("queues")
         .select(
-          "id, name, description, attended_by, responsible_user_id, auto_assign, is_default, position",
+          "id, name, description, attended_by, responsible_user_id, auto_assign, sla_seconds, is_default, position",
         )
         .eq("account_id", accountId)
         .eq("active", true)
@@ -232,7 +233,7 @@ export function QueuesSettings() {
                   {/* A fila do robô não tem responsável nem atribuição
                       automática: quem atende ali é o assistente. */}
                   {q.attended_by === "humans" && (
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs">
                           {t("responsibleLabel")}
@@ -270,6 +271,48 @@ export function QueuesSettings() {
                         </Select>
                         <p className="text-xs text-muted-foreground">
                           {t("responsibleHint")}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">{t("slaLabel")}</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={1440}
+                          value={
+                            q.sla_seconds ? Math.round(q.sla_seconds / 60) : ""
+                          }
+                          placeholder={t("slaPlaceholder")}
+                          onChange={(e) =>
+                            setQueues((prev) =>
+                              prev.map((x) =>
+                                x.id === q.id
+                                  ? {
+                                      ...x,
+                                      sla_seconds: e.target.value
+                                        ? Number(e.target.value) * 60
+                                        : null,
+                                    }
+                                  : x,
+                              ),
+                            )
+                          }
+                          onBlur={(e) =>
+                            void patch(q.id, {
+                              // Vazio = sem SLA. É o padrão de propósito:
+                              // alerta que ninguém pediu vira ruído, e
+                              // ruído treina a equipe a ignorar alerta.
+                              sla_seconds: e.target.value
+                                ? Number(e.target.value) * 60
+                                : null,
+                            })
+                          }
+                          disabled={!canEditSettings}
+                          className="h-8"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {t("slaHint")}
                         </p>
                       </div>
 
@@ -317,7 +360,7 @@ export function QueuesSettings() {
         <Card>
           <CardContent className="space-y-3 p-4">
             <Label className="text-sm font-medium">{t("newTitle")}</Label>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}

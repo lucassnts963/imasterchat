@@ -1915,7 +1915,10 @@
       "deleted": "대기열이 삭제되었습니다",
       "delete": "대기열 삭제",
       "confirmDelete": "\"{name}\" 대기열을 삭제할까요? 해당 대화는 대기열이 없어지고, 이력은 보존됩니다.",
-      "errorDuplicate": "같은 이름의 대기열이 이미 있습니다."
+      "errorDuplicate": "같은 이름의 대기열이 이미 있습니다.",
+      "slaLabel": "경고 시간(분)",
+      "slaPlaceholder": "경고 없음",
+      "slaHint": "비워두면 경고 없음. 값을 넣으면 이 시간을 넘겨 대기할 때 알립니다."
     }
   },
   "SignupPage": {

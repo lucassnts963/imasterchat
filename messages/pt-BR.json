@@ -1915,7 +1915,10 @@
       "deleted": "Fila removida",
       "delete": "Remover fila",
       "confirmDelete": "Remover a fila \"{name}\"? As conversas que estiverem nela ficam sem fila; o histórico é preservado.",
-      "errorDuplicate": "Já existe uma fila com esse nome."
+      "errorDuplicate": "Já existe uma fila com esse nome.",
+      "slaLabel": "Avisar após (minutos)",
+      "slaPlaceholder": "sem aviso",
+      "slaHint": "Vazio = sem aviso. Preenchido, alguém é avisado quando uma conversa passa desse tempo esperando aqui."
     }
   },
   "SignupPage": {

@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { drainWebhookEvents } from '@/app/api/whatsapp/webhook/route'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { drainBroadcasts } from '@/lib/broadcast/drain'
+import { sweepQueueSla } from '@/lib/queues/sla'
 import { resumePendingExecution } from '@/lib/automations/engine'
 import type { AutomationContext } from '@/lib/automations/engine'
 
@@ -112,6 +113,20 @@ export async function GET(request: Request) {
     console.error('[cron] dreno de disparos falhou:', err)
   }
 
+  // O relógio das filas humanas.
+  //
+  // A fila da IA já se resolve sozinha (espera, e passando do prazo vira
+  // gente). Do lado das pessoas não havia nada: uma conversa no
+  // Financeiro podia ficar a tarde inteira e o sistema estava
+  // tecnicamente correto o tempo todo.
+  let sla = { checked: 0, alerted: 0 }
+  try {
+    sla = await sweepQueueSla(admin)
+    if (sla.alerted) console.log(`[cron] SLA: ${sla.alerted} conversa(s) parada(s)`)
+  } catch (err) {
+    console.error('[cron] varredura de SLA falhou:', err)
+  }
+
   const { data: due, error } = await admin
     .from('automation_pending_executions')
     .select('*')
@@ -122,7 +137,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0)
-    return NextResponse.json({ processed: 0, webhook_queue: drained, ai_retried: retried, broadcasts: broadcastRun })
+    return NextResponse.json({ processed: 0, webhook_queue: drained, ai_retried: retried, broadcasts: broadcastRun, sla })
 
   let processed = 0
   for (const row of due) {
