@@ -1354,7 +1354,9 @@
         "blue": "Blue",
         "violet": "Violet",
         "pink": "Pink"
-      }
+      },
+      "aiSelectableTitle": "Labels the agent may apply",
+      "aiSelectableHint": "Only tick the ones you want the assistant to use on its own. The rest stay manual — and a customer can't ask for a label by message text if it isn't here."
     },
     "templates": {
       "title": "Message templates",
@@ -2206,19 +2208,25 @@
         "check_availability": "Looks up genuinely free slots, crossing Google Calendar with what is already booked here.",
         "book_appointment": "Books the appointment at the time the customer chose.",
         "reschedule_appointment": "Moves the customer's appointment to another free slot.",
-        "cancel_appointment": "Cancels the customer's appointment and frees the slot."
+        "cancel_appointment": "Cancels the customer's appointment and frees the slot.",
+        "route_to_queue": "Sends the conversation to the right team and stops replying. It picks using the description you wrote for each queue.",
+        "add_tag": "Labels the contact with one of the labels you allowed. Only allowed ones are offered to it."
       },
       "requirements": {
         "scheduling_off": "Unavailable: switch on “let the agent book on its own” in Settings → Scheduling.",
         "google_disconnected": "Unavailable: connect Google Calendar in Settings → Scheduling.",
-        "calendar_unusable": "Unavailable: the Google Calendar connection must be reconnected."
+        "calendar_unusable": "Unavailable: the Google Calendar connection must be reconnected.",
+        "no_human_queue": "Unavailable: create at least one people queue in Settings → Queues.",
+        "no_selectable_tag": "Unavailable: allow at least one label for the agent in Settings → Fields & tags."
       },
       "names": {
         "request_human": "Call a person",
         "check_availability": "Check free slots",
         "book_appointment": "Book an appointment",
         "reschedule_appointment": "Reschedule an appointment",
-        "cancel_appointment": "Cancel an appointment"
+        "cancel_appointment": "Cancel an appointment",
+        "route_to_queue": "Route to a queue",
+        "add_tag": "Label the contact"
       }
     },
     "context": {

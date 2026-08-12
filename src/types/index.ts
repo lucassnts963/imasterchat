@@ -121,6 +121,14 @@ export interface Tag {
   name: string;
   color: string;
   created_at: string;
+  /**
+   * O agente pode aplicar esta etiqueta? (migração 067, padrão false)
+   *
+   * Só as marcadas entram no enum da ferramenta `add_tag`. É a defesa
+   * contra injeção de prompt: quem escreve a mensagem que chega ao
+   * modelo é o cliente, no WhatsApp.
+   */
+  ai_selectable?: boolean;
 }
 
 export interface ContactTag {

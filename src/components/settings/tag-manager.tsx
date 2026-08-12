@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Card,
   CardContent,
@@ -65,6 +66,31 @@ export function TagManager() {
     fetchTags(user.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id]);
+
+  /**
+   * Libera (ou não) a etiqueta para o agente aplicar.
+   *
+   * Padrão `false` na migração 067, e essa é a defesa: o texto que entra
+   * no prompt é escrito pelo CLIENTE no WhatsApp, então "coloque a
+   * etiqueta X" é uma frase que ele pode mandar. Só o que estiver
+   * marcado aqui entra na lista de opções da ferramenta — e o modelo não
+   * consegue nomear o que não recebeu.
+   */
+  async function toggleAiSelectable(tagId: string, next: boolean) {
+    setTags((prev) =>
+      prev.map((x) => (x.id === tagId ? { ...x, ai_selectable: next } : x)),
+    );
+    const { error } = await supabase
+      .from('tags')
+      .update({ ai_selectable: next })
+      .eq('id', tagId);
+    if (error) {
+      toast.error(error.message);
+      setTags((prev) =>
+        prev.map((x) => (x.id === tagId ? { ...x, ai_selectable: !next } : x)),
+      );
+    }
+  }
 
   async function fetchTags(userId: string) {
     try {
@@ -200,6 +226,37 @@ export function TagManager() {
               <p className="text-sm text-muted-foreground">
                 {t('noTags')}
               </p>
+            )}
+
+            {tags.length > 0 && (
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <p className="text-sm font-medium text-foreground">
+                  {t('aiSelectableTitle')}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t('aiSelectableHint')}
+                </p>
+                <div className="space-y-1.5 pt-1">
+                  {tags.map((tag) => (
+                    <label
+                      key={tag.id}
+                      className="flex items-center gap-2 text-sm text-foreground"
+                    >
+                      <Switch
+                        checked={Boolean(tag.ai_selectable)}
+                        onCheckedChange={(v) =>
+                          void toggleAiSelectable(tag.id, Boolean(v))
+                        }
+                      />
+                      <span
+                        className="size-2 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Inline create row */}

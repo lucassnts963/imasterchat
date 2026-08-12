@@ -320,13 +320,36 @@ estada. Fechar a conversa fecha a passagem; reabrir abre outra. **O
 histórico começou a ser gravado** — que é o único item desta onda que
 não podia esperar, porque passado não gravado não volta.
 
-## Onda 4 — o agente operando as filas
+## Onda 4 — CONCLUÍDA (12/08/2026)
 
-| # | entrega | cuidado |
+| # | entrega | onde |
 |---|---|---|
-| 4.1 | `route_to_queue`, como handoff **com destino**, reusando `handOffConversation` | filas no schema como enum, para o modelo não inventar |
-| 4.2 | `add_tag` + `tags.ai_selectable` (padrão `false`) | injeção de prompt: o cliente controla o texto, e tag dispara automação |
-| 4.3 | As duas no liga/desliga de **Agentes → Ferramentas** | cada ferramenta paga o próprio schema em toda resposta |
+| 4.1 | `route_to_queue` — handoff **com destino** | `ai/tools/queues.ts` |
+| 4.2 | `add_tag` + `tags.ai_selectable` (padrão `false`) | `ai/tools/tags.ts`, migração 067 |
+| 4.3 | As duas em **Agentes → Ferramentas**, com o motivo quando indisponíveis | `api/ai/tools/route.ts` |
+| 4.4 | Marcação das etiquetas liberadas | `settings/tag-manager.tsx` |
+
+**`route_to_queue` reusa `handOffConversation`** em vez de abrir caminho
+novo: ela já grava status e nota, dispara o aviso e nunca rouba conversa
+que já tem dono humano. Ganhou um `queueId` opcional; quem registra a
+passagem continua sendo o gatilho da 066.
+
+Ela só atribui quando a fila manda (`auto_assign`). Numa fila sem
+responsável — a sala de espera — a conversa fica visível para o time em
+vez de cair num nome só.
+
+**A defesa das duas é o `enum`**, não instrução no texto. O modelo
+escolhe entre as filas e etiquetas que recebeu, e não consegue nomear o
+que não recebeu. Isso importa muito no `add_tag`: quem escreve a
+mensagem que chega ao prompt é o **cliente**, no WhatsApp, e etiqueta
+dispara automação. Por isso `ai_selectable` nasce `false` — ligar a
+ferramenta não muda nada até alguém escolher, uma a uma.
+
+Nenhuma das duas entra no catálogo quando não pode funcionar (sem fila
+humana, sem etiqueta liberada) — mesmo princípio das de agendamento. E a
+tela de Ferramentas descreve as duas mesmo ausentes, dizendo qual é o
+pré-requisito: "não existe fila" e "alguém desligou" parecem idênticos
+de fora e se resolvem em telas diferentes.
 
 ## Onda 5 — sobrecarga de verdade
 

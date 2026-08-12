@@ -7,6 +7,8 @@ import {
 } from '@/lib/scheduling/settings'
 import { requestHumanTool } from './handoff'
 import { buildSchedulingTools } from './scheduling'
+import { buildQueueTools, type QueueOption } from './queues'
+import { buildTagTools, type TagOption } from './tags'
 import type { AgentTool } from './types'
 import { recordEvent } from '@/lib/observability/events'
 
@@ -123,6 +125,78 @@ export interface BuildToolsArgs {
 }
 
 /**
+ * As filas para as quais o agente pode encaminhar.
+ *
+ * Só as HUMANAS: mandar para a fila do robô seria encaminhar para si
+ * mesmo. Só as ativas, e nunca a padrão — a conversa já está nela.
+ */
+async function loadRoutableQueues(
+  db: SupabaseClient,
+  accountId: string,
+): Promise<QueueOption[]> {
+  try {
+    const { data } = await db
+      .from('queues')
+      .select('id, name, description, responsible_user_id, auto_assign')
+      .eq('account_id', accountId)
+      .eq('active', true)
+      .eq('attended_by', 'humans')
+      .order('position')
+    // `Array.isArray`, e não `data ?? []`: uma resposta malformada não é
+    // nula, é um objeto — e o `.map` logo abaixo estouraria FORA do
+    // try/catch, derrubando a montagem inteira do catálogo por causa de
+    // uma consulta acessória.
+    if (!Array.isArray(data)) return []
+    return ((data ?? []) as Array<{
+      id: string
+      name: string
+      description: string | null
+      responsible_user_id: string | null
+      auto_assign: boolean
+    }>).map((q) => ({
+      id: q.id,
+      name: q.name,
+      description: q.description,
+      responsibleUserId: q.responsible_user_id,
+      autoAssign: q.auto_assign,
+    }))
+  } catch (err) {
+    // Falhar ABERTO seria oferecer encaminhamento que não funciona.
+    // Sem a lista, a ferramenta não entra no catálogo e o agente cai no
+    // `request_human`, que é o comportamento anterior a esta onda.
+    console.error('[ai tools] filas indisponíveis:', err)
+    return []
+  }
+}
+
+/**
+ * As etiquetas que a conta autorizou o agente a aplicar.
+ *
+ * `ai_selectable` é padrão `false` (migração 067): a lista nasce vazia,
+ * e a ferramenta só aparece depois que alguém escolhe. É a defesa contra
+ * o cliente pedir uma etiqueta pelo texto da mensagem.
+ */
+async function loadSelectableTags(
+  db: SupabaseClient,
+  accountId: string,
+): Promise<TagOption[]> {
+  try {
+    const { data } = await db
+      .from('tags')
+      .select('id, name')
+      .eq('account_id', accountId)
+      .eq('ai_selectable', true)
+      .order('name')
+    // Mesmo cuidado do carregador de filas: quem consome faz `.map`,
+    // e isso acontece fora deste try.
+    return Array.isArray(data) ? (data as TagOption[]) : []
+  } catch (err) {
+    console.error('[ai tools] etiquetas indisponíveis:', err)
+    return []
+  }
+}
+
+/**
  * Resolve the tools available to this account right now.
  *
  * `request_human` is unconditional: any agent that can talk to a
@@ -143,6 +217,15 @@ export async function buildToolCatalog(
   if (scheduling) {
     tools.push(...buildSchedulingTools(scheduling))
   }
+
+  // Filas humanas e etiquetas liberadas, em paralelo: são duas consultas
+  // independentes e ambas entram em toda montagem do catálogo.
+  const [queues, tags] = await Promise.all([
+    loadRoutableQueues(args.db, args.accountId),
+    loadSelectableTags(args.db, args.accountId),
+  ])
+  tools.push(...buildQueueTools(queues))
+  tools.push(...buildTagTools(tags))
 
   const disabled =
     args.disabled ?? (await loadDisabledTools(args.db, args.accountId))

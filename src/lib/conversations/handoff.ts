@@ -52,6 +52,18 @@ export interface HandoffArgs {
   summary: string
   /** Agent to park the thread on. Null leaves it in the shared queue. */
   assignTo?: string | null
+  /**
+   * Para qual fila a conversa vai (migração 065).
+   *
+   * Ausente, a conversa fica onde está — que é o comportamento de
+   * sempre, e é o certo para o `request_human`, que significa "chama
+   * alguém" e não "manda para o setor X".
+   *
+   * Presente, quem grava a PASSAGEM não é este código: é o gatilho da
+   * 066, que vê `queue_id` mudar. Um caminho só para o histórico,
+   * independente de quem move.
+   */
+  queueId?: string | null
 }
 
 export type HandoffResult =
@@ -64,7 +76,7 @@ export const MAX_HANDOFF_SUMMARY_LEN = 500
 export async function handOffConversation(
   args: HandoffArgs,
 ): Promise<HandoffResult> {
-  const { db, accountId, conversationId, assignTo = null } = args
+  const { db, accountId, conversationId, assignTo = null, queueId = null } = args
   const summary = args.summary.trim().slice(0, MAX_HANDOFF_SUMMARY_LEN)
 
   const { data: conv, error: convErr } = await db
@@ -116,6 +128,7 @@ export async function handOffConversation(
   if (assignTo && !conv.assigned_agent_id) {
     update.assigned_agent_id = assignTo
   }
+  if (queueId) update.queue_id = queueId
 
   const { error: upErr } = await db
     .from('conversations')

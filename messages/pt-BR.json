@@ -1354,7 +1354,9 @@
         "blue": "Azul",
         "violet": "Violeta",
         "pink": "Rosa"
-      }
+      },
+      "aiSelectableTitle": "Etiquetas que o agente pode aplicar",
+      "aiSelectableHint": "Marque só as que você quer que o assistente use sozinho. As demais continuam sendo aplicadas à mão — e o cliente não consegue pedir uma etiqueta pelo texto da mensagem se ela não estiver aqui."
     },
     "templates": {
       "title": "Modelos de mensagem",
@@ -2206,19 +2208,25 @@
         "check_availability": "Consulta os horários realmente livres, cruzando a Google Agenda com o que já está marcado aqui.",
         "book_appointment": "Marca o horário que o cliente escolheu.",
         "reschedule_appointment": "Move o horário do cliente para outro livre.",
-        "cancel_appointment": "Cancela o horário do cliente e o libera."
+        "cancel_appointment": "Cancela o horário do cliente e o libera.",
+        "route_to_queue": "Manda a conversa para o time certo e para de responder. Ele escolhe pela descrição que você escreveu em cada fila.",
+        "add_tag": "Marca o contato com uma das etiquetas que você liberou. Só as liberadas aparecem para ele."
       },
       "requirements": {
         "scheduling_off": "Indisponível: ligue “deixar o agente marcar sozinho” em Configurações → Agendamento.",
         "google_disconnected": "Indisponível: conecte a Google Agenda em Configurações → Agendamento.",
-        "calendar_unusable": "Indisponível: a conexão com a Google Agenda precisa ser refeita."
+        "calendar_unusable": "Indisponível: a conexão com a Google Agenda precisa ser refeita.",
+        "no_human_queue": "Indisponível: crie ao menos uma fila de pessoas em Configurações → Filas.",
+        "no_selectable_tag": "Indisponível: libere ao menos uma etiqueta para o agente em Configurações → Campos e etiquetas."
       },
       "names": {
         "request_human": "Chamar uma pessoa",
         "check_availability": "Consultar horários livres",
         "book_appointment": "Marcar horário",
         "reschedule_appointment": "Remarcar horário",
-        "cancel_appointment": "Cancelar horário"
+        "cancel_appointment": "Cancelar horário",
+        "route_to_queue": "Encaminhar para uma fila",
+        "add_tag": "Etiquetar o contato"
       }
     },
     "context": {

@@ -1354,7 +1354,9 @@
         "blue": "파랑",
         "violet": "보라",
         "pink": "분홍"
-      }
+      },
+      "aiSelectableTitle": "에이전트가 붙일 수 있는 태그",
+      "aiSelectableHint": "어시스턴트가 스스로 사용하길 원하는 것만 켜세요. 나머지는 수동으로 남습니다."
     },
     "templates": {
       "title": "메시지 템플릿",
@@ -2206,19 +2208,25 @@
         "check_availability": "Looks up genuinely free slots, crossing Google Calendar with what is already booked here.",
         "book_appointment": "Books the appointment at the time the customer chose.",
         "reschedule_appointment": "Moves the customer's appointment to another free slot.",
-        "cancel_appointment": "Cancels the customer's appointment and frees the slot."
+        "cancel_appointment": "Cancels the customer's appointment and frees the slot.",
+        "route_to_queue": "대화를 담당 팀으로 보내고 응답을 멈춥니다. 각 대기열에 적은 설명을 보고 고릅니다.",
+        "add_tag": "허용한 태그 중 하나를 연락처에 붙입니다. 허용한 것만 제시됩니다."
       },
       "requirements": {
         "scheduling_off": "Unavailable: switch on “let the agent book on its own” in Settings → Scheduling.",
         "google_disconnected": "Unavailable: connect Google Calendar in Settings → Scheduling.",
-        "calendar_unusable": "Unavailable: the Google Calendar connection must be reconnected."
+        "calendar_unusable": "Unavailable: the Google Calendar connection must be reconnected.",
+        "no_human_queue": "사용 불가: 설정 → 대기열에서 사람 대기열을 하나 이상 만드세요.",
+        "no_selectable_tag": "사용 불가: 설정 → 필드 및 태그에서 에이전트가 쓸 태그를 하나 이상 허용하세요."
       },
       "names": {
         "request_human": "Call a person",
         "check_availability": "Check free slots",
         "book_appointment": "Book an appointment",
         "reschedule_appointment": "Reschedule an appointment",
-        "cancel_appointment": "Cancel an appointment"
+        "cancel_appointment": "Cancel an appointment",
+        "route_to_queue": "대기열로 전달",
+        "add_tag": "연락처에 태그"
       }
     },
     "context": {

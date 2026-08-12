@@ -6,6 +6,15 @@ import {
 } from '@/lib/auth/account'
 import { requestHumanTool } from '@/lib/ai/tools/handoff'
 import { buildSchedulingTools } from '@/lib/ai/tools/scheduling'
+import { buildQueueTools } from '@/lib/ai/tools/queues'
+import { buildTagTools } from '@/lib/ai/tools/tags'
+
+/** Só para arrancar nome e descrição das ferramentas quando a conta
+ *  ainda não tem fila nem etiqueta liberada — nada aqui é chamado. */
+const SAMPLE_QUEUE = [
+  { id: '', name: '—', description: null, responsibleUserId: null, autoAssign: false },
+]
+const SAMPLE_TAG = [{ id: '', name: '—' }]
 import {
   ALWAYS_ON_TOOLS,
   loadDisabledTools,
@@ -104,6 +113,42 @@ export async function GET() {
               ? 'google_disconnected'
               : 'calendar_unusable'
           : null,
+        can_toggle: true,
+      })
+    }
+
+    // As duas da onda 4. Mesma lógica das de agendamento: descritas
+    // mesmo quando ausentes, porque "não existe fila humana" e "alguém
+    // desligou" parecem idênticos de fora e se resolvem em telas
+    // diferentes.
+    const [{ count: queueCount }, { count: tagCount }] = await Promise.all([
+      supabase
+        .from('queues')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .eq('active', true)
+        .eq('attended_by', 'humans'),
+      supabase
+        .from('tags')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .eq('ai_selectable', true),
+    ])
+
+    for (const [tool, hasPrereq, requirement] of [
+      [buildQueueTools(SAMPLE_QUEUE)[0], (queueCount ?? 0) > 0, 'no_human_queue'],
+      [buildTagTools(SAMPLE_TAG)[0], (tagCount ?? 0) > 0, 'no_selectable_tag'],
+    ] as const) {
+      const off = disabled.has(tool.name)
+      tools.push({
+        name: tool.name,
+        // A descrição real embute o catálogo de filas da conta, que aqui
+        // seria o de exemplo. A tela mostra o texto traduzido por nome
+        // de ferramenta, então o de exemplo não chega ao operador.
+        description: tool.description.split('\n')[0]!,
+        available: hasPrereq && !off,
+        blocked_by: !hasPrereq ? 'prerequisite' : off ? 'disabled' : null,
+        requirement: !hasPrereq ? requirement : null,
         can_toggle: true,
       })
     }
