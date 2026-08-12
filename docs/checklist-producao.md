@@ -851,6 +851,55 @@ sexta às 19h. Passado o prazo, a conversa muda de fila sozinha.
       `conversation_queue_stays` deve ter a passagem antiga fechada e uma
       nova aberta na fila de destino.
 
+### Rodízio entre a equipe (6.2)
+
+O modo antigo fazia `SELECT ... LIMIT 1` sem ordenação e sem memória —
+"qualquer um", quase sempre o mesmo. Este é o de verdade.
+
+Precisa de **duas ou mais pessoas** na conta para significar alguma coisa.
+
+- [ ] **A roda existe.** Em Configurações → Filas, escolha "Rodízio entre
+      a equipe" numa fila humana e ligue duas ou três pessoas em "Quem
+      está na roda".
+
+- [ ] 🔴 **Reveza de verdade.** Faça o agente encaminhar três conversas
+      seguidas para essa fila (ou chame a função direto — comando no
+      rodapé). Os donos devem ser **pessoas diferentes, na mesma ordem,
+      repetindo o ciclo**.
+      *Se cair sempre no mesmo:* é o defeito antigo de volta.
+
+- [ ] 🔴 **A corrida — o teste que mais importa.** Duas mensagens
+      simultâneas não podem cair na mesma pessoa. Simule com duas
+      chamadas em paralelo (comando no rodapé) e confira que os dois
+      resultados são **diferentes**.
+      *Por que isso quebra:* sem a trava, ambas leem "o último foi a Ana"
+      e ambas escolhem o Bruno — o rodízio desaparece justamente no pico.
+
+- [ ] **Offline é pulado.** Com "Pular quem está offline" ligado, deixe
+      só uma pessoa com o navegador aberto. Todas as conversas devem ir
+      para ela.
+
+- [ ] 🔴 **Ninguém online NÃO atribui.** Feche todos os navegadores e
+      encaminhe. A conversa deve ficar **na fila, sem dono** — e não ir
+      para alguém que foi embora. É o relógio do SLA que cobra a partir
+      daí.
+
+- [ ] **Menos-ocupado, se usar.** Vale saber do efeito colateral antes de
+      escolher: quem fecha conversa rápido recebe mais trabalho, e quem
+      deixa tudo aberto para de receber. O rodízio simples não tem isso.
+
+```bash
+# revezamento: seis chamadas seguidas devem ciclar
+docker exec supabase-db psql -U postgres -d postgres -t -A -c \
+  "select next_queue_assignee('<QUEUE_ID>') from generate_series(1,6)"
+
+# a corrida: duas ao mesmo tempo, precisam sair diferentes
+for i in 1 2; do
+  docker exec supabase-db psql -U postgres -d postgres -t -A -c \
+    "select next_queue_assignee('<QUEUE_ID>')" &
+done; wait
+```
+
 ### O comando do teste de reentrega
 
 ```bash

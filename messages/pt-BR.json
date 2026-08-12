@@ -1922,7 +1922,23 @@
       "overflowLabel": "Se ninguém pegar, mandar para",
       "noOverflow": "não passa adiante",
       "overflowHint": "Depois desse tempo sem ninguém pegar, a conversa muda de fila sozinha. Um salto só.",
-      "overflowAfterLabel": "Passar adiante após (min)"
+      "overflowAfterLabel": "Passar adiante após (min)",
+      "distributionLabel": "Quem recebe",
+      "rosterLabel": "Quem está na roda",
+      "skipOfflineLabel": "Pular quem está offline",
+      "skipOfflineHint": "Se ninguém da roda estiver online, a conversa fica na fila esperando — em vez de ir para quem foi embora.",
+      "distribution": {
+        "responsible": "O responsável",
+        "round_robin": "Rodízio entre a equipe",
+        "least_busy": "Quem tem menos conversas abertas",
+        "none": "Ninguém (sala de espera)"
+      },
+      "distributionHint": {
+        "responsible": "Tudo cai na pessoa escolhida acima.",
+        "round_robin": "Reveza na ordem, um de cada vez. Previsível — cada um sabe quando é a sua vez.",
+        "least_busy": "Parece mais justo, mas tem um efeito colateral: quem fecha conversa rápido recebe mais, e quem deixa tudo aberto para de receber.",
+        "none": "A conversa fica visível para o time e alguém pega."
+      }
     }
   },
   "SignupPage": {

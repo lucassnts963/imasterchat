@@ -12,7 +12,7 @@ import { buildTagTools } from '@/lib/ai/tools/tags'
 /** Só para arrancar nome e descrição das ferramentas quando a conta
  *  ainda não tem fila nem etiqueta liberada — nada aqui é chamado. */
 const SAMPLE_QUEUE = [
-  { id: '', name: '—', description: null, responsibleUserId: null, autoAssign: false },
+  { id: '', name: '—', description: null, responsibleUserId: null, autoAssign: false, distribution: 'responsible' },
 ]
 const SAMPLE_TAG = [{ id: '', name: '—' }]
 import {

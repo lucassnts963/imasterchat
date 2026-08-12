@@ -20,6 +20,7 @@ const FILAS: QueueOption[] = [
     description: 'Boleto, segunda via',
     responsibleUserId: 'user-ana',
     autoAssign: true,
+    distribution: 'responsible',
   },
   {
     id: 'q-vendas',
@@ -27,12 +28,13 @@ const FILAS: QueueOption[] = [
     description: 'Preço, orçamento',
     responsibleUserId: null,
     autoAssign: false,
+    distribution: 'none',
   },
 ]
 
 function ctx(over: Partial<ToolContext> = {}): ToolContext {
   return {
-    db: {} as never,
+    db: { rpc: async () => ({ data: 'user-rodizio', error: null }) } as never,
     accountId: 'acct-1',
     conversationId: 'conv-1',
     contactId: 'contact-1',
@@ -79,6 +81,37 @@ describe('route_to_queue', () => {
     await tool.execute({ queue: 'Vendas', reason: 'quer preço' }, ctx())
     expect(handOffConversation).toHaveBeenCalledWith(
       expect.objectContaining({ assignTo: null, queueId: 'q-vendas' }),
+    )
+  })
+
+  it('no rodízio, quem escolhe é o BANCO — não este código', async () => {
+    // A escolha vive na função do banco porque o avanço do cursor lá é a
+    // trava que impede duas mensagens simultâneas de caírem na mesma
+    // pessoa. Escolher aqui seria escolher fora da trava.
+    const [tool] = buildQueueTools([
+      { ...FILAS[0]!, distribution: 'round_robin', responsibleUserId: 'user-ana' },
+    ])
+    vi.mocked(handOffConversation).mockClear()
+    await tool.execute({ queue: 'Financeiro', reason: 'x' }, ctx())
+    expect(handOffConversation).toHaveBeenCalledWith(
+      // 'user-rodizio' vem do rpc, e NÃO 'user-ana' do responsável.
+      expect.objectContaining({ assignTo: 'user-rodizio' }),
+    )
+  })
+
+  it('ninguém disponível deixa a conversa na fila, sem dono', async () => {
+    const [tool] = buildQueueTools([
+      { ...FILAS[0]!, distribution: 'round_robin' },
+    ])
+    vi.mocked(handOffConversation).mockClear()
+    await tool.execute(
+      { queue: 'Financeiro', reason: 'x' },
+      ctx({ db: { rpc: async () => ({ data: null, error: null }) } as never }),
+    )
+    // Atribuir para quem foi embora esconderia o problema; o relógio do
+    // SLA é quem cobra a partir daqui.
+    expect(handOffConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ assignTo: null, queueId: 'q-fin' }),
     )
   })
 

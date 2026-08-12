@@ -1922,7 +1922,23 @@
       "overflowLabel": "아무도 안 맡으면 보낼 곳",
       "noOverflow": "이동 없음",
       "overflowHint": "이 시간이 지나면 대화가 스스로 대기열을 옮깁니다. 한 번만.",
-      "overflowAfterLabel": "이동 시간(분)"
+      "overflowAfterLabel": "이동 시간(분)",
+      "distributionLabel": "담당 배정",
+      "rosterLabel": "순환 대상",
+      "skipOfflineLabel": "오프라인인 사람 건너뛰기",
+      "skipOfflineHint": "순환 대상이 모두 오프라인이면 대화는 대기열에 남습니다.",
+      "distribution": {
+        "responsible": "책임자",
+        "round_robin": "팀 순환",
+        "least_busy": "열린 대화가 가장 적은 사람",
+        "none": "없음 (대기실)"
+      },
+      "distributionHint": {
+        "responsible": "모두 위에서 선택한 사람에게 갑니다.",
+        "round_robin": "순서대로 번갈아 갑니다. 예측 가능합니다.",
+        "least_busy": "공평해 보이지만 부작용이 있습니다.",
+        "none": "팀에게 보이고 누군가 가져갑니다."
+      }
     }
   },
   "SignupPage": {

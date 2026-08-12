@@ -45,6 +45,8 @@ interface QueueRow {
   sla_seconds: number | null;
   overflow_queue_id: string | null;
   overflow_after_seconds: number | null;
+  distribution: string;
+  skip_offline: boolean;
   is_default: boolean;
   position: number;
 }
@@ -62,6 +64,8 @@ export function QueuesSettings() {
 
   const [queues, setQueues] = useState<QueueRow[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  /** queueId → user_ids que estão na roda daquela fila. */
+  const [roster, setRoster] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -74,7 +78,7 @@ export function QueuesSettings() {
       supabase
         .from("queues")
         .select(
-          "id, name, description, attended_by, responsible_user_id, auto_assign, sla_seconds, overflow_queue_id, overflow_after_seconds, is_default, position",
+          "id, name, description, attended_by, responsible_user_id, auto_assign, sla_seconds, overflow_queue_id, overflow_after_seconds, distribution, skip_offline, is_default, position",
         )
         .eq("account_id", accountId)
         .eq("active", true)
@@ -82,6 +86,15 @@ export function QueuesSettings() {
         .order("name"),
       supabase.from("profiles").select("user_id, full_name, email"),
     ]);
+    const { data: qm } = await supabase
+      .from("queue_members")
+      .select("queue_id, user_id")
+      .eq("active", true);
+    const byQueue: Record<string, string[]> = {};
+    for (const r of (qm ?? []) as { queue_id: string; user_id: string }[]) {
+      (byQueue[r.queue_id] ??= []).push(r.user_id);
+    }
+    setRoster(byQueue);
     setQueues((qs ?? []) as QueueRow[]);
     setMembers((ms ?? []) as Member[]);
     setLoading(false);
@@ -149,6 +162,39 @@ export function QueuesSettings() {
     }
     toast.success(t("deleted"));
     await load();
+  }
+
+  /**
+   * Põe ou tira alguém da roda de uma fila.
+   *
+   * A `position` define a ORDEM do rodízio, e ela precisa ser estável —
+   * sem ordem determinística a sequência muda a cada consulta e deixa de
+   * ser rodízio. Quem entra vai para o fim.
+   */
+  async function toggleMember(queueId: string, userId: string, on: boolean) {
+    const current = roster[queueId] ?? [];
+    setRoster((prev) => ({
+      ...prev,
+      [queueId]: on
+        ? [...current, userId]
+        : current.filter((x) => x !== userId),
+    }));
+    const { error } = on
+      ? await supabase.from("queue_members").insert({
+          queue_id: queueId,
+          user_id: userId,
+          account_id: accountId,
+          position: current.length,
+        })
+      : await supabase
+          .from("queue_members")
+          .delete()
+          .eq("queue_id", queueId)
+          .eq("user_id", userId);
+    if (error) {
+      toast.error(error.message);
+      await load();
+    }
   }
 
   function memberLabel(m: Member) {
@@ -338,6 +384,78 @@ export function QueuesSettings() {
                           {t("autoAssignHint")}
                         </p>
                       </div>
+                    </div>
+                  )}
+
+                  {q.attended_by === "humans" && (
+                    <div className="space-y-2 rounded-lg border border-border p-3">
+                      <Label className="text-xs">{t("distributionLabel")}</Label>
+                      <Select
+                        value={q.distribution}
+                        onValueChange={(v) =>
+                          void patch(q.id, { distribution: String(v) })
+                        }
+                        disabled={!canEditSettings}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue>
+                            {(value) => t(`distribution.${String(value)}`)}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["responsible", "round_robin", "least_busy", "none"].map(
+                            (d) => (
+                              <SelectItem key={d} value={d}>
+                                {t(`distribution.${d}`)}
+                              </SelectItem>
+                            ),
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {t(`distributionHint.${q.distribution}`)}
+                      </p>
+
+                      {(q.distribution === "round_robin" ||
+                        q.distribution === "least_busy") && (
+                        <div className="space-y-1.5 pt-1">
+                          <Label className="text-xs">{t("rosterLabel")}</Label>
+                          {members.map((m) => (
+                            <label
+                              key={m.user_id}
+                              className="flex items-center gap-2 text-sm text-foreground"
+                            >
+                              <Switch
+                                checked={(roster[q.id] ?? []).includes(
+                                  m.user_id,
+                                )}
+                                onCheckedChange={(v) =>
+                                  void toggleMember(
+                                    q.id,
+                                    m.user_id,
+                                    Boolean(v),
+                                  )
+                                }
+                                disabled={!canEditSettings}
+                              />
+                              {memberLabel(m)}
+                            </label>
+                          ))}
+                          <label className="flex items-center gap-2 pt-1 text-sm text-foreground">
+                            <Switch
+                              checked={q.skip_offline}
+                              onCheckedChange={(v) =>
+                                void patch(q.id, { skip_offline: Boolean(v) })
+                              }
+                              disabled={!canEditSettings}
+                            />
+                            {t("skipOfflineLabel")}
+                          </label>
+                          <p className="text-xs text-muted-foreground">
+                            {t("skipOfflineHint")}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 

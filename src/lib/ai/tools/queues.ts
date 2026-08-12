@@ -27,6 +27,8 @@ export interface QueueOption {
   /** Quem recebe a conversa ao chegar, quando a fila tem responsável. */
   responsibleUserId: string | null
   autoAssign: boolean
+  /** 'responsible' | 'none' | 'round_robin' | 'least_busy' */
+  distribution: string
 }
 
 /**
@@ -110,15 +112,40 @@ function routeToQueueTool(queues: QueueOption[]): AgentTool {
         }
       }
 
+      // Quem recebe depende do modo da fila.
+      //
+      // No rodízio quem escolhe é o BANCO (`next_queue_assignee`), e não
+      // este código: o avanço do cursor lá é a trava que impede duas
+      // mensagens simultâneas de caírem na mesma pessoa. Escolher aqui
+      // seria escolher fora da trava.
+      //
+      // `null` é uma resposta legítima — ninguém disponível. A conversa
+      // fica NA FILA, visível, e o relógio do SLA cobra. Atribuir para
+      // quem foi embora esconderia o problema.
+      let assignTo: string | null = null
+      if (queue.autoAssign) {
+        if (
+          queue.distribution === 'round_robin' ||
+          queue.distribution === 'least_busy'
+        ) {
+          const { data, error } = await ctx.db.rpc('next_queue_assignee', {
+            p_queue_id: queue.id,
+          })
+          if (error) {
+            console.error('[ai tools] next_queue_assignee falhou:', error)
+          }
+          assignTo = (data as string | null) ?? null
+        } else if (queue.distribution === 'responsible') {
+          assignTo = queue.responsibleUserId
+        }
+      }
+
       const result = await handOffConversation({
         db: ctx.db,
         accountId: ctx.accountId,
         conversationId: ctx.conversationId,
         summary: `🤖 ${queue.name}: ${reason}`,
-        // Só atribui quando a fila manda atribuir. Numa fila sem
-        // responsável — a sala de espera compartilhada — a conversa
-        // fica visível para o time em vez de cair num nome só.
-        assignTo: queue.autoAssign ? queue.responsibleUserId : null,
+        assignTo,
         queueId: queue.id,
       })
 

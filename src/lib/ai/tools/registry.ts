@@ -137,7 +137,7 @@ async function loadRoutableQueues(
   try {
     const { data } = await db
       .from('queues')
-      .select('id, name, description, responsible_user_id, auto_assign')
+      .select('id, name, description, responsible_user_id, auto_assign, distribution')
       .eq('account_id', accountId)
       .eq('active', true)
       .eq('attended_by', 'humans')
@@ -153,12 +153,14 @@ async function loadRoutableQueues(
       description: string | null
       responsible_user_id: string | null
       auto_assign: boolean
+      distribution: string
     }>).map((q) => ({
       id: q.id,
       name: q.name,
       description: q.description,
       responsibleUserId: q.responsible_user_id,
       autoAssign: q.auto_assign,
+      distribution: q.distribution ?? 'responsible',
     }))
   } catch (err) {
     // Falhar ABERTO seria oferecer encaminhamento que não funciona.

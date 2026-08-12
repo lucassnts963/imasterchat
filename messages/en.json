@@ -1922,7 +1922,23 @@
       "overflowLabel": "If nobody picks up, send to",
       "noOverflow": "stays put",
       "overflowHint": "After this long unattended, the conversation moves queue on its own. One hop only.",
-      "overflowAfterLabel": "Move after (minutes)"
+      "overflowAfterLabel": "Move after (minutes)",
+      "distributionLabel": "Who receives",
+      "rosterLabel": "Who's in the rotation",
+      "skipOfflineLabel": "Skip people who are offline",
+      "skipOfflineHint": "If nobody in the rotation is online, the conversation waits in the queue — instead of going to someone who left.",
+      "distribution": {
+        "responsible": "The responsible",
+        "round_robin": "Round-robin across the team",
+        "least_busy": "Whoever has fewest open conversations",
+        "none": "Nobody (waiting room)"
+      },
+      "distributionHint": {
+        "responsible": "Everything goes to the person chosen above.",
+        "round_robin": "Takes turns, in order. Predictable — everyone knows when it is their turn.",
+        "least_busy": "Looks fairer, but has a side effect: closing fast earns more work, and leaving everything open stops the flow.",
+        "none": "The conversation stays visible to the team and someone picks it up."
+      }
     }
   },
   "SignupPage": {
