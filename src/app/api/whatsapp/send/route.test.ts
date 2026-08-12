@@ -334,23 +334,24 @@ describe('POST /api/whatsapp/send — role enforcement', () => {
     expect(sendTemplateMessage).toHaveBeenCalledTimes(1)
   })
 
-  // Responder PEGA a conversa.
+  // Responder NÃO pega a conversa.
   //
-  // Antes, o envio só mexia na prévia da última mensagem. Como o portão
-  // que cala o bot é ter dono, a sequência real era: a atendente
-  // responde, o cliente escreve de novo, e a IA responde por cima dela.
+  // Isso chegou a existir e foi removido a pedido de quem opera: cada
+  // resposta silenciava o bot naquela conversa para sempre, sem que
+  // ninguém tivesse pedido. Assumir passou a ser um clique explícito, e
+  // o compositor fica travado enquanto o assistente está no comando.
   //
-  // A asserção olha o payload do UPDATE, e não uma resposta da rota,
-  // porque é a escrita que produz o efeito — e uma volta atrás aqui não
-  // mudaria nada visível em nenhum outro teste.
-  it('atribui a conversa a quem respondeu', async () => {
+  // O teste ficou invertido em vez de apagado porque o comportamento
+  // antigo é fácil de reintroduzir sem querer — basta alguém "consertar"
+  // a IA respondendo por cima do atendente do jeito óbvio.
+  it('NÃO atribui a conversa a quem respondeu', async () => {
     callerRole = 'agent'
 
     const res = await postContactTemplate()
 
     expect(res.status).toBe(200)
-    expect(conversationUpdates).toContainEqual(
-      expect.objectContaining({ assigned_agent_id: 'user-1' }),
+    expect(conversationUpdates.every((u) => !('assigned_agent_id' in u))).toBe(
+      true,
     )
   })
 })

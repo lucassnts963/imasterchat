@@ -226,7 +226,8 @@
       "send": "보내기",
       "quickReplyNamePrompt": "이 빠른 답장의 이름을 지정하세요:",
       "quickReplySaved": "빠른 답장으로 저장되었습니다.",
-      "quickReplySaveError": "빠른 답장을 저장하지 못했습니다."
+      "quickReplySaveError": "빠른 답장을 저장하지 못했습니다.",
+      "aiHoldingHint": "어시스턴트가 이 대화를 처리 중입니다. 위의 '대화 맡기'를 눌러 직접 답장하세요."
     },
     "bubble": {
       "photo": "사진",

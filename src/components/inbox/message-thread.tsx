@@ -223,6 +223,10 @@ export function MessageThread({
     }, 700);
   }, [isRefreshing, onRefresh]);
   const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
+  /** O assistente está segurando esta conversa (ativo e sem dono)? A
+   *  tarja é quem sabe — ela já busca o estado da conta — e avisa aqui
+   *  para o compositor travar junto. */
+  const [aiHolding, setAiHolding] = useState(false);
 
   // Profiles are bounded by RLS to rows the current user is allowed to
   // see — today that's just the current user, but the dropdown keeps the
@@ -1217,6 +1221,7 @@ export function MessageThread({
           after a handoff. Renders nothing unless the account has
           auto-reply configured. */}
       <AiThreadBanner
+        onHoldingChange={setAiHolding}
         conversationId={conversation.id}
         disabled={conversation.ai_autoreply_disabled ?? false}
         handoffSummary={conversation.ai_handoff_summary}
@@ -1233,6 +1238,11 @@ export function MessageThread({
       <MessageComposer
         conversationId={conversation.id}
         sessionExpired={sessionInfo.expired}
+        // Trava enquanto o assistente responde e ninguém assumiu. O
+        // estado vem do mesmo lugar que a tarja usa, para os dois nunca
+        // discordarem: se a tarja oferece "Assumir", o compositor está
+        // travado; assim que alguém assume, ele abre.
+        aiHolding={aiHolding}
         onSend={handleSend}
         onSendMedia={handleSendMedia}
         onSendInteractive={handleSendInteractive}

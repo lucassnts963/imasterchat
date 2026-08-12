@@ -118,6 +118,16 @@ interface MediaDraft {
 interface MessageComposerProps {
   conversationId: string;
   sessionExpired: boolean;
+  /**
+   * O assistente está no comando desta conversa e ninguém assumiu.
+   *
+   * Trava o compositor de propósito: enquanto o bot responde, duas vozes
+   * na mesma conversa é o pior resultado possível para o cliente.
+   * Assumir passou a ser um clique consciente — antes ele acontecia
+   * como efeito colateral de responder, e o efeito colateral confundia
+   * mais do que ajudava.
+   */
+  aiHolding?: boolean;
   onSend: (text: string, replyToId?: string) => void;
   onSendMedia: (payload: SendMediaPayload) => void;
   onSendInteractive: (payload: InteractiveMessagePayload, replyToId?: string) => void;
@@ -140,6 +150,7 @@ const OPUS_ENCODER_PATH = "/opus/encoderWorker.min.js";
 export function MessageComposer({
   conversationId,
   sessionExpired,
+  aiHolding = false,
   onSend,
   onSendMedia,
   onSendInteractive,
@@ -196,7 +207,7 @@ export function MessageComposer({
   // For solo users this is always true — single-owner accounts pass
   // every capability — so the disabled branch is a no-op there.
   const canSend = useCan("send-messages");
-  const readOnly = !canSend;
+  const readOnly = !canSend || aiHolding;
   // Media (like free-form text) is only allowed inside the 24h window.
   const inputsDisabled = readOnly || sessionExpired;
 
@@ -552,6 +563,11 @@ export function MessageComposer({
             preview={replyTo.preview}
             onDismiss={onClearReply}
           />
+        </div>
+      )}
+      {aiHolding && (
+        <div className="mb-2 rounded-lg bg-primary/10 px-3 py-2">
+          <p className="text-xs text-primary">{t("aiHoldingHint")}</p>
         </div>
       )}
       {sessionExpired && (
