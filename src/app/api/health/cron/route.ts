@@ -7,6 +7,7 @@ import {
   persistCheck,
 } from '@/lib/observability/health'
 import { settlePastAppointments } from '@/lib/scheduling/settle'
+import { purgeExpiredLogs } from '@/lib/observability/retention'
 
 // ============================================================
 // GET /api/health/cron — a ronda
@@ -53,6 +54,12 @@ export async function GET(request: Request) {
     // aquele contato de agendar de novo — para sempre. Aposentar é
     // barato e a ronda já roda de hora em hora.
     const settled = await settlePastAppointments(db)
+
+    // A faxina pega carona nesta ronda em vez de virar um agendador
+    // novo: mais um endpoint agendado é mais uma coisa para alguém
+    // esquecer de configurar num deploy novo, e a periodicidade de hora
+    // em hora é folgada para o que ela faz.
+    const retention = await purgeExpiredLogs(db)
 
     const platform = await checkPlatform(db)
 
@@ -114,6 +121,7 @@ export async function GET(request: Request) {
       failing,
       platform,
       appointments_settled: settled.settled,
+      retention,
     })
   } catch (err) {
     console.error('[health cron] varredura falhou:', err)

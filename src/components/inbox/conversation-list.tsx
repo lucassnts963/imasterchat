@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import {
   CONVERSATION_SELECT,
   matchesContactFilters,
@@ -45,7 +46,7 @@ const STATUS_COLORS: Record<ConversationStatus, string> = {
 
 
 
-type InboxFilter = ConversationStatus | "all" | "unread";
+type InboxFilter = ConversationStatus | "all" | "unread" | "mine";
 
 export function ConversationList({
   activeConversationId,
@@ -55,10 +56,16 @@ export function ConversationList({
   resyncToken = 0,
 }: ConversationListProps) {
   const t = useTranslations("Inbox.conversationList");
-  
+  const { user } = useAuth();
+
   const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
     { label: t("filterAll"), value: "all" },
     { label: t("filterUnread"), value: "unread" },
+    // "Minhas" logo depois de "Não lidas" de propósito: são as duas
+    // perguntas que um atendente faz ao abrir a tela, e até agora só uma
+    // delas tinha resposta. Sem este filtro, dar um responsável a uma
+    // fila seria dar uma responsabilidade que a pessoa não consegue ver.
+    { label: t("filterMine"), value: "mine" },
     { label: t("filterOpen"), value: "open" },
     { label: t("filterPending"), value: "pending" },
     { label: t("filterClosed"), value: "closed" },
@@ -164,6 +171,12 @@ export function ConversationList({
 
     if (filter === "unread") {
       result = result.filter((c) => c.unread_count > 0);
+    } else if (filter === "mine") {
+      // Sem usuário resolvido, lista vazia em vez da lista inteira: uma
+      // aba "Minhas" que mostra as de todo mundo é pior que uma vazia.
+      result = user?.id
+        ? result.filter((c) => c.assigned_agent_id === user.id)
+        : [];
     } else if (filter !== "all") {
       result = result.filter((c) => c.status === filter);
     }
@@ -189,7 +202,7 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, search, selectedTagIds, selectedCompany]);
+  }, [conversations, filter, search, selectedTagIds, selectedCompany, user?.id]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>

@@ -212,27 +212,59 @@ sobre a busca de contato). A 064 foi validada em transação com
 `ROLLBACK` antes de ser aplicada, e o plano de consulta foi conferido —
 o índice novo é usado (`Index Scan using idx_contacts_account_phone_suffix`).
 
-## Onda 1 — dias, risco baixo, mexe no que o cliente vê
+## Onda 1 — CONCLUÍDA (12/08/2026)
 
-| # | item | por quê |
+| # | item | onde |
 |---|---|---|
-| 1.1 | **Paginar destinatários do disparo** | hoje 3.000 viram 1.000 com a barra em 100% |
-| 1.2 | Limitar a thread às N recentes + "carregar mais" | acima de 1.000 mensagens o atendente para de ver as novas |
-| 1.3 | Retenção em `platform_events` (a coluna `screenshot`) | nenhuma tabela de log tem política; essa é a que mais pesa |
+| 1.1 | Destinatários do disparo paginados **e** o público "todos os contatos" junto | `use-broadcast-sending.ts` |
+| 1.2 | Thread carrega as 100 mais recentes + "Carregar mensagens anteriores" | `message-thread.tsx` |
+| 1.3 | Retenção em `platform_events`, em dois tempos | `observability/retention.ts` |
 
-**1.1 é o item mais urgente do plano inteiro.** Enquanto não sair,
-prometer volume é prometer errado.
+**1.1 rendeu mais do que o previsto.** O teto de 1.000 do PostgREST não
+cortava só a leitura dos destinatários — cortava também a montagem do
+público quando a audiência é "todos os contatos", e esse corte acontecia
+**antes** de as linhas serem gravadas, então nem a contagem no banco
+denunciava. Os dois foram paginados, e o envio agora aborta se o número
+de destinatários carregados não bater com o de inseridos.
 
-## Onda 2 — decisões de produto, baratas de código
+**1.2:** a thread pede em ordem decrescente com limite e inverte no
+cliente. Resolve o corte e, de carona, para de transferir a conversa
+inteira a cada clique. O "carregar anteriores" se ancora no `created_at`
+da mensagem mais antiga já carregada, e não num deslocamento — com
+deslocamento, uma mensagem nova entre dois cliques faz repetir ou pular
+linha.
 
-Cada uma é pequena, mas muda comportamento — precisa da sua decisão.
+**1.3:** política em dois tempos, e não uma só. O `screenshot` sai aos
+**7 dias**, o evento aos **90**. O print é o que pesa e o que é dado de
+terceiro (é a caixa de entrada de um cliente da ótica); o evento em si é
+pequeno e é o que faz o histórico valer. Pega carona na ronda de saúde,
+que já roda de hora em hora, em vez de virar mais um agendador para
+alguém esquecer de configurar.
 
-| # | item | a decisão |
+## Onda 2 — CONCLUÍDA (12/08/2026)
+
+| # | item | decisão tomada |
 |---|---|---|
-| 2.1 | **Responder pelo inbox assume a conversa** | hoje a IA responde por cima do atendente. Assumir automático é o que as pessoas esperam — mas muda o fluxo de quem só manda um "já verifico" |
-| 2.2 | Handoff de fluxo desliga a IA | hoje não desliga, e o bot continua elegível |
-| 2.3 | A política de áudio respeitar o agente desligado | hoje responde mesmo com o agente off — surpresa real |
-| 2.4 | Filtro **"minhas conversas"** no inbox | não existe; vira obrigatório com filas |
+| 2.1 | **Responder assume a conversa** | sim, **e o botão "Assumir" continua** |
+| 2.2 | Handoff de fluxo desliga a IA | feito, mais a nota na tarja |
+| 2.3 | Áudio respeita o agente desligado | sim — desliga tudo, inclusive a transcrição |
+| 2.4 | Filtro "Minhas" no inbox | feito |
+
+**2.1** é um `UPDATE` separado com `.is('assigned_agent_id', null)` — um
+compare-and-set. Quem já tem dono não é roubado, e não há
+leitura-antes-de-escrita para duas abas correrem entre si. É a mesma
+regra do handoff, que nunca toma conversa de humano. O botão "Assumir"
+continua sendo como se pega uma conversa **sem responder**, e o único
+jeito de tomar uma que já é de outra pessoa.
+
+**2.2** também passou a gravar a nota do nó em `ai_handoff_summary`:
+antes ela só ia para o log do fluxo, onde a atendente não olha, e a
+tarja do inbox aparecia sem motivo nenhum.
+
+**2.3** desliga **tudo**, inclusive a transcrição. É a leitura direta do
+interruptor, e a que não gasta a chave da ElevenLabs de quem acha que
+parou o sistema. Quem quiser transcrição sem resposta automática tem o
+caminho certo: agente ligado, resposta automática desligada.
 
 ## Onda 3 — as filas
 

@@ -165,6 +165,10 @@ export async function POST(request: Request) {
         templateMessageParams: template_message_params,
         interactivePayload: interactive_payload,
         replyToMessageId: reply_to_message_id,
+        // Quem responde pelo painel PEGA a conversa, se ela ainda não
+        // for de ninguém. Sem isto, a IA voltava a responder por cima da
+        // atendente na próxima mensagem do cliente.
+        assignToUserId: userId,
       })
 
       return NextResponse.json({

@@ -84,6 +84,19 @@ export interface SendMessageParams {
   /** Structured payload for `messageType === 'interactive'`. */
   interactivePayload?: InteractiveMessagePayload | null;
   replyToMessageId?: string | null;
+  /**
+   * Quem está respondendo, quando é uma PESSOA.
+   *
+   * Presente, a conversa passa a ser dela — e como ter dono é o portão
+   * que cala o bot (`ai/auto-reply.ts`), responder passa a significar
+   * "eu peguei esta conversa", que é o que qualquer atendente já
+   * acredita que aconteceu ao apertar enviar.
+   *
+   * Ausente na API pública v1 de propósito: ali não há pessoa nenhuma
+   * para receber a conversa, e atribuir a um usuário técnico esconderia
+   * a thread de quem realmente atende.
+   */
+  assignToUserId?: string | null;
 }
 
 export interface SendMessageResult {
@@ -488,6 +501,41 @@ export async function sendMessageToConversation(
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversationId);
+
+  // Responder ASSUME a conversa.
+  //
+  // Antes, o envio mexia só na prévia acima. Nada tocava em
+  // `assigned_agent_id`, e como o bot só se cala quando a conversa tem
+  // dono, a sequência real era: a atendente respondia, o cliente
+  // escrevia de novo, e a IA respondia POR CIMA dela — porque, para o
+  // sistema, nada tinha mudado.
+  //
+  // É um UPDATE separado e condicional, e não um campo a mais no de
+  // cima, por dois motivos:
+  //
+  //   - `.is('assigned_agent_id', null)` transforma isto num
+  //     compare-and-set: quem já tem dono não é roubado, e não há
+  //     leitura-antes-de-escrita para duas abas correrem entre si.
+  //     É a mesma regra do handoff, que nunca toma conversa de humano.
+  //   - juntar as duas condições no update de cima faria a prévia da
+  //     última mensagem deixar de ser gravada em toda conversa que já
+  //     tem dono.
+  //
+  // O botão "Assumir" continua existindo e continua necessário: ele é
+  // como se pega uma conversa SEM responder — e é o único jeito de tomar
+  // uma que já é de outra pessoa.
+  if (params.assignToUserId) {
+    const { error: claimErr } = await db
+      .from('conversations')
+      .update({ assigned_agent_id: params.assignToUserId })
+      .eq('id', conversationId)
+      .is('assigned_agent_id', null);
+    if (claimErr) {
+      // Não derruba o envio: a mensagem JÁ saiu para o cliente, e falhar
+      // aqui só faria a atendente reenviar.
+      console.error('[send-message] claim on reply failed:', claimErr.message);
+    }
+  }
 
   // Pause any active Flow run for this contact — the agent stepping in
   // is the strongest "yield, human is here" signal. Best-effort.

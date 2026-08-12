@@ -27,6 +27,7 @@ import { buildTranscriptionPrompt } from './prompt'
 // ============================================================
 
 interface AudioConfigRow {
+  is_active: boolean
   audio_policy: string
   audio_transcription_provider: string
   elevenlabs_api_key: string | null
@@ -61,10 +62,25 @@ export async function handleInboundAudio(args: {
     const { data } = await args.db
       .from('ai_configs')
       .select(
-        'audio_policy, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
+        'is_active, audio_policy, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
       )
       .eq('account_id', args.accountId)
       .maybeSingle<AudioConfigRow>()
+
+    // A chave mestra vale aqui também.
+    //
+    // Este caminho não lia `is_active`, então desligar o assistente
+    // deixava o áudio funcionando: o cliente mandava um áudio com o
+    // agente OFF e recebia "não consigo ouvir, pode escrever?" — uma
+    // resposta automática de um robô que o dono acreditava ter
+    // desligado.
+    //
+    // Desligar desliga TUDO, inclusive a transcrição. É a leitura direta
+    // do interruptor, e a que não gasta a chave da ElevenLabs de quem
+    // pensa que parou o sistema. Quem quiser transcrição sem respostas
+    // automáticas tem o caminho certo: agente ligado, resposta
+    // automática desligada.
+    if (data && data.is_active === false) return IGNORE
 
     const policy = isAudioPolicy(data?.audio_policy)
       ? data.audio_policy

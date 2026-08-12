@@ -20,10 +20,10 @@ Não é a Meta, não é a OpenAI, não é o Postgres. Em ordem:
 
 | # | o que | quando aparece | sintoma |
 |---|---|---|---|
-| 1 | **Disparo corta em 1.000** | já, hoje | 2.000 clientes não recebem e a barra marca 100% |
+| 1 | ~~Disparo corta em 1.000~~ | — | ✅ corrigido 12/08 (paginado) |
 | 2 | **Disparo morre com a aba** | já, hoje | fecha o navegador, para o envio |
 | 3 | **Webhook serial dentro de 60 s** | pico real | mensagem perdida **sem reentrega** |
-| 4 | **Thread trava nas 1.000 primeiras** | conversa longa | atendente para de ver o que o cliente escreveu |
+| 4 | ~~Thread trava nas 1.000 primeiras~~ | — | ✅ corrigido 12/08 (janela de 100 + carregar anteriores) |
 | 5 | ~~Índices faltando~~ | — | ✅ corrigido 12/08 (migração 064) |
 | 6 | **429 do provedor** | pico com IA | cliente sem resposta, em silêncio |
 
@@ -56,6 +56,17 @@ a barra de progresso chega a 100% e o relatório concorda com o erro.
 Ninguém é avisado. É a pior forma de falha que existe: silenciosa e com
 a interface confirmando que deu certo.
 
+**✅ Corrigido em 12/08/2026.** A leitura passou a ser paginada em
+páginas de 500, com ordem estável (sem ela, duas páginas podem repetir
+uma linha — e repetir aqui é mandar a mesma mensagem duas vezes para o
+mesmo cliente). O envio agora **aborta** se o número carregado não bater
+com o inserido, em vez de mostrar 100% no fim.
+
+E havia um segundo corte, no mesmo teto e pior: a audiência "todos os
+contatos" também lia sem paginar (`resolveAudience`), cortando o público
+**antes** de as linhas serem gravadas — nem a contagem no banco
+denunciava. Também paginado.
+
 ### E a thread de conversa
 
 A lista de mensagens carrega a conversa **inteira**, ordenada do mais
@@ -65,6 +76,10 @@ e nunca as recentes.
 
 Não é degradação gradual — é um corte. E antes disso, cada troca de
 conversa transfere o histórico completo pela rede.
+
+**✅ Corrigido em 12/08/2026.** A thread pede as 100 mais recentes em
+ordem decrescente e inverte no cliente, com um botão "Carregar mensagens
+anteriores" ancorado no `created_at` da mais antiga já carregada.
 
 ### O medidor de custo mente por cima
 
@@ -261,9 +276,8 @@ existe, e o orçamento para esperá-la não.
 
 **Agora, antes de qualquer conversa sobre escala** — são bugs, e baratos:
 
-1. Paginar a leitura de destinatários do disparo (ou `range()` em laço).
-   Sem isso, prometer 3.000 mensagens é prometer 1.000.
-2. Limitar a thread às N mensagens mais recentes, com "carregar mais".
+1. ~~Paginar a leitura de destinatários do disparo.~~ ✅ feito
+2. ~~Limitar a thread às N mais recentes, com "carregar mais".~~ ✅ feito
 3. ~~Os quatro índices.~~ ✅ feito (064)
 4. ~~Busca de contato indexada.~~ ✅ feito (`phone_suffix8`)
 5. ~~Timeout em todo `fetch` para a Graph API.~~ ✅ feito — 20 s nas
@@ -277,7 +291,10 @@ existe, e o orçamento para esperá-la não.
 7. Mover o disparo para o servidor, em lotes retomáveis.
 8. Retentativa com backoff lendo `Retry-After`, e reconhecer o 130429.
 9. Teto de concorrência de IA por conta.
-10. Retenção nas tabelas de log, começando por `platform_events`.
+10. ~~Retenção começando por `platform_events`.~~ ✅ feito (dois tempos:
+    print aos 7 dias, evento aos 90). As outras tabelas de log —
+    `ai_usage_log`, `automation_logs`, `flow_run_events`, `messages` —
+    seguem sem política.
 
 **O que dá para dizer ao cliente hoje, com honestidade:** o sistema
 recebe e responde bem no volume de uma operação normal; o que ainda não

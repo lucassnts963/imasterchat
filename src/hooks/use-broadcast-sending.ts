@@ -80,6 +80,17 @@ interface BroadcastApiResult {
 type CustomValueIndex = Map<string, Map<string, string>>;
 
 /**
+ * Uma linha de `broadcast_recipients` com o contato embutido, como a
+ * consulta paginada do passo 4 a devolve. Só os campos que o laço de
+ * envio realmente toca — o `*` traz mais, e tipar o resto seria
+ * convidar a divergência com o schema.
+ */
+interface BroadcastRecipientRow {
+  id: string;
+  contact?: Contact | null;
+}
+
+/**
  * Per-contact resolution of custom-field placeholders. Static and
  * built-in-field mappings resolve synchronously; custom fields read
  * from a pre-built index to avoid N+1 queries during the send loop.
@@ -147,6 +158,39 @@ async function fetchCustomValueIndex(
   return index;
 }
 
+/**
+ * Lê uma tabela inteira em páginas.
+ *
+ * O PostgREST corta toda resposta em `PGRST_DB_MAX_ROWS` (1000 nesta
+ * instalação) sem erro e sem aviso — quem não pagina simplesmente recebe
+ * menos linhas do que existe e nunca fica sabendo.
+ *
+ * A página é menor que o teto de propósito, para o app não depender de
+ * conhecer a configuração do servidor.
+ */
+async function fetchAllPaginated<T>(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+): Promise<T[]> {
+  const PAGE = 500;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      // Ordem estável entre páginas: sem ela o Postgres pode repetir ou
+      // pular linhas, e repetir um contato aqui é mandar a mesma
+      // mensagem duas vezes para a mesma pessoa.
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Failed to fetch ${table}: ${error.message}`);
+    if (!data?.length) break;
+    out.push(...(data as T[]));
+    if (data.length < PAGE) break;
+  }
+  return out;
+}
+
 export function useBroadcastSending(): UseBroadcastSendingReturn {
   const { accountId } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -158,9 +202,13 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     let contacts: Contact[] = [];
 
     if (audience.type === 'all') {
-      const { data, error } = await supabase.from('contacts').select('*');
-      if (error) throw new Error(`Failed to fetch contacts: ${error.message}`);
-      contacts = data ?? [];
+      // Paginado pelo mesmo motivo da leitura de destinatários: o teto
+      // de linhas do PostgREST é silencioso, então "todos os contatos"
+      // eram no máximo os 1000 primeiros — e o disparo saía parecendo
+      // completo. Aqui o corte era ainda mais traiçoeiro, porque
+      // acontecia ANTES de os destinatários serem gravados: nem a
+      // contagem no banco denunciava.
+      contacts = await fetchAllPaginated<Contact>(supabase, 'contacts');
     } else if (
       audience.type === 'tags' &&
       audience.tagIds &&
@@ -418,14 +466,51 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       }
 
       // ── Step 4: Fetch recipients (joined contact) + preload custom values
+      //
+      // PAGINADO, e não uma leitura só.
+      //
+      // O PostgREST tem um teto GLOBAL de linhas por resposta
+      // (`PGRST_DB_MAX_ROWS`, hoje 1000 nesta instalação) e ele é
+      // SILENCIOSO: a consulta não falha, ela devolve 1000 e pronto.
+      //
+      // Sem paginação, um disparo para 3000 contatos inseria 3000 linhas
+      // e lia 1000 de volta. Os outros 2000 nunca eram enviados — e como
+      // o laço percorria só o que veio, o `sent_count` batia 1000, a
+      // barra chegava a 100% e o relatório concordava com o erro.
+      // Ninguém era avisado.
+      //
+      // A página é menor que o teto de propósito: assim o código não
+      // depende de saber qual é o teto do servidor, que é configuração
+      // de infra e pode mudar sem ninguém avisar o app.
       setProgress(30);
-      const { data: recipients, error: recipientsFetchError } = await supabase
-        .from('broadcast_recipients')
-        .select('*, contact:contacts(*)')
-        .eq('broadcast_id', broadcast.id);
+      const RECIPIENT_PAGE_SIZE = 500;
+      const recipients: BroadcastRecipientRow[] = [];
+      for (let from = 0; ; from += RECIPIENT_PAGE_SIZE) {
+        const { data: page, error: recipientsFetchError } = await supabase
+          .from('broadcast_recipients')
+          .select('*, contact:contacts(*)')
+          .eq('broadcast_id', broadcast.id)
+          // Ordem estável: sem ela, duas páginas podem repetir ou pular
+          // linhas, e repetir aqui significa mandar a mesma mensagem
+          // duas vezes para o mesmo cliente.
+          .order('id', { ascending: true })
+          .range(from, from + RECIPIENT_PAGE_SIZE - 1);
 
-      if (recipientsFetchError || !recipients) {
-        throw new Error('Failed to fetch broadcast recipients');
+        if (recipientsFetchError) {
+          throw new Error('Failed to fetch broadcast recipients');
+        }
+        if (!page?.length) break;
+        recipients.push(...(page as BroadcastRecipientRow[]));
+        if (page.length < RECIPIENT_PAGE_SIZE) break;
+      }
+
+      // O que foi inserido tem de ser o que vai ser enviado. Se estes
+      // números divergirem, alguém não vai receber — e é melhor falhar
+      // alto agora do que mostrar 100% no fim.
+      if (recipients.length !== contacts.length) {
+        throw new Error(
+          `Recipient count mismatch: inserted ${contacts.length}, loaded ${recipients.length}. Aborting so nobody is silently skipped.`,
+        );
       }
 
       // One bulk fetch of custom values for every contact in this

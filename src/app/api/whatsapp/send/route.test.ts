@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // Records of what the route wrote, so we can assert the right rows landed.
 const conversationInserts: Array<Record<string, unknown>> = []
 const messageInserts: Array<Record<string, unknown>> = []
+/** Payloads de UPDATE em `conversations`, para conferir a reivindicação. */
+const conversationUpdates: Array<Record<string, unknown>> = []
 
 // Toggles for the per-test scenario.
 let existingConversation: Record<string, unknown> | null = null
@@ -91,9 +93,25 @@ function makeSupabaseMock() {
 
     const b: Record<string, unknown> = {}
     const chain = () => b
-    for (const m of ['select', 'eq', 'in', 'order', 'limit', 'update', 'delete']) {
+    // `is` entra na lista porque o envio passou a reivindicar a conversa
+    // com um compare-and-set: `.update({assigned_agent_id}).eq(id).is(
+    // 'assigned_agent_id', null)`. Sem ele no encadeador, a chamada
+    // estourava e a rota respondia 500.
+    for (const m of [
+      'select',
+      'eq',
+      'is',
+      'in',
+      'order',
+      'limit',
+      'delete',
+    ]) {
       b[m] = vi.fn(chain)
     }
+    b.update = vi.fn((payload: Record<string, unknown>) => {
+      if (table === 'conversations') conversationUpdates.push(payload)
+      return b
+    })
     b.insert = vi.fn((payload: Record<string, unknown>) => {
       didInsert = true
       if (table === 'conversations') {
@@ -184,6 +202,7 @@ describe('POST /api/whatsapp/send — contact_id template path', () => {
   beforeEach(() => {
     conversationInserts.length = 0
     messageInserts.length = 0
+    conversationUpdates.length = 0
     existingConversation = null
     createdConversation = null
     contactRow = CONTACT
@@ -273,6 +292,7 @@ describe('POST /api/whatsapp/send — role enforcement', () => {
   beforeEach(() => {
     conversationInserts.length = 0
     messageInserts.length = 0
+    conversationUpdates.length = 0
     existingConversation = {
       id: 'conv-existing',
       account_id: 'acct-1',
@@ -312,5 +332,25 @@ describe('POST /api/whatsapp/send — role enforcement', () => {
 
     expect(res.status).toBe(200)
     expect(sendTemplateMessage).toHaveBeenCalledTimes(1)
+  })
+
+  // Responder PEGA a conversa.
+  //
+  // Antes, o envio só mexia na prévia da última mensagem. Como o portão
+  // que cala o bot é ter dono, a sequência real era: a atendente
+  // responde, o cliente escreve de novo, e a IA responde por cima dela.
+  //
+  // A asserção olha o payload do UPDATE, e não uma resposta da rota,
+  // porque é a escrita que produz o efeito — e uma volta atrás aqui não
+  // mudaria nada visível em nenhum outro teste.
+  it('atribui a conversa a quem respondeu', async () => {
+    callerRole = 'agent'
+
+    const res = await postContactTemplate()
+
+    expect(res.status).toBe(200)
+    expect(conversationUpdates).toContainEqual(
+      expect.objectContaining({ assigned_agent_id: 'user-1' }),
+    )
   })
 })

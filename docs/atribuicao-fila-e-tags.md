@@ -129,11 +129,15 @@ depois de a transferência já estar gravada (`ai/auto-reply.ts:297-307`).
 
 ### O handoff de fluxo é mais fraco — e isso surpreende
 
-O nó de handoff dos **fluxos** só muda o `status` para `pending`. Ele
-não escreve a nota e **não liga `ai_autoreply_disabled`**
-(`flows/engine.ts:440-449`). Resultado: a tarja do inbox não mostra
-motivo nenhum, e se ninguém for atribuído, **o bot de IA continua
-elegível naquela conversa**.
+O nó de handoff dos **fluxos** só mudava o `status` para `pending`. Não
+escrevia a nota e **não ligava `ai_autoreply_disabled`**: a tarja do
+inbox aparecia sem motivo, e se ninguém fosse atribuído o bot continuava
+elegível — o fluxo dizia "vou chamar uma pessoa" e a IA respondia por
+cima da promessa.
+
+**✅ Corrigido em 12/08/2026**, nos dois caminhos (o nó e o fallback
+esgotado): ambos passaram a desligar a resposta automática, e a nota
+interna do nó agora vira o motivo que a tarja mostra.
 
 Pior, o campo `assign_to` desse nó existe no motor e no tipo, mas **não
 existe no formulário**: a tela só oferece a nota interna
@@ -167,9 +171,17 @@ Ou seja: **o atendente responde, e a IA responde de novo na próxima
 mensagem do cliente**, porque para o sistema nada mudou. Só clicar em
 "Atribuir" ou "Assumir" muda.
 
-Isso precisa estar no tutorial em letra grande — e provavelmente
-deveria mudar no produto: atender é o gesto que mais claramente diz "eu
-peguei esta conversa".
+**✅ Mudou em 12/08/2026.** Responder pelo painel passou a atribuir a
+conversa a quem respondeu — mas só quando ela **ainda não tem dono**. É
+um compare-and-set (`.is('assigned_agent_id', null)`), a mesma regra do
+handoff: nunca tomar conversa de outra pessoa.
+
+O botão "Assumir" continua e continua necessário: é como se pega uma
+conversa **sem responder**, e é o único jeito de tomar uma que já é de
+alguém.
+
+A API pública v1 **não** atribui, de propósito — ali não há pessoa para
+receber a conversa.
 
 ### E o "Retomar IA" solta qualquer dono
 
@@ -261,8 +273,9 @@ Em ordem do que eu consertaria primeiro:
    parece: os avisos JÁ ENTREGUES no celular de alguém carregam a
    grafia antiga para sempre, e quem tocar num push de semana passada
    precisa cair na conversa certa.
-5. **A lista do inbox não mostra nem filtra por dono** — não dá para ver
-   "minhas conversas" (`conversation-list.tsx:48,59-65`).
+5. ~~**A lista do inbox não mostra nem filtra por dono**~~ — ✅ o filtro
+   **"Minhas"** entrou em 12/08/2026. Mostrar o dono no item da lista
+   continua pendente.
 6. **`assigned_agent_id` sem chave estrangeira** — nada no banco impede
    gravar um usuário de outra conta ali.
 

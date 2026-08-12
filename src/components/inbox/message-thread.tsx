@@ -66,6 +66,16 @@ function renderTemplateBody(body: string, params: string[]): string {
   });
 }
 
+/**
+ * Quantas mensagens a thread carrega de uma vez.
+ *
+ * Bem abaixo do teto do PostgREST de propósito: o objetivo não é caber
+ * no teto, é não transferir uma conversa de dois anos toda vez que
+ * alguém clica nela. O que passar disso vem pelo botão "carregar
+ * anteriores".
+ */
+const MESSAGE_PAGE_SIZE = 100;
+
 interface MessageThreadProps {
   conversation: Conversation | null;
   contact: Contact | null;
@@ -183,6 +193,9 @@ export function MessageThread({
   const { user } = useAuth();
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
+  /** Há mensagens mais antigas do que a janela carregada? */
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -289,18 +302,33 @@ export function MessageThread({
     (async () => {
       setLoading(true);
 
+      // As MAIS RECENTES, e não a conversa inteira.
+      //
+      // A consulta antiga era `order(created_at asc)` sem limite. Como o
+      // PostgREST corta toda resposta em `PGRST_DB_MAX_ROWS` (1000 aqui)
+      // em silêncio, uma conversa que passasse de mil mensagens mostrava
+      // para sempre as MIL PRIMEIRAS — o atendente parava de ver o que o
+      // cliente tinha acabado de escrever. Não era degradação gradual,
+      // era um corte.
+      //
+      // Pedir em ordem decrescente e inverter no cliente resolve os dois
+      // problemas de uma vez: pega o fim da conversa, e transfere uma
+      // janela em vez do histórico inteiro a cada troca de conversa.
       const { data, error } = await supabase
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(MESSAGE_PAGE_SIZE);
 
       if (cancelled) return;
 
       if (error) {
         console.error("Failed to fetch messages:", error);
       } else {
-        onMessagesLoadedRef.current(data ?? []);
+        const page = (data ?? []).slice().reverse();
+        setHasOlder((data ?? []).length === MESSAGE_PAGE_SIZE);
+        onMessagesLoadedRef.current(page);
       }
 
       if (!cancelled) setLoading(false);
@@ -876,6 +904,38 @@ export function MessageThread({
     ? (currentAssignee?.full_name ?? t("assigned"))
     : t("assign");
 
+  /**
+   * Traz a página anterior e a coloca na frente da lista.
+   *
+   * Ancorado no `created_at` da mensagem mais antiga já carregada, e não
+   * num deslocamento: com deslocamento, uma mensagem nova chegando entre
+   * dois cliques empurra a janela e faz repetir ou pular linha.
+   */
+  async function loadOlder() {
+    const oldest = messages[0];
+    if (!oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", oldest.conversation_id)
+        .lt("created_at", oldest.created_at)
+        .order("created_at", { ascending: false })
+        .limit(MESSAGE_PAGE_SIZE);
+      if (error) {
+        console.error("Failed to fetch older messages:", error);
+        return;
+      }
+      const older = (data ?? []).slice().reverse();
+      setHasOlder((data ?? []).length === MESSAGE_PAGE_SIZE);
+      if (older.length) onMessagesLoaded([...older, ...messages]);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
   return (
     // `min-w-0` is load-bearing: the page already puts min-w-0 on the
     // thread's flex *wrapper* (issue #165), but this root keeps the
@@ -1080,6 +1140,18 @@ export function MessageThread({
           </div>
         ) : (
           <div className="space-y-4">
+            {hasOlder && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void loadOlder()}
+                  disabled={loadingOlder}
+                  className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted disabled:opacity-60"
+                >
+                  {loadingOlder ? t("loadingOlder") : t("loadOlder")}
+                </button>
+              </div>
+            )}
             {messageGroups.map((group) => (
               <div key={group.date}>
                 {/* Date separator */}
