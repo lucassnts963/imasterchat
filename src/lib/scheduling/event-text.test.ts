@@ -52,7 +52,7 @@ describe('buildEventDescription', () => {
     expect(out).toContain('Empresa: Solar Belém');
     expect(out).toContain('Pedido: Quero ver a bike dobrável');
     expect(out).toContain(
-      'https://imasterchat.com.br/inbox?conversation=c0ffee00-0000-4000-8000-000000000001',
+      'https://imasterchat.com.br/inbox?c=c0ffee00-0000-4000-8000-000000000001',
     );
     expect(out).toContain('Marcado pelo agente de IA');
   });
@@ -72,7 +72,7 @@ describe('buildEventDescription', () => {
 
   it('tolera barra sobrando na origem', () => {
     const out = buildEventDescription({ ...BASE, siteUrl: 'https://x.com.br/' });
-    expect(out).toContain('https://x.com.br/inbox?conversation=');
+    expect(out).toContain('https://x.com.br/inbox?c=');
     expect(out).not.toContain('.br//inbox');
   });
 

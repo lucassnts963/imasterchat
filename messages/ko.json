@@ -958,7 +958,7 @@
         "tagLabel": "태그",
         "modeLabel": "모드",
         "modes": {
-          "round_robin": "순차 배정",
+          "round_robin": "팀원 아무나",
           "specific": "특정 상담원"
         },
         "agentLabel": "상담원",

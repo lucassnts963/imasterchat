@@ -191,22 +191,26 @@ que interessa: **o que está esperando agora, e há quanto tempo.**
 
 # As ondas
 
-## Onda 0 — horas, risco quase zero
+## Onda 0 — CONCLUÍDA (12/08/2026)
 
-Nada aqui muda comportamento que alguém dependa. São correções e
-remoções de mentira.
-
-| # | item | onde | efeito |
+| # | item | onde | estado |
 |---|---|---|---|
-| 0.1 | Tirar o rótulo "Rodízio" | `automation-builder.tsx`, `pt-BR.json` | para de prometer o que não faz |
-| 0.2 | Deep link `?conversation=` → `?c=` | 4 arquivos | push de handoff passa a abrir a conversa |
-| 0.3 | `requireRole('admin')` no PATCH/DELETE de templates | `templates/[id]/route.ts` | fecha o alto nº 4 da auditoria |
-| 0.4 | Allowlist de `Content-Type` no proxy de mídia | `media/[mediaId]/route.ts` | fecha o XSS armazenado |
-| 0.5 | Timeout em todo `fetch` da Graph API | 17 lugares | um envio lento para de travar o lote |
-| 0.6 | Migração de índices + `phone_normalized` no webhook | `066_indices.sql` | o custo de receber mensagem para de crescer com o histórico |
+| 0.1 | Rótulo "Rodízio" → "Qualquer pessoa da equipe" | `pt-BR/en/ko.json`, `automations/engine.ts` | ✅ |
+| 0.2 | Deep link `?conversation=` → `?c=` | 5 geradores + a tela aceita as duas | ✅ |
+| 0.3 | `requireRole('admin')` no PATCH/DELETE de templates | `templates/[id]/route.ts` | ✅ |
+| 0.4 | Allowlist de `Content-Type` no proxy de mídia | `media/[mediaId]/route.ts` | ✅ |
+| 0.5 | Timeout em toda chamada à Graph API | `meta-api.ts` (17), `embedded-signup.ts` (4) | ✅ |
+| 0.6 | Índices do caminho quente + busca por sufixo indexado | `064_hot_path_indexes.sql`, `contacts/dedupe.ts` | ✅ aplicada |
 
-0.3 e 0.4 exigem rebuild. 0.6 é migração isolada. **Tudo isto cabe numa
-tarde.**
+Detalhes de cada uma nas seções correspondentes de
+[`auditoria-seguranca.md`](./auditoria-seguranca.md),
+[`carga-3000-mensagens.md`](./carga-3000-mensagens.md) e
+[`atribuicao-fila-e-tags.md`](./atribuicao-fila-e-tags.md).
+
+Verificação: `tsc --noEmit` limpo e **913 testes passando** (dois novos,
+sobre a busca de contato). A 064 foi validada em transação com
+`ROLLBACK` antes de ser aplicada, e o plano de consulta foi conferido —
+o índice novo é usado (`Index Scan using idx_contacts_account_phone_suffix`).
 
 ## Onda 1 — dias, risco baixo, mexe no que o cliente vê
 

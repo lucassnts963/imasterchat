@@ -42,11 +42,22 @@ export async function findExistingContact(
 
   const suffix = normalized.length >= 8 ? normalized.slice(-8) : normalized;
 
+  // Igualdade sobre a coluna gerada, e não `LIKE '%sufixo'` sobre a
+  // coluna crua (migração 064).
+  //
+  // O curinga à esquerda não podia usar índice nenhum, e esta consulta
+  // roda em TODA mensagem que chega — o custo de receber uma mensagem
+  // crescia com o tamanho da agenda do cliente.
+  //
+  // `phone_suffix8` é `right(regexp_replace(phone,'\D','','g'), 8)`, que
+  // é exatamente o que as duas linhas acima calculam em JS. Números com
+  // menos de 8 dígitos funcionam nos dois lados: `right()` devolve a
+  // string inteira, e o `slice` também.
   const { data, error } = await db
     .from("contacts")
     .select("*")
     .eq("account_id", accountId)
-    .like("phone", `%${suffix}`);
+    .eq("phone_suffix8", suffix);
 
   if (error || !data) return null;
 

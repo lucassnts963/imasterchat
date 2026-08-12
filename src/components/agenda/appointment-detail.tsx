@@ -168,7 +168,7 @@ export function AppointmentDetail({
 
           {appointment.conversation_id && (
             <Link
-              href={`/inbox?conversation=${appointment.conversation_id}`}
+              href={`/inbox?c=${appointment.conversation_id}`}
               className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <MessageSquare className="h-3.5 w-3.5" />

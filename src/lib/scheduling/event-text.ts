@@ -78,7 +78,7 @@ export function buildEventDescription(
 
   const site = input.siteUrl?.trim().replace(/\/+$/, '')
   if (site && input.conversationId) {
-    blocks.push(`Conversa: ${site}/inbox?conversation=${input.conversationId}`)
+    blocks.push(`Conversa: ${site}/inbox?c=${input.conversationId}`)
   }
 
   blocks.push(

@@ -485,9 +485,19 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!args.contactId) throw new Error('assign_conversation needs a contact')
       let agentId = cfg.agent_id
       if (cfg.mode === 'round_robin') {
-        // Pick any member of the account. The existing implementation
-        // only ever returned the automation's author; preserving that
-        // shape until a real round-robin algorithm replaces it.
+        // NÃO é rodízio, e a tela deixou de chamar assim: o rótulo agora
+        // é "Qualquer pessoa da equipe", que é o que esta consulta faz.
+        //
+        // Sem ORDER BY e sem estado do último escolhido, o Postgres
+        // devolve a linha que quiser — na prática quase sempre a mesma
+        // pessoa. Prometer revezamento aqui era pior que não oferecer:
+        // quem ligava acreditava que a equipe estava sendo repartida.
+        //
+        // O nome da chave continua `round_robin` de propósito, para não
+        // quebrar as automações já salvas. Quando o rodízio de verdade
+        // existir (por FILA, com cursor travado na própria linha — ver
+        // docs/plano.md, onda 6), ele entra como um modo NOVO, e este
+        // continua sendo o que sempre foi.
         const { data: profiles } = await db
           .from('profiles')
           .select('user_id')

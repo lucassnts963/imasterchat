@@ -142,7 +142,7 @@ export async function handOffConversation(
     payload: {
       title: 'Atendimento precisa de você',
       body: previewText(summary.replace(/^🤖\s*/, '')),
-      url: `/inbox?conversation=${conversationId}`,
+      url: `/inbox?c=${conversationId}`,
       tag: `handoff:${conversationId}`,
       urgent: true,
     },

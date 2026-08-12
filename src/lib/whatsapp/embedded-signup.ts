@@ -15,6 +15,15 @@
  * meta-api.ts, and for the same reason (swapped-args bugs).
  */
 
+/** Mesmo motivo do `metaFetch` em meta-api.ts: `fetch` sem `signal` não
+ *  tem timeout, e o cadastro incorporado roda com o cliente esperando na
+ *  tela — pendurar aqui é um popup que nunca fecha. */
+const ES_TIMEOUT_MS = 20_000
+
+function esFetch(url: string | URL, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { ...init, signal: init.signal ?? AbortSignal.timeout(ES_TIMEOUT_MS) })
+}
+
 const META_API_VERSION = 'v21.0'
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
 
@@ -63,7 +72,7 @@ export async function exchangeCodeForToken(
   url.searchParams.set('client_secret', args.appSecret)
   url.searchParams.set('code', args.code)
 
-  const response = await fetch(url, { method: 'GET' })
+  const response = await esFetch(url, { method: 'GET' })
   if (!response.ok) {
     await throwMetaError(response, 'Could not exchange the signup code')
   }
@@ -103,7 +112,7 @@ export async function listSharedWabas(args: {
   url.searchParams.set('input_token', args.businessToken)
   url.searchParams.set('access_token', `${args.appId}|${args.appSecret}`)
 
-  const response = await fetch(url, { method: 'GET' })
+  const response = await esFetch(url, { method: 'GET' })
   if (!response.ok) {
     await throwMetaError(response, 'Could not inspect the signup token')
   }
@@ -150,7 +159,7 @@ export async function getWabaDetails(args: {
   const url = new URL(`${META_API_BASE}/${args.wabaId}`)
   url.searchParams.set('fields', 'name,owner_business_info')
 
-  const response = await fetch(url, {
+  const response = await esFetch(url, {
     headers: { Authorization: `Bearer ${args.accessToken}` },
   })
   if (!response.ok) {
@@ -186,7 +195,7 @@ export async function listWabaPhoneNumbers(args: {
     'id,display_phone_number,verified_name,code_verification_status',
   )
 
-  const response = await fetch(url, {
+  const response = await esFetch(url, {
     headers: { Authorization: `Bearer ${args.accessToken}` },
   })
   if (!response.ok) {

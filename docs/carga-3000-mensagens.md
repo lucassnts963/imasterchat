@@ -24,7 +24,7 @@ Não é a Meta, não é a OpenAI, não é o Postgres. Em ordem:
 | 2 | **Disparo morre com a aba** | já, hoje | fecha o navegador, para o envio |
 | 3 | **Webhook serial dentro de 60 s** | pico real | mensagem perdida **sem reentrega** |
 | 4 | **Thread trava nas 1.000 primeiras** | conversa longa | atendente para de ver o que o cliente escreveu |
-| 5 | **Índices faltando** | dezenas de milhares de linhas | tudo fica lento junto |
+| 5 | ~~Índices faltando~~ | — | ✅ corrigido 12/08 (migração 064) |
 | 6 | **429 do provedor** | pico com IA | cliente sem resposta, em silêncio |
 
 Os dois primeiros são bug, não limite de escala — e são exatamente o
@@ -129,7 +129,7 @@ quase todos independentes.
 
 ## 4. O banco
 
-### Quatro índices faltando, todos no caminho quente
+### Quatro índices faltando — ✅ CORRIGIDO em 12/08/2026
 
 | falta | onde dói |
 |---|---|
@@ -142,14 +142,34 @@ O de `broadcast_recipients` tem um efeito perverso: **o custo de receber
 uma mensagem cresce com o número de disparos já feitos.** Dez disparos
 de 3.000 e são 30 mil linhas varridas por mensagem que chega.
 
+**A migração `064_hot_path_indexes.sql` criou os quatro** (mais um
+quinto, `conversations(assigned_agent_id, status)`, que "minhas
+conversas" vai usar). Aplicada e verificada em produção.
+
 ### A busca de contato por telefone
 
 Roda em **toda** mensagem recebida e usa `LIKE` com curinga à esquerda —
 que nenhum índice atende. Existe uma coluna gerada `phone_normalized`
 com índice único que resolveria, e ela não é usada nesse caminho.
 
-O comentário no código diz que o pré-filtro evita "puxar todo contato a
-cada mensagem". Ele evita o tráfego, não a varredura.
+O comentário no código dizia que o pré-filtro evitava "puxar todo
+contato a cada mensagem". Ele evitava o tráfego, não a varredura.
+
+**Corrigido em 12/08/2026, e não do jeito óbvio.** Trocar `phone` por
+`phone_normalized` não resolveria: casar SUFIXO continua sendo curinga à
+esquerda, que nenhum btree atende. O que resolve é materializar o
+próprio sufixo — a 064 criou `contacts.phone_suffix8`
+(`right(regexp_replace(phone,'\D','','g'), 8)`, gerada e indexada junto
+com `account_id`) e a busca passou a comparar por igualdade.
+
+Conferido no plano de consulta:
+`Index Scan using idx_contacts_account_phone_suffix`.
+
+O risco que isso cria e que ficou registrado no `COMMENT` da coluna: a
+expressão SQL precisa continuar idêntica ao `normalizePhone()` do TS. Se
+uma mudar sem a outra, a busca deixa de achar contato existente e o
+sistema passa a criar duplicata **em silêncio**. Há teste cobrindo os
+dois lados.
 
 ### Realtime sem filtro
 
@@ -244,9 +264,11 @@ existe, e o orçamento para esperá-la não.
 1. Paginar a leitura de destinatários do disparo (ou `range()` em laço).
    Sem isso, prometer 3.000 mensagens é prometer 1.000.
 2. Limitar a thread às N mensagens mais recentes, com "carregar mais".
-3. Os quatro índices. Uma migração, sem risco.
-4. Usar `phone_normalized` na busca do webhook.
-5. Timeout em todo `fetch` para a Graph API.
+3. ~~Os quatro índices.~~ ✅ feito (064)
+4. ~~Busca de contato indexada.~~ ✅ feito (`phone_suffix8`)
+5. ~~Timeout em todo `fetch` para a Graph API.~~ ✅ feito — 20 s nas
+   chamadas de API, 45 s no download de mídia (que move bytes e não
+   pode ter o mesmo teto)
 
 **Antes de atender um cliente de alto volume:**
 

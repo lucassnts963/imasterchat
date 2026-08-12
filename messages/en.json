@@ -958,7 +958,7 @@
         "tagLabel": "Tag",
         "modeLabel": "Mode",
         "modes": {
-          "round_robin": "Round-robin",
+          "round_robin": "Any team member",
           "specific": "Specific agent"
         },
         "agentLabel": "Agent",

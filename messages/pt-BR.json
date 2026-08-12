@@ -1197,7 +1197,7 @@
         "tagLabel": "Etiqueta",
         "modeLabel": "Modo",
         "modes": {
-          "round_robin": "Rodízio",
+          "round_robin": "Qualquer pessoa da equipe",
           "specific": "Agente específico"
         },
         "agentLabel": "Agente",

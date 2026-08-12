@@ -3,6 +3,54 @@ import { createClient } from '@/lib/supabase/server'
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
 import { decrypt } from '@/lib/whatsapp/encryption'
 
+// ============================================================
+// O tipo do arquivo é decidido AQUI, não pelo remetente.
+//
+// A Meta repassa o mime que quem enviou declarou. Um cliente qualquer,
+// sem conta e sem login, manda um "documento" chamado
+// "orcamento-2026.pdf" cujo mime é text/html com <script> dentro. A
+// atendente clica no anexo, e o navegador executa aquilo NA ORIGEM DO
+// APP, dentro da sessão autenticada dela.
+//
+// A lista abaixo é o conserto: o que não estiver nela é servido como
+// binário e baixado em vez de aberto. `nosniff` fecha a outra metade,
+// impedindo o navegador de adivinhar um tipo melhor que o nosso.
+// ============================================================
+const INLINE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'audio/aac',
+  'audio/mp4',
+  'audio/mpeg',
+  'audio/amr',
+  'audio/ogg',
+  'audio/opus',
+  'video/mp4',
+  'video/3gpp',
+])
+
+/** PDF é o único não-mídia que vale abrir embutido — é metade dos anexos
+ *  de um orçamento, e os navegadores o renderizam num visualizador
+ *  próprio, sem executar script na nossa origem. */
+const INLINE_DOCUMENT_TYPES = new Set(['application/pdf'])
+
+function safeContentType(raw: string | null | undefined): {
+  type: string
+  inline: boolean
+} {
+  // Corta parâmetros ("audio/ogg; codecs=opus") e normaliza.
+  const base = (raw ?? '').split(';')[0]!.trim().toLowerCase()
+
+  if (INLINE_TYPES.has(base)) return { type: base, inline: true }
+  if (INLINE_DOCUMENT_TYPES.has(base)) return { type: base, inline: true }
+
+  // Tudo o mais — inclusive text/html, image/svg+xml e qualquer coisa
+  // que a Meta invente amanhã — baixa como binário.
+  return { type: 'application/octet-stream', inline: false }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ mediaId: string }> }
@@ -73,10 +121,16 @@ export async function GET(
       accessToken,
     })
 
+    const safe = safeContentType(contentType || mediaInfo.mimeType)
+
     return new Response(new Uint8Array(buffer), {
       status: 200,
       headers: {
-        'Content-Type': contentType || mediaInfo.mimeType || 'application/octet-stream',
+        'Content-Type': safe.type,
+        // Só imagem, áudio e vídeo abrem na própria página. Todo o resto
+        // baixa, e é isso que impede um "documento" de virar página.
+        'Content-Disposition': safe.inline ? 'inline' : 'attachment',
+        'X-Content-Type-Options': 'nosniff',
         'Cache-Control': 'public, max-age=86400',
       },
     })

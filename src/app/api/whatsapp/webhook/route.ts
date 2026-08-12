@@ -915,7 +915,7 @@ async function processMessage(
       payload: {
         title: contactRecord.name?.trim() || contactRecord.phone,
         body: previewText(inboundText),
-        url: `/inbox?conversation=${conversation.id}`,
+        url: `/inbox?c=${conversation.id}`,
         // One notification per conversation that updates in place — a
         // customer sending five lines should not produce five alerts
         // to dismiss.

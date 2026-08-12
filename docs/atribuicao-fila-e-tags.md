@@ -88,11 +88,17 @@ Ele não faz rodízio. A implementação é:
 Sem `ORDER BY` e sem estado de rodízio. O Postgres devolve a linha que
 quiser — na prática, quase sempre a mesma pessoa.
 
-**Isto é uma promessa quebrada na interface, não só uma limitação.** Um
-cliente que ligar "Rodízio" vai concluir, com razão, que o produto está
-distribuindo entre a equipe. Ou o rodízio passa a existir de verdade, ou
-o rótulo precisa mudar. Enquanto não muda, **nenhum tutorial pode
-descrever esse modo como distribuição entre atendentes.**
+**Isto era uma promessa quebrada na interface, não só uma limitação.**
+
+**Resolvido em 12/08/2026 pelo lado honesto:** o rótulo passou a ser
+**"Qualquer pessoa da equipe"** (`Any team member` / `팀원 아무나`), que
+é o que a consulta faz. A chave `round_robin` continua no banco para não
+quebrar as automações já salvas.
+
+O rodízio de verdade — por fila, com cursor travado na própria linha —
+está desenhado na onda 6 do [`plano.md`](./plano.md), e entra quando
+houver cliente com três ou mais pessoas na mesma fila. Antes disso ele
+resolve um problema que ninguém tem.
 
 ---
 
@@ -249,13 +255,12 @@ Em ordem do que eu consertaria primeiro:
    faz.
 3. **Handoff de fluxo não desliga a IA** e não deixa escolher a pessoa
    pela tela.
-4. **Deep link de push quebrado**: o push de handoff aponta para
-   `/inbox?conversation=<id>`, e a tela lê `?c=`
-   (`handoff.ts:145` contra `inbox/page.tsx:44`). O link abre o inbox sem
-   abrir a conversa. O mesmo descasamento está em
-   `webhook/route.ts:918`, `agenda-board.tsx:336` e
-   `scheduling/event-text.ts:81` — enquanto `dashboard/queries.ts:323` e
-   `notifications/page.tsx:149` usam `?c=` e funcionam.
+4. ~~**Deep link de push quebrado**~~ — ✅ corrigido em 12/08/2026.
+   Os cinco geradores passaram a emitir `?c=`, **e a tela passou a
+   aceitar as duas grafias**. A segunda metade importa mais do que
+   parece: os avisos JÁ ENTREGUES no celular de alguém carregam a
+   grafia antiga para sempre, e quem tocar num push de semana passada
+   precisa cair na conversa certa.
 5. **A lista do inbox não mostra nem filtra por dono** — não dá para ver
    "minhas conversas" (`conversation-list.tsx:48,59-65`).
 6. **`assigned_agent_id` sem chave estrangeira** — nada no banco impede

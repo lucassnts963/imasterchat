@@ -89,7 +89,7 @@ faltava o conteúdo.
 
 ## 🟠 Alto
 
-### 4. Um `viewer` apaga na Meta os templates da conta
+### 4. Um `viewer` apaga na Meta os templates da conta — ✅ CORRIGIDO
 
 `PATCH` e `DELETE` de `/api/whatsapp/templates/[id]` exigem só sessão —
 nenhum `requireRole`. Um membro `viewer` manda o DELETE: o template é
@@ -100,7 +100,13 @@ sem erro (zero linhas não é erro no PostgREST) e a rota responde
 Resultado: a conta perde um template aprovado e continua vendo a linha
 no painel. As rotas irmãs (`submit`, `sync`) já usam `requireRole`.
 
-### 5. XSS armazenado, disparado por um cliente do WhatsApp
+**Corrigido em 12/08/2026.** As duas passaram a exigir
+`requireRole('admin')`, como as irmãs. E o DELETE local agora usa
+`count: 'exact'` com filtro de conta: zero linhas deixa de virar
+`200 {success:true}` e vira 404 — era assim que o template sumia da Meta
+e continuava no painel.
+
+### 5. XSS armazenado, disparado por um cliente do WhatsApp — ✅ CORRIGIDO
 
 `/api/whatsapp/media/[mediaId]` repassa o `Content-Type` que veio da
 Meta — que é o que **o remetente escolheu**.
@@ -110,8 +116,12 @@ chamado `orcamento-2026.pdf` cujo mime é `text/html` com `<script>`. A
 atendente clica no anexo; o navegador recebe `text/html` **na origem do
 app**, dentro da sessão autenticada dela.
 
-Conserto: decidir o `Content-Type` no servidor por allowlist e
-`Content-Disposition: attachment` para o que não for imagem/áudio/vídeo.
+**Corrigido em 12/08/2026.** O tipo passou a ser decidido no servidor
+por allowlist (`safeContentType`): imagem, áudio, vídeo e PDF são
+servidos com o próprio tipo e `inline`; **todo o resto vira
+`application/octet-stream` com `Content-Disposition: attachment`**, mais
+`X-Content-Type-Options: nosniff` para o navegador não adivinhar um tipo
+melhor que o nosso.
 
 ---
 
@@ -186,5 +196,10 @@ baixando. O caminho é `account-<uuid>/<timestamp>-<nome>`, sem
 componente aleatório. Fechar isso pede sufixo aleatório e URL assinada
 — mudança de produto, registrada em [`pendencias.md`](./pendencias.md).
 
-**4, 5, 6 e 7 ainda não foram corrigidos.** São mudanças de código, não
-de banco, e cada uma cabe em poucas linhas.
+**4 e 5 foram corrigidos em 12/08/2026** (onda 0 do
+[`plano.md`](./plano.md)) — exigem rebuild do app para valerem em
+produção.
+
+**6 e 7 seguem abertos.** São mudanças de código pequenas: validar o
+cabeçalho de IP antes de usá-lo como chave de balde, e acrescentar o
+teto por conta na rota do playground.

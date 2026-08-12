@@ -333,7 +333,7 @@ export function ConversationLink({ conversationId }: { conversationId: string })
   const t = useTranslations('Agenda');
   return (
     <Link
-      href={`/inbox?conversation=${conversationId}`}
+      href={`/inbox?c=${conversationId}`}
       className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
     >
       <MessageSquare className="h-3.5 w-3.5" />

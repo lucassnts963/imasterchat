@@ -35,6 +35,14 @@ function makeDb(script: Script): SupabaseClient {
   let likeCalls = 0;
   let convLookupCalls = 0;
 
+  function nextContactCandidates() {
+    const data = script.contactCandidatesByCall
+      ? (script.contactCandidatesByCall[likeCalls] ?? [])
+      : (script.contactCandidates ?? []);
+    likeCalls++;
+    return data;
+  }
+
   const builder: Record<string, unknown> = {
     select: () => builder,
     insert: () => {
@@ -45,7 +53,17 @@ function makeDb(script: Script): SupabaseClient {
       mode = 'update';
       return builder;
     },
-    eq: () => builder,
+    eq: (col?: string) => {
+      // A busca de contato passou a terminar no filtro por sufixo
+      // (migração 064): antes era `.like('phone', '%1234')`, curinga à
+      // esquerda que nenhum índice atende. O stub acompanha a forma real
+      // da consulta — o `.like` abaixo continua aqui só para quem ainda
+      // o use.
+      if (table === 'contacts' && mode === 'select' && col === 'phone_suffix8') {
+        return Promise.resolve({ data: nextContactCandidates(), error: null });
+      }
+      return builder;
+    },
     order: () => builder,
     limit: () => {
       // Only the conversation lookup terminates on `.limit(1)`.
@@ -58,13 +76,7 @@ function makeDb(script: Script): SupabaseClient {
       }
       return Promise.resolve({ data: [], error: null });
     },
-    like: () => {
-      const data = script.contactCandidatesByCall
-        ? (script.contactCandidatesByCall[likeCalls] ?? [])
-        : (script.contactCandidates ?? []);
-      likeCalls++;
-      return Promise.resolve({ data, error: null });
-    },
+    like: () => Promise.resolve({ data: nextContactCandidates(), error: null }),
     maybeSingle: () => {
       if (table === 'whatsapp_config')
         return Promise.resolve({ data: script.config ?? null, error: null });
