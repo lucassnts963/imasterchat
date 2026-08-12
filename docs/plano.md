@@ -1,73 +1,128 @@
 # Plano de trabalho
 
-Duas frentes: fechar o que a auditoria e o estudo de carga acharam, e
-construir **filas de verdade** com o agente sabendo encaminhar.
+Ordenado por **custo e risco crescentes**. As primeiras ondas são horas
+de trabalho e quase nenhum risco; as últimas mexem no caminho por onde
+toda mensagem entra.
 
-Ordenado por retorno. Cada item diz o que muda, onde, e o que pode dar
-errado.
-
----
-
-# Parte A — o que já está decidido
-
-Detalhes em [`auditoria-seguranca.md`](./auditoria-seguranca.md) e
-[`carga-3000-mensagens.md`](./carga-3000-mensagens.md).
-
-| # | item | tipo | risco |
-|---|---|---|---|
-| A1 | **Paginar os destinatários do disparo** | código | baixo |
-| A2 | Papel exigido no `PATCH`/`DELETE` de templates | código | baixo |
-| A3 | Allowlist de `Content-Type` no proxy de mídia | código | baixo |
-| A4 | Quatro índices + `phone_normalized` no webhook | migração | baixo |
-| A5 | Timeout em todo `fetch` para a Graph API | código | baixo |
-
-**A1 é o mais urgente.** Enquanto ele não sair, um disparo para 3.000
-contatos envia para 1.000 e a barra marca 100%. Nenhuma conversa sobre
-volume faz sentido antes disso.
-
-A2 e A3 exigem rebuild e deploy. A4 é uma migração isolada.
+Cada item diz o que muda, onde, e o que pode dar errado.
 
 ---
 
-# Parte B — filas de verdade
+## Antes de tudo: o rodízio, explicado
 
-## O que existe hoje
+Você pediu para entender a finalidade antes de decidir. Ela é estreita.
 
-Nada. A "fila" é uma convenção: `status = 'pending'` com
-`assigned_agent_id IS NULL`. Não há tabela de fila, de time ou de
-departamento — o levantamento está em
-[`atribuicao-fila-e-tags.md`](./atribuicao-fila-e-tags.md).
+**O que é.** Quando uma conversa precisa de gente e existem *várias*
+pessoas que poderiam pegar, o rodízio decide qual — revezando. Ana,
+Bruno, Carla, Ana de novo.
 
-O agente não tem como encaminhar: o catálogo dele é `request_human` mais
-as quatro de agendamento, e `request_human` manda sempre para o mesmo
-`handoff_agent_id` da conta. Não existe "manda para o financeiro".
+**Para que serve.** Um problema só, e ele é humano, não técnico: quando
+ninguém é designado, ou todo mundo acha que outro vai pegar e ninguém
+pega, ou a pessoa mais diligente pega tudo e afunda enquanto os outros
+ficam ociosos. O rodízio tira essa decisão das pessoas.
 
-## O desenho
+**Quando NÃO serve para nada.** Com **um** atendente. Rodízio de uma
+pessoa é sempre a mesma pessoa — cerimônia pura. Com dois, já é
+discutível: eles se organizam sozinhos, olhando a tela.
 
-### B1. A tabela `queues`
+Ele começa a valer com **três ou mais pessoas na mesma fila**.
+
+**Como está hoje: mentindo.** O modo existe na interface, chamado
+"Rodízio", e faz isto:
+
+```ts
+// automations/engine.ts:487-497
+.select('user_id').eq('account_id', …).limit(1)   // sem ORDER BY, sem estado
+```
+
+Sem ordenação e sem memória do último. O Postgres devolve a linha que
+quiser — na prática, quase sempre a mesma pessoa. **Está pior do que
+não existir**, porque quem liga acredita que a equipe está sendo
+revezada.
+
+### A recomendação
+
+**Não implemente rodízio agora.** A ótica tem uma ou duas pessoas; ele
+resolveria um problema que ela não tem, e é o item mais caro de fazer
+direito (a parte difícil é a corrida entre dois encaminhamentos
+simultâneos — detalhada na Onda 5).
+
+O que fazer agora, em minutos: **tirar o rótulo "Rodízio" da tela**. O
+desenho de fila abaixo já deixa o lugar dele pronto — quando aparecer um
+cliente com quatro atendentes no mesmo balcão, é uma coluna e uma
+função.
+
+---
+
+## E a fila ajuda com a sobrecarga?
+
+Ajuda — mas não do jeito que a palavra sugere, e vale separar bem porque
+são **duas filas diferentes com o mesmo nome**:
+
+| | fila de atendimento | fila de processamento |
+|---|---|---|
+| o que é | onde a conversa espera por quem atende | onde a mensagem crua espera para ser processada |
+| resolve | ninguém ficar sem resposta | mensagem não se perder num pico |
+| onde está | este plano, Onda 3 | `pendencias.md` item 1, Onda 6 |
+
+A **fila de atendimento não acrescenta vazão**. Botar conversa em fila
+não faz o sistema responder mais rápido.
+
+O que ela faz, e que é exatamente o seu problema:
+
+**1. Transforma perda silenciosa em espera visível.** Hoje uma conversa
+que vai para `pending` sem dono é indistinguível de uma que ninguém
+percebeu. Com fila e hora de entrada, "7 conversas esperando há mais de
+20 minutos no Financeiro" vira um número que alguém pode ver — e do qual
+dá para disparar alerta.
+
+**2. Dá um lugar natural para o teto de concorrência da IA.** Este é o
+ponto forte, e nasce da sua ideia da fila atendida pelo agente.
+
+Hoje, 3.000 mensagens viram 3.000 chamadas simultâneas na chave do
+cliente. O provedor recusa a maioria, **cada recusa é um cliente sem
+resposta**, e nada disso aparece em lugar nenhum (`pendencias.md`,
+item 2).
+
+Com uma fila atendida pela IA, o teto tem casa: a fila drena N por vez.
+O excedente vira **espera visível** em vez de **falha invisível**. É a
+mesma quantidade de trabalho, com a diferença de que você enxerga a
+fila crescendo e pode agir — mandar para humano, avisar o cliente,
+aumentar o teto.
+
+Sem a fila, o teto de concorrência precisaria de uma estrutura própria.
+Com ela, é uma consulta.
+
+---
+
+## O desenho de fila
+
+Sua ideia muda o modelo para melhor: **toda conversa está sempre em
+exatamente uma fila**, e a fila diz quem atende — o robô ou um time.
 
 ```sql
 create table public.queues (
   id                  uuid primary key default gen_random_uuid(),
   account_id          uuid not null references accounts(id) on delete cascade,
   name                text not null,
-  -- A descrição NÃO é enfeite: é o que o modelo lê para escolher a fila.
-  -- "Financeiro — cobrança, boleto, segunda via, renegociação."
+  -- O que o MODELO lê para escolher. Escreva com as palavras do cliente.
   description         text,
-  -- Quem RESPONDE pela fila. Um só, e um usuário pode responder por
-  -- várias — a cardinalidade usuário → filas sai de graça de a coluna
-  -- ser simples. É accountability, não distribuição (ver `distribution`).
+
+  -- Quem atende. É isto que unifica o desenho: o robô é uma fila como
+  -- qualquer outra, e o handoff deixa de ser um estado especial para
+  -- virar "mudou de fila".
+  attended_by         text not null default 'humans'
+                      check (attended_by in ('ai','humans')),
+
+  -- Quem RESPONDE pela fila: um, e um usuário pode responder por várias.
   responsible_user_id uuid references auth.users(id) on delete set null,
   auto_assign         boolean not null default true,
-  -- Como escolher a pessoa quando a conversa entra na fila.
-  distribution        text not null default 'responsible'
-                      check (distribution in ('responsible','round_robin','least_busy','none')),
-  -- Cursor do rodízio. Vive na linha da fila de propósito: é a trava
-  -- que serializa dois encaminhamentos simultâneos (ver B7).
-  rr_cursor           bigint not null default 0,
-  -- Pular quem está offline. Atribuir para quem foi embora é pior que
-  -- não atribuir: o cliente espera até amanhã sem ninguém saber.
-  skip_offline        boolean not null default true,
+
+  -- Teto de conversas sendo atendidas ao mesmo tempo. Só faz sentido
+  -- na fila da IA hoje; é onde o controle de sobrecarga mora.
+  concurrency_limit   integer,
+
+  is_default          boolean not null default false,
   position            integer not null default 0,
   active              boolean not null default true,
   created_at          timestamptz not null default now(),
@@ -75,28 +130,13 @@ create table public.queues (
 );
 
 create unique index queues_account_name on public.queues (account_id, lower(name));
-
--- Quem RECEBE da fila. Separado do responsável porque as duas perguntas
--- são diferentes: "quem responde por isto" tem uma resposta, "entre
--- quem eu reparto" tem várias.
-create table public.queue_members (
-  queue_id  uuid not null references public.queues(id) on delete cascade,
-  user_id   uuid not null references auth.users(id) on delete cascade,
-  position  integer not null default 0,
-  active    boolean not null default true,
-  primary key (queue_id, user_id)
-);
+create unique index queues_one_default   on public.queues (account_id) where is_default;
 ```
 
-`responsible_user_id` é anulável de propósito: uma fila sem dono é a
-sala de espera compartilhada, que é o caso mais comum no começo.
-
-Com `queue_members` vazio e `distribution = 'responsible'`, o
-comportamento é exatamente o que você descreveu no começo: a fila tem um
-dono e tudo cai nele. As outras modalidades só entram em jogo quando
-você põe gente na fila.
-
-E `conversations` ganha um ponteiro:
+Toda conta nasce com **uma fila padrão `attended_by = 'ai'`** —
+"Atendimento automático". As conversas entram nela. Um handoff move para
+uma fila humana. Se a conta não tem fila humana nenhuma, move para a
+fila padrão de espera, que é o comportamento de hoje com um nome.
 
 ```sql
 alter table public.conversations
@@ -106,373 +146,243 @@ create index idx_conversations_account_queue
   on public.conversations (account_id, queue_id, status);
 ```
 
-**RLS**, seguindo o padrão que já existe para `tags`: ler é de qualquer
-membro; criar, editar e apagar exige `admin`. Encaminhar uma conversa
-para uma fila exige `agent` — mesma separação de hoje entre "criar tag"
-e "aplicar tag".
+### O histórico: por onde passou e quanto tempo ficou
 
-### B2. A decisão que muda tudo: `auto_assign`
+**Não é uma tabela de eventos.** Já existem `platform_events` e
+`flow_run_events` com significados diferentes, e um terceiro `*_events`
+seria confusão garantida — foi o seu alerta, e ele estava certo.
 
-Quando o agente encaminha para uma fila, duas coisas podem acontecer:
-
-| `auto_assign` | o que acontece | quando usar |
-|---|---|---|
-| **`true`** (padrão) | a conversa é atribuída ao responsável da fila | a fila é uma pessoa: "Financeiro = Ana" |
-| `false` | só `queue_id` é gravado; a conversa fica sem dono, em `pending` | a fila é uma sala de espera que vários atendem |
-
-Isso importa por causa do portão em `auto-reply.ts:122`: **ter dono cala
-o bot.** Com `auto_assign = true`, encaminhar é desligar a IA naquela
-conversa — o que está certo quando a fila é um time humano, e estaria
-errado se a fila fosse mera classificação.
-
-Deixar o padrão em `true` é o que corresponde ao que você descreveu.
-Mas a coluna existe para o dia em que uma conta quiser uma fila de
-triagem onde o bot continua trabalhando.
-
-### B3. A ferramenta `route_to_queue`
-
-**Implementada como um handoff com destino**, e não como um caminho
-novo. `handOffConversation` já grava status, nota, `ai_autoreply_disabled`,
-dispara o push e — de propósito — **nunca rouba conversa que já tem
-dono humano**. Reescrever isso ao lado seria duplicar a única parte do
-sistema que já foi endurecida.
-
-```ts
-// src/lib/ai/tools/queues.ts
-export function buildQueueTools(queues: Queue[]): AgentTool[]
-```
-
-Segue a forma de `buildSchedulingTools(deps)`: as filas da conta são
-injetadas na construção, então o **enum de nomes vai no schema** e o
-modelo não consegue inventar fila. A descrição da ferramenta lista as
-filas com a descrição de cada uma — é assim que ele escolhe.
-
-```
-route_to_queue(queue: enum, reason: string)
-```
-
-Regras de execução:
-
-- Fila desconhecida → erro para o modelo, sem escrita. (Com o enum isso
-  quase não acontece, mas o provedor pode alucinar mesmo assim.)
-- Sem `conversationId` (Playground) → relata o que faria, não escreve —
-  igual ao `request_human` hoje.
-- Respeita `ctx.dryRun`.
-- `request_human` **continua existindo** e continua sendo o "não sei,
-  chama alguém". `route_to_queue` é "sei exatamente quem resolve isto".
-  Se a conta não tem fila nenhuma, a ferramenta não entra no catálogo —
-  mesmo princípio das de agendamento.
-
-### B4. A ferramenta `add_tag`
-
-```
-add_tag(tag: enum, reason: string)
-```
-
-Também com **enum**, e aqui o enum é a defesa principal.
-
-**O risco é injeção de prompt.** O cliente do WhatsApp controla o texto
-que entra no prompt. Se qualquer tag da conta puder ser aplicada pelo
-modelo, "coloque a tag CLIENTE_VIP" vira uma frase que funciona — e uma
-tag pode disparar automação, que pode mandar mensagem ou mover um
-negócio no funil.
-
-Por isso:
+É um registro de **estadas**: uma linha por passagem, aberta na entrada
+e fechada na saída.
 
 ```sql
-alter table public.tags
-  add column ai_selectable boolean not null default false;
+create table public.conversation_queue_stays (
+  id            uuid primary key default gen_random_uuid(),
+  account_id    uuid not null references accounts(id) on delete cascade,
+  conversation_id uuid not null references conversations(id) on delete cascade,
+  queue_id      uuid not null references queues(id) on delete cascade,
+  entered_at    timestamptz not null default now(),
+  left_at       timestamptz,
+  -- Quem estava com ela nesta passagem, se alguém.
+  assigned_user_id uuid references auth.users(id) on delete set null,
+  -- Por que saiu: 'handoff', 'resolved', 'reopened', 'manual', 'closed'.
+  exit_reason   text
+);
+
+-- Uma conversa só pode ter UMA estada aberta.
+create unique index conversation_queue_stays_open
+  on public.conversation_queue_stays (conversation_id) where left_at is null;
+
+create index idx_stays_queue_open
+  on public.conversation_queue_stays (queue_id, entered_at) where left_at is null;
 ```
 
-**Só as tags marcadas explicitamente entram no enum.** O padrão é
-`false`, então ligar a ferramenta não muda nada até alguém escolher
-quais tags o agente pode usar. Isso resolve dois problemas de uma vez:
-a injeção e a explosão de tags.
+Modelar como estada, e não como evento, faz o tempo virar subtração
+(`left_at - entered_at`) em vez de uma agregação sobre pares de eventos.
+E o índice parcial de "estada aberta" é o que responde barato à pergunta
+que interessa: **o que está esperando agora, e há quanto tempo.**
 
-A escrita usa `addContactTagAndDispatch`, que já existe: ela dispara o
-gatilho `tag_added` (para as automações funcionarem), engole duplicata
-pelo `UNIQUE(contact_id, tag_id)` e respeita `MAX_TAG_CHAIN_DEPTH` —
-o que impede tag → automação → tag em laço.
+> **Decida antes de subir:** isto só responde sobre o que foi gravado a
+> partir do dia em que existir. Não há como recuperar o passado. Se
+> "quantas passaram pelo Financeiro em julho" for pergunta de negócio,
+> a tabela precisa nascer junto com a fila — não depois.
 
-`ctx.contactId` já está no `ToolContext`, então não há consulta nova.
+---
 
-### B5. O que a interface precisa ganhar
+# As ondas
 
-Sem isto, a fila existe no banco e não existe para o usuário:
+## Onda 0 — horas, risco quase zero
 
-1. **Configurações → Filas** — criar, nomear, descrever, escolher o
-   responsável, ligar `auto_assign`, reordenar. A descrição precisa de
-   um texto de ajuda dizendo que **é o agente que vai ler aquilo**;
-   quem escrever "fila 2" vai ter encaminhamento ruim e não vai saber
-   por quê.
-2. **Filtro de fila no inbox**, ao lado dos de status e tag.
-3. **"Minhas conversas"** — o filtro por dono que hoje não existe
-   (`conversation-list.tsx:59-65`) e que vira obrigatório no momento em
-   que há responsável por fila. Sem ele, dar responsável a alguém é dar
-   uma responsabilidade que a pessoa não consegue ver.
-4. **A fila no item da lista**, junto do status.
-5. **Agentes → Ferramentas**: as duas novas entram no liga/desliga que
-   já existe (`ai_disabled_tools`).
-6. **Agentes → Regras** ou a tela de tags: a marcação `ai_selectable`.
+Nada aqui muda comportamento que alguém dependa. São correções e
+remoções de mentira.
 
-### B7. O rodízio, de verdade
+| # | item | onde | efeito |
+|---|---|---|---|
+| 0.1 | Tirar o rótulo "Rodízio" | `automation-builder.tsx`, `pt-BR.json` | para de prometer o que não faz |
+| 0.2 | Deep link `?conversation=` → `?c=` | 4 arquivos | push de handoff passa a abrir a conversa |
+| 0.3 | `requireRole('admin')` no PATCH/DELETE de templates | `templates/[id]/route.ts` | fecha o alto nº 4 da auditoria |
+| 0.4 | Allowlist de `Content-Type` no proxy de mídia | `media/[mediaId]/route.ts` | fecha o XSS armazenado |
+| 0.5 | Timeout em todo `fetch` da Graph API | 17 lugares | um envio lento para de travar o lote |
+| 0.6 | Migração de índices + `phone_normalized` no webhook | `066_indices.sql` | o custo de receber mensagem para de crescer com o histórico |
 
-Hoje o modo `round_robin` do passo `assign_conversation` faz
-`SELECT user_id FROM profiles WHERE account_id = X LIMIT 1` — sem
-`ORDER BY` e sem estado (`automations/engine.ts:487-497`). Não é rodízio:
-é "qualquer um", e na prática quase sempre o mesmo.
+0.3 e 0.4 exigem rebuild. 0.6 é migração isolada. **Tudo isto cabe numa
+tarde.**
 
-Fazer de verdade tem três problemas, e o segundo é o que costuma ser
-esquecido.
+## Onda 1 — dias, risco baixo, mexe no que o cliente vê
 
-#### 1. Quem entra na roda
+| # | item | por quê |
+|---|---|---|
+| 1.1 | **Paginar destinatários do disparo** | hoje 3.000 viram 1.000 com a barra em 100% |
+| 1.2 | Limitar a thread às N recentes + "carregar mais" | acima de 1.000 mensagens o atendente para de ver as novas |
+| 1.3 | Retenção em `platform_events` (a coluna `screenshot`) | nenhuma tabela de log tem política; essa é a que mais pesa |
 
-`queue_members` com `active = true`, ordenados por `(position, user_id)`
-— ordem **determinística**, senão o rodízio muda de sequência a cada
+**1.1 é o item mais urgente do plano inteiro.** Enquanto não sair,
+prometer volume é prometer errado.
+
+## Onda 2 — decisões de produto, baratas de código
+
+Cada uma é pequena, mas muda comportamento — precisa da sua decisão.
+
+| # | item | a decisão |
+|---|---|---|
+| 2.1 | **Responder pelo inbox assume a conversa** | hoje a IA responde por cima do atendente. Assumir automático é o que as pessoas esperam — mas muda o fluxo de quem só manda um "já verifico" |
+| 2.2 | Handoff de fluxo desliga a IA | hoje não desliga, e o bot continua elegível |
+| 2.3 | A política de áudio respeitar o agente desligado | hoje responde mesmo com o agente off — surpresa real |
+| 2.4 | Filtro **"minhas conversas"** no inbox | não existe; vira obrigatório com filas |
+
+## Onda 3 — as filas
+
+A fundação. Sem as telas, fila é dado que ninguém vê.
+
+| # | entrega |
+|---|---|
+| 3.1 | Migrações: `queues`, `queue_members`, `conversation_queue_stays`, `conversations.queue_id` |
+| 3.2 | Fila padrão `attended_by='ai'` para toda conta, e backfill das conversas existentes |
+| 3.3 | Tela **Configurações → Filas**: criar, descrever, responsável, `auto_assign` |
+| 3.4 | Filtro de fila no inbox + a fila no item da lista |
+| 3.5 | Abrir/fechar estada em todo caminho que muda `queue_id` |
+
+O 3.5 é o que não pode ser deixado para depois: se a estada não for
+gravada desde o primeiro dia, o histórico daquele período não existe.
+
+## Onda 4 — o agente operando as filas
+
+| # | entrega | cuidado |
+|---|---|---|
+| 4.1 | `route_to_queue`, como handoff **com destino**, reusando `handOffConversation` | filas no schema como enum, para o modelo não inventar |
+| 4.2 | `add_tag` + `tags.ai_selectable` (padrão `false`) | injeção de prompt: o cliente controla o texto, e tag dispara automação |
+| 4.3 | As duas no liga/desliga de **Agentes → Ferramentas** | cada ferramenta paga o próprio schema em toda resposta |
+
+## Onda 5 — sobrecarga de verdade
+
+Aqui mora o cliente das 3.000 mensagens. É a onda cara e a de maior
+risco: é o caminho por onde toda mensagem entra, e a falha é silenciosa.
+
+| # | entrega |
+|---|---|
+| 5.1 | **Persistir antes de confirmar**, idempotência `(phone_number_id, wamid)` — `pendencias.md` item 1 |
+| 5.2 | **Teto de concorrência da IA ancorado na fila da IA** (`concurrency_limit`) |
+| 5.3 | Retentativa com backoff lendo `Retry-After`; reconhecer o 130429 da Meta |
+| 5.4 | Disparo no servidor, em lotes retomáveis |
+| 5.5 | Aplicar `monthly_budget_usd`, que hoje é só exibido |
+
+5.2 fica quase de graça depois de 3.1 — é o argumento a favor de fazer
+as filas antes.
+
+## Onda 6 — o que só faz sentido depois
+
+| # | entrega | quando |
+|---|---|---|
+| 6.1 | Alerta de SLA: "esperando há mais de X na fila Y" | quando houver fila com espera real |
+| 6.2 | **Rodízio de verdade** | quando um cliente tiver 3+ pessoas na mesma fila |
+| 6.3 | Transbordo entre filas | depende de 6.1 |
+| 6.4 | Tela de tutoriais | `tela-de-tutoriais.md` |
+
+### 6.2 — quando chegar a hora, o difícil é a corrida
+
+Duas mensagens entram no mesmo instante, ambas leem "o último foi a
+Ana", ambas escolhem o Bruno. O rodízio some no primeiro pico.
+
+A correção não é trava na aplicação: é fazer **o avanço do cursor ser a
+trava**, numa instrução só.
+
+```sql
+update public.queues set rr_cursor = rr_cursor + 1
+ where id = p_queue_id returning rr_cursor into v_n;
+```
+
+O `UPDATE` trava a linha; o segundo chamador espera ali. Sai de graça,
+porque o cursor já precisava avançar. A ordem dos membros precisa ser
+determinística (`position, user_id`), senão a sequência muda a cada
 consulta e deixa de ser rodízio.
 
-Sem membros ativos, cai para `responsible_user_id`. Sem responsável,
-fica sem dono na fila — visível e esperando, que é honesto.
+Duas regras que decidem se funciona na prática:
 
-#### 2. Dois encaminhamentos ao mesmo tempo pegam a mesma pessoa
+- **Quem está offline é pulado**, e se ninguém está online a conversa
+  **não é atribuída** — fica na fila, visível. Atribuir para quem foi
+  embora esconde o problema.
+- Existe o irmão `least_busy` (menos conversas abertas), que parece mais
+  justo e tem incentivo perverso: quem fecha rápido recebe mais, quem
+  deixa aberto para de receber. **Rodízio simples é o padrão certo.**
 
-Duas mensagens entram no mesmo instante para a mesma fila. Ambas leem
-"o último foi a Ana", ambas escolhem o Bruno. O rodízio some no primeiro
-pico — que é justamente quando ele importa.
-
-A correção não é bloqueio na aplicação: é fazer o avanço do cursor ser
-**a própria trava**, numa instrução só.
-
-```sql
-create or replace function public.next_queue_assignee(p_queue_id uuid)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_n      bigint;
-  v_user   uuid;
-begin
-  -- O UPDATE trava a LINHA da fila. Um segundo chamador espera aqui até
-  -- o primeiro commitar, então nunca leem o mesmo cursor. É isto que
-  -- torna o rodízio correto sob concorrência — e é de graça, porque o
-  -- avanço do cursor já precisava acontecer.
-  update public.queues
-     set rr_cursor = rr_cursor + 1
-   where id = p_queue_id
-  returning rr_cursor into v_n;
-
-  if v_n is null then return null; end if;
-
-  select qm.user_id into v_user
-    from public.queue_members qm
-   where qm.queue_id = p_queue_id
-     and qm.active
-   order by qm.position, qm.user_id
-   offset (v_n - 1) % greatest((select count(*) from public.queue_members
-                                 where queue_id = p_queue_id and active), 1)
-   limit 1;
-
-  return v_user;
-end $$;
-
-revoke execute on function public.next_queue_assignee(uuid) from public, anon, authenticated;
-grant  execute on function public.next_queue_assignee(uuid) to service_role;
-```
-
-O `REVOKE`/`GRANT` explícito não é zelo excessivo: é exatamente a lição
-da migração 063 — função `SECURITY DEFINER` nova nasce fechada, senão o
-próximo `GRANT ALL` a reabre e ninguém percebe.
-
-> Entrar e sair gente da fila desloca a sequência, porque o cursor é uma
-> posição e não um ponteiro para pessoa. É aceitável: o efeito é uma
-> volta ligeiramente desigual, uma vez, quando a equipe muda.
-
-#### 3. Rodízio justo em contagem não é justo em trabalho
-
-Cinco conversas para cada um parece justo até uma delas ser uma
-negociação de quarenta mensagens e a outra ser "obrigado". Depois de
-algumas horas, alguém está enterrado.
-
-Daí a modalidade irmã, `least_busy`: escolhe quem tem **menos conversas
-abertas atribuídas**.
-
-```sql
-select p.user_id
-  from queue_members qm
-  join profiles p on p.user_id = qm.user_id
-  left join conversations c
-         on c.assigned_agent_id = qm.user_id
-        and c.status in ('open','pending')
- where qm.queue_id = $1 and qm.active
- group by p.user_id
- order by count(c.id) asc, p.user_id
- limit 1;
-```
-
-Precisa do índice `conversations(assigned_agent_id, status)`, que não
-existe hoje — entra junto com os de A4.
-
-**Qual usar como padrão?** `round_robin`. O `least_busy` tem um incentivo
-perverso que só aparece semanas depois: quem fecha conversa rápido
-recebe mais trabalho, e quem deixa tudo aberto para de receber. O
-rodízio não tem esse problema, e é o que a pessoa consegue prever — o
-que importa quando ela precisa confiar na distribuição.
-
-Deixe `least_busy` disponível para quem tiver conversas de duração muito
-desigual.
-
-#### 4. Quem está offline
-
-Presença é confiável aqui: batida a cada 30 s e offline após 75 s
-(`lib/presence.ts:16,23`). Com `skip_offline = true`, o candidato é
-pulado e o rodízio anda.
-
-Uma regra importa mais que as outras: **se ninguém da fila está online,
-a conversa NÃO é atribuída** — ela fica na fila, sem dono, visível como
-esperando. Atribuir para quem foi embora esconde o problema; deixar na
-fila mostra que falta gente.
-
-Isso significa que o cursor pode avançar sem atribuir a ninguém.
-Aceitável, e melhor que a alternativa.
-
-#### 5. O que fazer com o passo de automação que já existe
-
-O modo `round_robin` do `assign_conversation` passa a aceitar um
-`queue_id` e a chamar `next_queue_assignee`. Sem `queue_id`, ele deixa de
-mentir: ou vira "responsável da fila padrão da conta", ou some da
-interface. **Manter o rótulo "Rodízio" sobre o `LIMIT 1` atual não é
-opção depois desta implementação.**
-
-> E há um defeito ali que precisa sair junto: o passo atualiza **todas**
-> as conversas daquele contato (`.eq('contact_id', …)` sem filtrar a
-> conversa), não só a que disparou. Com fila e responsável, isso deixa de
-> ser detalhe e vira conversa trocando de dono sem motivo.
-
-### B6. O que isto custa em token
-
-Cada ferramenta paga o próprio schema em **toda** requisição, e a tela
-de Contexto já mostra que o catálogo é uma fatia grande do prompt. Com
-dez filas de descrição longa, `route_to_queue` fica caro.
-
-Duas defesas: limitar a descrição por fila (~120 caracteres, validado no
-formulário) e não montar a ferramenta quando a conta tem zero filas
-ativas.
-
-Depois de implementar, a própria tela **Agentes → Contexto** mostra o
-antes e o depois — é para isso que ela existe.
+A função nasce com `REVOKE`/`GRANT` explícito — lição da 063, onde um
+`GRANT ALL` reabriu o que sete migrações tinham fechado.
 
 ---
 
-## Ordem de trabalho
+## Fora do escopo, registrado
 
-| passo | entrega | depende de |
-|---|---|---|
-| 1 | Migração `064_queues.sql` + `065_tags_ai_selectable.sql` | — |
-| 2 | Tela de Filas em Configurações (CRUD + responsável) | 1 |
-| 3 | Filtro de fila e **"minhas conversas"** no inbox | 1 |
-| 4 | `route_to_queue`, reusando `handOffConversation` | 1, 2 |
-| 5 | `add_tag` com `ai_selectable` | 1 |
-| 6 | Marcação de `ai_selectable` na tela de tags | 5 |
-
-Os passos 2 e 3 vêm **antes** das ferramentas de propósito: uma fila que
-o agente preenche e que ninguém consegue ver é pior que não ter fila.
-Dá para operar com 1–3 e sem 4–5, atribuindo à mão; o contrário não.
+- **Rodízio ponderado** (o sênior recebe mais que o estagiário): uma
+  coluna `weight` em `queue_members`, barata de acrescentar depois.
+- **Fila com vários responsáveis**: `queue_members` já é a junção; falta
+  só a interface.
+- **Métrica de tempo médio por fila**: sai de `conversation_queue_stays`
+  com uma consulta, mas precisa de tela.
 
 ---
 
-## O que este plano NÃO resolve
+## O que ainda depende de você
 
-- **SLA / tempo de espera na fila.** Não há relógio, não há alerta de
-  conversa parada há duas horas. É o pedido seguinte mais provável
-  depois que as filas existirem — e o desenho já deixa o caminho pronto,
-  porque `queue_id` + `status` + `updated_at` é tudo de que uma ronda de
-  SLA precisaria.
-- **Transbordo entre filas.** "Ninguém no Financeiro há 30 min → manda
-  para o Geral" não existe. Depende do relógio acima.
-- **Histórico de quem passou pela fila.** `queue_id` guarda onde a
-  conversa **está**, não por onde andou. Se um dia a pergunta for
-  "quantas passaram pelo Financeiro este mês", precisa de uma tabela de
-  eventos — não dá para responder depois sobre o passado que não foi
-  gravado. Vale decidir isso ANTES de rodar em produção, porque é o tipo
-  de dado que não se recupera.
-- **Rodízio ponderado.** Todo mundo na roda recebe igual. Um estagiário
-  recebe tanto quanto o sênior. Se precisar, o caminho é um `weight` em
-  `queue_members` — barato de acrescentar depois.
+1. **Quais filas no primeiro cliente.** Sugestões por segmento no
+   apêndice abaixo.
+2. **2.1 — responder assume a conversa?** É a mudança de comportamento
+   mais sensível da Onda 2.
+3. **O histórico de estadas entra junto com as filas?** Recomendo sim,
+   pelo motivo do quadro acima: passado não gravado não volta.
 
 ---
 
-## Apêndice — filas sugeridas por segmento
+## Apêndice — filas sugeridas
 
-Sugestões, não receita. A regra que vale para os três: **comece com três
-ou quatro.** Fila vazia confunde o modelo (ele tem que escolher entre
-opções que nunca são usadas) e custa token em toda resposta. É fácil
-acrescentar depois; é constrangedor tirar depois de treinar a equipe.
+Comece com **três ou quatro humanas**, além da fila da IA que toda conta
+tem. Fila vazia confunde o modelo e custa token em toda resposta.
 
-A descrição é o que o agente lê — escreva com as **palavras que o
-cliente usa**, não com o nome interno do departamento.
+A descrição é o que o agente lê: escreva com as **palavras que o cliente
+usa**, não com o nome interno do departamento.
 
-### Ótica (o cliente de hoje)
+### Ótica
 
-| fila | descrição para o agente | distribuição |
-|---|---|---|
-| **Vendas e orçamento** | Preço de armação e lente, orçamento, promoção, o que está disponível na loja | rodízio |
-| **Financeiro** | Boleto, segunda via, pagamento, parcelamento, nota fiscal | responsável |
-| **Convênio** | Plano de saúde, autorização, reembolso, quais convênios são aceitos | responsável |
-| **Assistência** | Óculos quebrado, ajuste, troca de lente, garantia, conserto | rodízio |
+| fila | descrição para o agente |
+|---|---|
+| Atendimento automático (IA) | *padrão, toda conta tem* |
+| Vendas e orçamento | Preço de armação e lente, orçamento, promoção, o que tem na loja |
+| Financeiro | Boleto, segunda via, pagamento, parcelamento, nota fiscal |
+| Convênio | Plano de saúde, autorização, reembolso, quais convênios são aceitos |
+| Assistência | Óculos quebrado, ajuste, troca de lente, garantia, conserto |
 
-Agendamento **não vira fila**: já é ferramenta do agente, e ele marca
-sozinho. Só cai em fila quando a ferramenta falha — e aí é `request_human`.
+Agendamento **não vira fila**: já é ferramenta, o agente marca sozinho.
+Só cai em fila quando a ferramenta falha.
 
-### Loja de bicicletas elétricas
+### Bicicletas elétricas
 
-| fila | descrição para o agente | distribuição |
-|---|---|---|
-| **Vendas** | Modelos, preço, autonomia, test-ride, financiamento | rodízio |
-| **Oficina** | Revisão, defeito, bateria não carrega, freio, orçamento de conserto | rodízio |
-| **Garantia** | Produto com defeito dentro da garantia, troca, peça que quebrou sozinha | responsável |
-| **Peças e acessórios** | Capacete, bagageiro, câmara, peça avulsa, disponibilidade | responsável |
+| fila | descrição para o agente |
+|---|---|
+| Vendas | Modelos, preço, autonomia, test-ride, financiamento |
+| Oficina | Revisão, defeito, bateria não carrega, freio, orçamento de conserto |
+| Garantia | Defeito dentro da garantia, troca, peça que quebrou sozinha |
+| Peças e acessórios | Capacete, bagageiro, câmara, peça avulsa, disponibilidade |
 
-Separar **Oficina** de **Garantia** parece pedantismo e não é: quem paga
-o conserto muda, e a conversa começa diferente.
+Separar Oficina de Garantia parece pedantismo e não é: muda quem paga, e
+a conversa começa diferente.
 
-### Energia solar fotovoltaica
+### Energia solar
 
-| fila | descrição para o agente | distribuição |
-|---|---|---|
-| **Novo projeto** | Quer instalar, quer simulação, quanto economiza, quanto custa, conta de luz | rodízio |
-| **Visita técnica** | Agendar ou remarcar a visita de avaliação do telhado, endereço, acesso | responsável |
-| **Homologação** | Documentação, prazo da concessionária, parecer de acesso, troca de medidor | responsável |
-| **Pós-venda** | Sistema gerando menos, inversor com erro, monitoramento, limpeza | rodízio |
+| fila | descrição para o agente |
+|---|---|
+| Novo projeto | Quer instalar, simulação, quanto economiza, conta de luz |
+| Visita técnica | Agendar ou remarcar a avaliação do telhado, endereço, acesso |
+| Homologação | Documentação, prazo da concessionária, parecer de acesso, medidor |
+| Pós-venda | Gerando menos, inversor com erro, monitoramento, limpeza |
 
-**Homologação** é a que mais surpreende quem não é do ramo: o processo
-com a concessionária arrasta semanas e gera muita mensagem de "e aí,
-saiu?". Sem fila própria, isso entope Vendas.
+Homologação é a que surpreende quem não é do ramo: o processo com a
+concessionária arrasta semanas e gera muito "e aí, saiu?". Sem fila
+própria, entope Vendas.
 
-### Um padrão que vale para os três
+### O critério para qualquer fila nova
 
-Repare que **Financeiro é sempre `responsible`** e **Vendas é sempre
-rodízio**. Não é coincidência:
+**Qualquer pessoa da equipe consegue terminar sozinha essa conversa?**
+Se sim, a fila pode ser repartida. Se não, ela tem um responsável.
 
-- Vendas se reparte porque qualquer vendedor atende qualquer cliente, e
-  repartir é literalmente o objetivo.
-- Financeiro concentra porque quem responde precisa de acesso ao sistema
-  de cobrança, contexto do histórico e autoridade para negociar. Repartir
-  ali cria conversa que a pessoa não consegue terminar.
-
-Quando estiver em dúvida sobre uma fila nova, a pergunta é essa:
-**qualquer pessoa da equipe consegue terminar sozinha essa conversa?**
-Se sim, rodízio. Se não, responsável.
-
-## Uma decisão sua, antes do passo 4
-
-Quando o agente encaminha para uma fila cujo responsável está definido, a
-conversa é atribuída àquela pessoa e **o bot para de responder**.
-
-Isso é o certo quando a fila é um time humano ("Financeiro"). Mas se
-você quiser uma fila de *triagem* — onde o agente classifica e continua
-atendendo — ela precisa nascer com `auto_assign = false`.
-
-Vale decidir quais filas você quer no primeiro cliente antes de eu
-escrever a tela, porque isso muda o texto de ajuda do formulário.
+É por isso que Financeiro tende a ter dono e Vendas tende a ser
+repartida: quem responde por cobrança precisa de acesso ao sistema,
+histórico e autoridade para negociar.
