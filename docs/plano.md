@@ -351,7 +351,7 @@ tela de Ferramentas descreve as duas mesmo ausentes, dizendo qual é o
 pré-requisito: "não existe fila" e "alguém desligou" parecem idênticos
 de fora e se resolvem em telas diferentes.
 
-## Onda 5 — sobrecarga (4 de 5 CONCLUÍDAS em 12/08/2026)
+## Onda 5 — CONCLUÍDA (12/08/2026)
 
 | # | entrega | estado |
 |---|---|---|
@@ -359,7 +359,7 @@ de fora e se resolvem em telas diferentes.
 | 5.2 | Teto de concorrência da IA + fila de espera com prazo | ✅ migração 069 |
 | 5.3 | `Retry-After` do provedor; 130429 da Meta reconhecido | ✅ |
 | 5.5 | `monthly_budget_usd` aplicado | ✅ migração 069 |
-| 5.4 | Disparo no servidor, em lotes retomáveis | ⬜ **pendente** |
+| 5.4 | Disparo no servidor, em lotes retomáveis | ✅ |
 
 **A chave de idempotência não é o wamid.** A 009 já registrava que os
 ids da Meta não são únicos entre números; e `(phone_number_id, wamid)`
@@ -376,6 +376,22 @@ delas é desistir. Padrões: 5 simultâneas, 5 minutos de espera máxima.
 De carona, dois pontos que **perdiam mensagem em silêncio** passaram a
 entrar na fila em vez de sumir: o limite por minuto da conta e o 429 do
 provedor.
+
+**No 5.4, o envio saiu do navegador.** Ele rodava num laço dentro de um
+hook `'use client'`: fechar a aba interrompia o disparo pela metade, sem
+retomada e sem aviso, e a rede do atendente era variável do produto.
+Agora o navegador resolve o público e grava as linhas; quem envia é o
+dreno do cron, em lotes.
+
+Retomar saiu de graça, e é o que justifica o desenho: o estado já está
+em `broadcast_recipients.status`, então "o que falta" é uma consulta —
+não um ponteiro guardado em algum lugar que pode se perder.
+
+A resolução de `{{1}}` → "Ana" mudou de casa junto, para
+`lib/broadcast/variables.ts`. Deixá-la no hook obrigaria o servidor a
+importar um módulo `'use client'` ou a ter uma segunda cópia da regra —
+e a segunda cópia diverge, aparecendo como mensagem enviada ao cliente
+com o nome errado.
 
 **Verificação em produção:** Fase 16b do
 [`checklist-producao.md`](./checklist-producao.md), com o comando pronto

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { drainWebhookEvents } from '@/app/api/whatsapp/webhook/route'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import { drainBroadcasts } from '@/lib/broadcast/drain'
 import { resumePendingExecution } from '@/lib/automations/engine'
 import type { AutomationContext } from '@/lib/automations/engine'
 
@@ -93,6 +94,24 @@ export async function GET(request: Request) {
     console.error('[cron] varredura da fila da IA falhou:', err)
   }
 
+  // O disparo em massa, agora do lado do servidor.
+  //
+  // Antes ele rodava no navegador de quem clicou: fechar a aba
+  // interrompia o envio pela metade, sem retomada e sem aviso. Retomar é
+  // de graça aqui porque o estado já está em broadcast_recipients.status
+  // — "o que falta" é uma consulta, não um ponteiro que pode se perder.
+  let broadcastRun = { broadcasts: 0, sent: 0, failed: 0 }
+  try {
+    broadcastRun = await drainBroadcasts(admin)
+    if (broadcastRun.sent || broadcastRun.failed) {
+      console.log(
+        `[cron] disparos: ${broadcastRun.sent} enviados, ${broadcastRun.failed} falharam`,
+      )
+    }
+  } catch (err) {
+    console.error('[cron] dreno de disparos falhou:', err)
+  }
+
   const { data: due, error } = await admin
     .from('automation_pending_executions')
     .select('*')
@@ -103,7 +122,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0)
-    return NextResponse.json({ processed: 0, webhook_queue: drained, ai_retried: retried })
+    return NextResponse.json({ processed: 0, webhook_queue: drained, ai_retried: retried, broadcasts: broadcastRun })
 
   let processed = 0
   for (const row of due) {

@@ -762,6 +762,36 @@ Tempo: ~25 min, mais 5 de espera passiva.
       *Antes desta onda*, esse destinatário era marcado falho para
       sempre e nunca mais tentado.
 
+### Disparo em massa pelo servidor (5.4)
+
+O envio saiu do navegador. Estes itens verificam a consequência que mais
+importa: **fechar a aba não interrompe mais nada.**
+
+- [ ] 🔴 🌐 **O disparo continua sem a aba.** Crie um disparo para 3+
+      contatos de teste e **feche a aba** assim que a tela disser que foi
+      criado. Espere um ciclo do cron (até 5 min).
+      *Esperado:* todos recebem, e o disparo vira `sent`.
+      *Antes desta onda:* os que faltavam simplesmente não recebiam, sem
+      nada dizer.
+
+- [ ] **A tela não mente sobre o progresso.** A barra agora vai até "foi
+      criado", não até "todos receberam" — o envio não é mais desta aba.
+      Os contadores da lista de disparos (enviados/entregues/lidos) é que
+      são a verdade, e vêm do gatilho do banco.
+
+- [ ] **Retomada depois de queda.** Com um disparo em andamento,
+      reinicie o app (`./stack up apps/imasterchat`). O envio deve
+      continuar na rodada seguinte do cron, do ponto em que parou.
+      *Por que funciona:* "o que falta" é `status = 'pending'` em
+      `broadcast_recipients` — uma consulta, não um ponteiro guardado.
+
+- [ ] **Limite da Meta não queima destinatário.** Se o log trouxer
+      `limite da Meta no disparo`, os destinatários restantes devem
+      continuar `pending` (e sair na próxima rodada), **não** `failed`.
+
+- [ ] **Sem WhatsApp configurado, falha visível.** Um disparo numa conta
+      sem conexão deve virar `failed`, e não ficar `sending` para sempre.
+
 ### O comando do teste de reentrega
 
 ```bash
