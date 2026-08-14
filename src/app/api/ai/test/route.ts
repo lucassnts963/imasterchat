@@ -3,7 +3,8 @@ import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { validateAiCredentials } from '@/lib/ai/validate'
-import { AiError, type AiProvider } from '@/lib/ai/types'
+import { AiError } from '@/lib/ai/types'
+import { validateProviderSelection } from '@/lib/ai/providers/catalog'
 
 /**
  * POST /api/ai/test  (admin+)
@@ -26,12 +27,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
 
-    const provider = body.provider as AiProvider
-    if (provider !== 'openai' && provider !== 'anthropic') {
-      return NextResponse.json(
-        { error: 'provider must be "openai" or "anthropic"' },
-        { status: 400 },
-      )
+    const provider = String(body.provider ?? '')
+    const selection = validateProviderSelection(provider, body.base_url)
+    if (!selection.ok) {
+      return NextResponse.json({ error: selection.error }, { status: 400 })
     }
     const model = typeof body.model === 'string' ? body.model.trim() : ''
     if (!model) {
@@ -67,12 +66,15 @@ export async function POST(request: Request) {
         provider,
         model,
         apiKey: apiKeyPlain,
+        baseUrl: selection.baseUrl,
         systemPrompt: null,
         isActive: true,
         autoReplyEnabled: false,
         autoReplyMaxPerConversation: 3,
         handoffAgentId: null,
         embeddingsApiKey: null,
+        embeddingsBaseUrl: null,
+        embeddingsModel: null,
       })
     } catch (err) {
       if (err instanceof AiError) {
