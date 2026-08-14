@@ -7,9 +7,12 @@ import {
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
 import { validateAiCredentials } from '@/lib/ai/validate'
-import { embedTexts } from '@/lib/ai/embeddings'
+import { validateEmbeddingsTarget } from '@/lib/ai/embeddings'
 import { AiError } from '@/lib/ai/types'
-import { validateProviderSelection } from '@/lib/ai/providers/catalog'
+import {
+  resolveEmbeddingsTarget,
+  validateProviderSelection,
+} from '@/lib/ai/providers/catalog'
 
 function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 })
@@ -127,6 +130,17 @@ export async function POST(request: Request) {
         : ''
     const clearEmbeddingsKey = body.embeddings_api_key === null
 
+    // Where the embeddings key points. Independent of the chat provider
+    // because Anthropic and DeepSeek have no embeddings endpoint at all.
+    const embeddingsBaseUrl =
+      typeof body.embeddings_base_url === 'string' && body.embeddings_base_url.trim()
+        ? body.embeddings_base_url.trim().replace(/\/+$/, '')
+        : null
+    const embeddingsModel =
+      typeof body.embeddings_model === 'string' && body.embeddings_model.trim()
+        ? body.embeddings_model.trim()
+        : null
+
     // Reuse the stored key when the form didn't send a fresh one.
     const { data: existing } = await supabase
       .from('ai_configs')
@@ -188,13 +202,28 @@ export async function POST(request: Request) {
 
     // Validate a new embeddings key before storing (a cheap 1-input
     // embed), same "verify before save" discipline as the chat key.
+    // This also asserts the model's output width matches the knowledge
+    // base — a mismatch caught here names both numbers, where the same
+    // mismatch caught later surfaces as a Postgres type error midway
+    // through a reindex.
     if (rawEmbeddingsKey) {
+      const target = resolveEmbeddingsTarget({
+        provider,
+        embeddingsApiKey: rawEmbeddingsKey,
+        embeddingsBaseUrl,
+        embeddingsModel,
+      })
+      if (!target) {
+        return bad(
+          `${selection.preset.label} has no embeddings endpoint, so an embeddings key needs somewhere to go. Set the embeddings endpoint and model, or clear the key to use keyword search.`,
+        )
+      }
       try {
-        await embedTexts(rawEmbeddingsKey, ['ping'])
+        await validateEmbeddingsTarget(target)
       } catch (err) {
         if (err instanceof AiError) {
           return NextResponse.json(
-            { error: `Embeddings key: ${err.message}`, code: err.code },
+            { error: `Embeddings: ${err.message}`, code: err.code },
             { status: 400 },
           )
         }
@@ -218,8 +247,12 @@ export async function POST(request: Request) {
     if (handoffProvided) shared.handoff_agent_id = handoffAgentId
     if (rawEmbeddingsKey) {
       shared.embeddings_api_key = encrypt(rawEmbeddingsKey)
+      shared.embeddings_base_url = embeddingsBaseUrl
+      shared.embeddings_model = embeddingsModel
     } else if (clearEmbeddingsKey) {
       shared.embeddings_api_key = null
+      shared.embeddings_base_url = null
+      shared.embeddings_model = null
     }
 
     if (existing) {

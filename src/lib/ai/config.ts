@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import type { AiConfig } from './types'
+import type { EmbeddingsTarget } from './embeddings'
+import { resolveEmbeddingsTarget } from './providers/catalog'
 
 interface AiConfigRow {
   provider: string
@@ -89,32 +91,45 @@ export async function loadAiConfig(
 }
 
 /**
- * Load + decrypt just the embeddings key, independent of `is_active`.
+ * Load + decrypt the embeddings target, independent of `is_active`.
  * Used by the knowledge-base ingest routes so the KB gets embedded (and
  * semantic search works) whenever an embeddings key is present, even if
  * the assistant's master switch is currently off.
  *
- * Returns `{ key, corrupt }`: `key` is null when there's no key OR it
- * can't be decrypted; `corrupt` distinguishes those cases so callers can
- * warn ("a key is set but unusable") rather than silently indexing
- * lexical-only and reporting success.
+ * Returns `{ target, corrupt }`: `target` is null when there's no key,
+ * the key can't be decrypted, or there's nowhere to send it; `corrupt`
+ * distinguishes the undecryptable case so callers can warn ("a key is
+ * set but unusable") rather than silently indexing lexical-only and
+ * reporting success.
  */
-export async function loadEmbeddingsKey(
+export async function loadEmbeddingsTarget(
   db: SupabaseClient,
   accountId: string,
-): Promise<{ key: string | null; corrupt: boolean }> {
+): Promise<{ target: EmbeddingsTarget | null; corrupt: boolean }> {
   const { data, error } = await db
     .from('ai_configs')
-    .select('embeddings_api_key')
+    .select('provider, embeddings_api_key, embeddings_base_url, embeddings_model')
     .eq('account_id', accountId)
     .maybeSingle()
-  if (error || !data?.embeddings_api_key) return { key: null, corrupt: false }
+  if (error || !data?.embeddings_api_key) return { target: null, corrupt: false }
+
+  let apiKey: string
   try {
-    return { key: decrypt(data.embeddings_api_key), corrupt: false }
+    apiKey = decrypt(data.embeddings_api_key)
   } catch {
     console.error(
       `[ai config] embeddings key for account ${accountId} could not be decrypted — check ENCRYPTION_KEY.`,
     )
-    return { key: null, corrupt: true }
+    return { target: null, corrupt: true }
+  }
+
+  return {
+    target: resolveEmbeddingsTarget({
+      provider: data.provider,
+      embeddingsApiKey: apiKey,
+      embeddingsBaseUrl: data.embeddings_base_url,
+      embeddingsModel: data.embeddings_model,
+    }),
+    corrupt: false,
   }
 }

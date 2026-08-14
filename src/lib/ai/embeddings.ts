@@ -3,20 +3,39 @@ import { aiRequestTimeoutMs } from './defaults'
 import { providerHttpError, toNetworkError } from './providers/shared'
 
 // ============================================================
-// Embeddings (OpenAI-compatible).
+// Embeddings (OpenAI-compatible wire format).
 //
 // Used for the knowledge base's optional semantic-search path: embed
-// each chunk at ingest, and embed the query at retrieval. Anthropic has
-// no embeddings endpoint, so this is always OpenAI's — the account
-// supplies a (possibly separate) embeddings key. 1536-dim
-// text-embedding-3-small matches the `vector(1536)` column in
-// migration 030.
+// each chunk at ingest, and embed the query at retrieval.
+//
+// Deliberately independent of the chat provider. Anthropic has never had
+// an embeddings endpoint and DeepSeek closed the request as not-planned,
+// so an account can perfectly well run chat on one host and embeddings
+// on another — `resolveEmbeddingsTarget` in providers/catalog.ts is what
+// decides where this goes.
 // ============================================================
 
-const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings'
+/**
+ * The dimension the knowledge base is built for. Matches the
+ * `vector(1024)` column and the casts inside
+ * `match_ai_knowledge_semantic` (migration 038) — changing it here
+ * without changing those is a runtime failure, so they move together.
+ *
+ * 1024 because that is where the good open multilingual models sit
+ * natively (`baai/bge-m3`, `intfloat/multilingual-e5-large`), and this
+ * CRM's knowledge bases are mostly not in English. pgvector's HNSW index
+ * also caps at 2000 dimensions, which rules out the 3072-dim tier
+ * regardless.
+ */
+export const EMBEDDING_DIMENSIONS = 1024
 
-export const EMBEDDING_MODEL = 'text-embedding-3-small'
-export const EMBEDDING_DIMENSIONS = 1536
+/** Where and what to embed with. Built by `resolveEmbeddingsTarget`. */
+export interface EmbeddingsTarget {
+  apiKey: string
+  /** Origin, no trailing slash. `/embeddings` is appended. */
+  baseUrl: string
+  model: string
+}
 
 // OpenAI accepts an array input; keep batches modest so a big re-index
 // stays under request-size limits and partial failures are cheap.
@@ -39,7 +58,7 @@ export function toVectorLiteral(embedding: number[]): string {
  * to degrade (retrieval) or surface (ingest).
  */
 export async function embedTexts(
-  apiKey: string,
+  target: EmbeddingsTarget,
   inputs: string[],
 ): Promise<number[][]> {
   if (inputs.length === 0) return []
@@ -51,13 +70,24 @@ export async function embedTexts(
 
     let res: Response
     try {
-      res = await fetch(OPENAI_EMBEDDINGS_URL, {
+      res = await fetch(`${target.baseUrl}/embeddings`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${target.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ model: EMBEDDING_MODEL, input: batch }),
+        body: JSON.stringify({
+          model: target.model,
+          input: batch,
+          // Sent unconditionally. Models with Matryoshka support (the
+          // `text-embedding-3-*` family among them) need it to come back
+          // at our column width, and hosts serving a natively 1024-dim
+          // model either honour it or ignore it as an unknown field.
+          // A host that rejects it outright surfaces at configuration
+          // time — the save-time probe in /api/ai/config runs this exact
+          // path — rather than midway through a reindex.
+          dimensions: EMBEDDING_DIMENSIONS,
+        }),
         signal: AbortSignal.timeout(timeoutMs),
       })
     } catch (err) {
@@ -65,7 +95,7 @@ export async function embedTexts(
     }
 
     if (!res.ok) {
-      throw await providerHttpError('OpenAI embeddings', res)
+      throw await providerHttpError('Embeddings', res)
     }
 
     const data = (await res.json().catch(() => null)) as EmbeddingResponse | null
@@ -97,4 +127,32 @@ export async function embedTexts(
   }
 
   return out
+}
+
+/**
+ * Embed one probe string and confirm the model returns vectors of the
+ * width the knowledge base is built for.
+ *
+ * Without this, a model of the wrong dimension is accepted at save time
+ * and fails much later, inside a reindex, as a Postgres type error on an
+ * insert — which tells the operator nothing about which setting is
+ * wrong. Here it fails on the save that caused it, naming both numbers.
+ *
+ * Throws `AiError`; resolves on success.
+ */
+export async function validateEmbeddingsTarget(
+  target: EmbeddingsTarget,
+): Promise<void> {
+  const [probe] = await embedTexts(target, ['ping'])
+  if (!probe) {
+    throw new AiError('The embeddings endpoint returned no vector.', {
+      code: 'embeddings_malformed',
+    })
+  }
+  if (probe.length !== EMBEDDING_DIMENSIONS) {
+    throw new AiError(
+      `"${target.model}" returns ${probe.length}-dimensional vectors, but the knowledge base stores ${EMBEDDING_DIMENSIONS}. Choose a model of ${EMBEDDING_DIMENSIONS} dimensions — baai/bge-m3 is one.`,
+      { code: 'embeddings_dimension_mismatch', status: 400 },
+    )
+  }
 }
