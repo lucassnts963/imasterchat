@@ -69,9 +69,20 @@ services:
 
       # --- Transcrição de áudio local (migração 061) ---
       # Só é lida quando a conta escolhe "Whisper na VPS" em Agentes →
-      # Regras. Quem usa ElevenLabs, ou não usa áudio, pode ignorar e
-      # não subir o perfil `whisper` lá embaixo.
-      WHISPER_URL: ${WHISPER_URL:-http://whisper:9000}
+      # Regras. Quem usa ElevenLabs, ou não usa áudio, deixa vazio.
+      #
+      # SEM VALOR PADRÃO, de propósito. Isto já foi
+      # `${WHISPER_URL:-http://whisper:9000}` e o padrão era uma
+      # armadilha: numa máquina que não subiu o perfil `whisper`, a
+      # variável chegava preenchida apontando para um serviço que não
+      # existe. Quem inspecionasse o container veria "configurado" e o
+      # áudio falharia na primeira tentativa real — com o app caindo no
+      # aviso "não consegui ouvir", que é indistinguível de transcrição
+      # ruim.
+      #
+      # Vazia, o código diz o que está acontecendo:
+      # "[audio] provedor local escolhido sem WHISPER_URL".
+      WHISPER_URL: ${WHISPER_URL:-}
 
       # --- Push / PWA (migração 051) ---
       # A pública aparece aqui E como build arg de propósito: o
