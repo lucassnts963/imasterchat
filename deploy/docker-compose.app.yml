@@ -104,12 +104,22 @@ services:
     ports:
       - '${HOST_PORT:-3000}:3000'
     restart: unless-stopped
-    depends_on:
-      # Not a readiness guarantee — just ordering. The app tolerates a
-      # briefly-unavailable Supabase (requests fail and retry); the
-      # migrations are what genuinely must wait, and
-      # deploy/apply-migrations.sh does its own waiting.
-      - kong
+    # SEM `depends_on`, de propósito.
+    #
+    # Ele apontava para o serviço `kong`. O stack do Supabase renomeou o
+    # gateway para `api-gw` — o `docker-compose.kong.yml` apenas o
+    # substitui em cima, preservando `kong` como ALIAS DE REDE. Ou seja:
+    # `kong` continua resolvendo por DNS, mas não existe mais como nome
+    # de serviço, e o compose recusa o projeto inteiro com
+    # "depends on undefined service kong".
+    #
+    # Apontar para `api-gw` só moveria o problema para a próxima
+    # renomeação, e quebraria quem ainda roda o stack antigo.
+    #
+    # Nada se perde: isto nunca foi garantia de prontidão, só ordem — e
+    # o app tolera um Supabase momentaneamente fora (a requisição falha e
+    # é refeita). O que realmente precisa esperar são as migrações, e o
+    # `deploy/apply-migrations.sh` já espera sozinho.
     healthcheck:
       test:
         [
