@@ -46,6 +46,79 @@ async function throwMetaError(
 }
 
 // ============================================================
+// Step 0 — reading what the popup posts back
+// ============================================================
+
+/**
+ * The dialog announces success under three different names, and which
+ * one arrives depends on the flow that was requested. Coexistence — the
+ * flow this product asks for — uses the third. Listening for only the
+ * first two meant the phone/WABA hint never arrived in the flow we
+ * actually run, so the server fell back to inferring both from the
+ * token and answered 409 whenever the WABA held more than one number.
+ */
+const FINISH_EVENTS = new Set([
+  'FINISH',
+  'FINISH_ONLY_WABA',
+  'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+])
+
+export type SignupMessage =
+  /** The client picked a WABA/number and the dialog completed. */
+  | { kind: 'finish'; phoneNumberId?: string; wabaId?: string }
+  /**
+   * The dialog ended without a code. `errorMessage` is Meta's own text
+   * when its side refused (a restricted business portfolio, an
+   * ineligible number); both fields are absent when the person simply
+   * closed the window, which is not an error.
+   */
+  | { kind: 'cancel'; step?: string; errorMessage?: string }
+  /** Not ours — Facebook posts plenty of other messages. */
+  | null
+
+/**
+ * Parse one `postMessage` payload from the Embedded Signup popup.
+ *
+ * Pure so the event vocabulary is testable without a DOM: the bug this
+ * exists to prevent is a finish event we do not recognise, which is
+ * invisible at runtime — it degrades into "we guessed" rather than
+ * failing.
+ */
+export function readSignupMessage(raw: unknown): SignupMessage {
+  if (typeof raw !== 'string') return null
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null
+
+  const msg = parsed as { type?: unknown; event?: unknown; data?: Record<string, unknown> }
+  if (msg.type !== 'WA_EMBEDDED_SIGNUP' || typeof msg.event !== 'string') return null
+
+  const str = (v: unknown): string | undefined =>
+    typeof v === 'string' && v !== '' ? v : undefined
+
+  if (FINISH_EVENTS.has(msg.event)) {
+    return {
+      kind: 'finish',
+      phoneNumberId: str(msg.data?.phone_number_id),
+      wabaId: str(msg.data?.waba_id),
+    }
+  }
+  if (msg.event === 'CANCEL') {
+    return {
+      kind: 'cancel',
+      step: str(msg.data?.current_step),
+      errorMessage: str(msg.data?.error_message),
+    }
+  }
+  return null
+}
+
+// ============================================================
 // Step 1 — code → business access token
 // ============================================================
 

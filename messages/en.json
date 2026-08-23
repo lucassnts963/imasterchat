@@ -1572,7 +1572,9 @@
         "errorAmbiguous": "Your WhatsApp account has more than one number. Pick one in the Facebook window, or use manual setup below.",
         "errorNotConfigured": "This deployment is not set up as a Tech Provider yet.",
         "manualTitle": "Or set it up manually",
-        "title": "Quick connection"
+        "title": "Quick connection",
+        "errorFromMeta": "Meta refused the connection: {message}",
+        "errorCancelledAt": "The connection stopped at the \"{step}\" step in the Meta window. Check that your business portfolio is active and that you are an admin of it, then try again."
       }
     },
     "sections": {

@@ -1572,7 +1572,9 @@
         "errorAmbiguous": "Sua conta do WhatsApp tem mais de um número. Escolha um na janela do Facebook, ou use a configuração manual abaixo.",
         "errorNotConfigured": "Esta instalação ainda não está configurada como Tech Provider.",
         "manualTitle": "Ou configure manualmente",
-        "title": "Conexão rápida"
+        "title": "Conexão rápida",
+        "errorFromMeta": "A Meta recusou a conexão: {message}",
+        "errorCancelledAt": "A conexão parou no passo \"{step}\" na janela da Meta. Confira se o seu portfólio empresarial está ativo e se você é administrador dele, e tente de novo."
       }
     },
     "sections": {

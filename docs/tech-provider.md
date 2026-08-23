@@ -91,6 +91,37 @@ Um número só pode alimentar uma conta (o webhook roteia por
 `phone_number_id`). Se já estiver em uso, a resposta é
 `phone_number_already_claimed`.
 
+## Quando o popup da Meta recusa
+
+O erro aparece **dentro da janela da Meta**, antes de o nosso servidor receber
+qualquer coisa — não há nada para corrigir no app que faça aquela tela passar.
+Desde a correção do `CANCEL`, o motivo aparece como toast na tela em vez de
+sumir; o payload completo fica no console do navegador.
+
+O caso já visto em produção:
+
+> `<id> não é uma identificação da empresa válida (#1690130:<session id>)`
+
+É sobre o **portfólio empresarial** que o cliente escolheu, não sobre o número.
+Na ordem, confira:
+
+1. **Com qual conta do Facebook o cliente entrou, e qual portfólio ele
+   selecionou.** Se o campo "Nome da conta do WhatsApp Business" vier
+   preenchido com o SEU nome de parceiro, ele caiu no seu portfólio em vez do
+   dele — é a causa mais provável, e a mais fácil de não enxergar.
+2. O portfólio existe, está **ativo** (não restrito nem desabilitado) e o
+   cliente é **Admin** dele — "Funcionário" não basta.
+3. Autenticação em dois fatores ligada na conta do admin.
+4. Método de pagamento cadastrado na WABA (veja a lista acima).
+5. Se o portfólio foi criado agora, dentro do próprio fluxo, espere alguns
+   minutos e repita — há relatos de um transitório que passa sozinho.
+
+Persistindo, o **Session ID** que a Meta mostra no rodapé do diálogo é o que o
+suporte deles consegue rastrear. Leve-o junto do código do erro.
+
+Enquanto isso, o **caminho manual destrava o cliente no mesmo dia** — é o
+fallback para o qual ele existe.
+
 ## Testar
 
 O Embedded Signup **não funciona em localhost**: a Meta valida o domínio

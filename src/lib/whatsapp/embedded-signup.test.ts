@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   exchangeCodeForToken,
+  readSignupMessage,
   listSharedWabas,
   listWabaPhoneNumbers,
 } from './embedded-signup'
@@ -161,5 +162,57 @@ describe('listWabaPhoneNumbers', () => {
     await expect(
       listWabaPhoneNumbers({ wabaId: 'w', accessToken: 't' }),
     ).resolves.toEqual([])
+  })
+})
+
+describe('readSignupMessage', () => {
+  const wrap = (event: string, data: Record<string, unknown> = {}) =>
+    JSON.stringify({ type: 'WA_EMBEDDED_SIGNUP', event, data })
+
+  it.each([
+    'FINISH',
+    'FINISH_ONLY_WABA',
+    // The coexistence flow's own name. This repo asks for coexistence
+    // via `featureType`, so this is THE event it receives in practice —
+    // and the one that used to be ignored.
+    'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+  ])('reads the WABA and number out of %s', (event) => {
+    expect(
+      readSignupMessage(wrap(event, { phone_number_id: '123', waba_id: '456' })),
+    ).toEqual({ kind: 'finish', phoneNumberId: '123', wabaId: '456' })
+  })
+
+  it('keeps what Meta said when its own dialog refused', () => {
+    expect(
+      readSignupMessage(
+        wrap('CANCEL', {
+          current_step: 'WABA_ONBOARDING',
+          error_message: '103860505700201 is not a valid business id',
+        }),
+      ),
+    ).toEqual({
+      kind: 'cancel',
+      step: 'WABA_ONBOARDING',
+      errorMessage: '103860505700201 is not a valid business id',
+    })
+  })
+
+  it('reports a plain close as a cancel with nothing to show', () => {
+    // Distinguishing this from the case above is the whole point: one
+    // deserves a red toast, the other is just someone closing a window.
+    expect(readSignupMessage(wrap('CANCEL'))).toEqual({
+      kind: 'cancel',
+      step: undefined,
+      errorMessage: undefined,
+    })
+  })
+
+  it.each([
+    ['a message from another sender', JSON.stringify({ type: 'SOMETHING_ELSE' })],
+    ['an unknown event', JSON.stringify({ type: 'WA_EMBEDDED_SIGNUP', event: 'PING' })],
+    ['non-JSON chatter', 'not json at all'],
+    ['a non-string payload', { type: 'WA_EMBEDDED_SIGNUP' }],
+  ])('ignores %s', (_label, payload) => {
+    expect(readSignupMessage(payload)).toBeNull()
   })
 })

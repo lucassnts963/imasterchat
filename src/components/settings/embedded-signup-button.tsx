@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { readSignupMessage } from '@/lib/whatsapp/embedded-signup';
 
 // ============================================================
 // Embedded Signup — the one-click WhatsApp connection.
@@ -31,6 +32,12 @@ import { Button } from '@/components/ui/button';
 interface SessionInfo {
   phoneNumberId?: string;
   wabaId?: string;
+}
+
+/** What Meta said when the dialog ended without handing us a code. */
+interface CancelInfo {
+  step?: string;
+  errorMessage?: string;
 }
 
 interface EmbeddedSignupButtonProps {
@@ -68,6 +75,9 @@ export function EmbeddedSignupButton({
   // A ref (not state) because the callback closes over it and must see
   // the value the listener wrote moments earlier, not a stale render.
   const sessionInfo = useRef<SessionInfo>({});
+  // Same reason as sessionInfo: written by the listener, read by the
+  // FB.login callback moments later.
+  const cancelInfo = useRef<CancelInfo>({});
 
   // Load the Facebook JS SDK once. Deliberately not a next/script tag:
   // this component only renders when the deployment is configured as a
@@ -155,6 +165,7 @@ export function EmbeddedSignupButton({
   const launch = useCallback(() => {
     if (!window.FB) return;
     sessionInfo.current = {};
+    cancelInfo.current = {};
 
     const onMessage = (event: MessageEvent) => {
       // Origin check first — this listener is open to the whole page
@@ -165,18 +176,24 @@ export function EmbeddedSignupButton({
       ) {
         return;
       }
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type !== 'WA_EMBEDDED_SIGNUP') return;
-        if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA') {
-          sessionInfo.current = {
-            phoneNumberId: data.data?.phone_number_id,
-            wabaId: data.data?.waba_id,
-          };
-        }
-      } catch {
-        // Not our JSON payload — Facebook posts other messages too.
+      const message = readSignupMessage(event.data);
+      if (!message) return;
+
+      if (message.kind === 'finish') {
+        sessionInfo.current = {
+          phoneNumberId: message.phoneNumberId,
+          wabaId: message.wabaId,
+        };
+        return;
       }
+
+      // Meta's own dialog refused — a restricted business portfolio, an
+      // ineligible number. FB.login then calls back with no code, which
+      // is indistinguishable from "the user closed the window" unless we
+      // keep what was said here. Without this the screen stayed silent
+      // and the only way to see the reason was a photo of the popup.
+      cancelInfo.current = { step: message.step, errorMessage: message.errorMessage };
+      console.error('[embedded signup] Meta ended the dialog without a code:', message);
     };
 
     window.addEventListener('message', onMessage);
@@ -186,8 +203,14 @@ export function EmbeddedSignupButton({
         window.removeEventListener('message', onMessage);
         const code = response?.authResponse?.code;
         if (!code) {
-          // User closed the popup or declined — not an error worth a
-          // red toast.
+          const { step, errorMessage } = cancelInfo.current;
+          if (errorMessage) {
+            toast.error(t('errorFromMeta', { message: errorMessage }));
+          } else if (step) {
+            toast.error(t('errorCancelledAt', { step }));
+          }
+          // No cancel payload at all means the user simply closed the
+          // popup or declined — not an error worth a red toast.
           return;
         }
         void finish(code);
@@ -216,7 +239,7 @@ export function EmbeddedSignupButton({
         },
       },
     );
-  }, [configId, finish]);
+  }, [configId, finish, t]);
 
   return (
     <div className="space-y-2">
