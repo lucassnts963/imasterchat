@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
 import { readSignupMessage } from '@/lib/whatsapp/embedded-signup';
 
 // ============================================================
@@ -246,11 +247,14 @@ export function EmbeddedSignupButton({
       <Button onClick={launch} disabled={!sdkReady || connecting}>
         {connecting ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
             {t('connecting')}
           </>
         ) : (
-          t('cta')
+          <>
+            <WhatsAppIcon className="h-4 w-4" />
+            {t('cta')}
+          </>
         )}
       </Button>
       <p className="text-xs text-muted-foreground">{t('hint')}</p>

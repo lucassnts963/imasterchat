@@ -1561,9 +1561,9 @@
         "webhookCopied": "Webhook URL이 클립보드에 복사되었습니다"
       },
       "embeddedSignup": {
-        "cta": "Facebook으로 연결",
+        "cta": "WhatsApp 연결",
         "connecting": "연결 중…",
-        "hint": "비즈니스를 관리하는 Facebook 계정으로 로그인하세요. WhatsApp 설정은 저희가 처리합니다 — 토큰을 복사할 필요가 없습니다.",
+        "hint": "Facebook 창이 열립니다 — Meta는 그곳에서 연결을 승인합니다. 비즈니스를 관리하는 계정으로 로그인하세요. 휴대폰의 WhatsApp Business 앱은 같은 번호와 기록으로 계속 작동합니다.",
         "connected": "WhatsApp이 연결되었습니다.",
         "connectedTo": "{name}에 연결되었습니다.",
         "connectedNoInbound": "연결되었지만 Meta가 아직 수신 전달을 확인하지 않았습니다. 아래 등록 상태를 확인하세요.",

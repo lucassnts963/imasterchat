@@ -1561,9 +1561,9 @@
         "webhookCopied": "Webhook URL copied to clipboard"
       },
       "embeddedSignup": {
-        "cta": "Connect with Facebook",
+        "cta": "Connect WhatsApp",
         "connecting": "Connecting…",
-        "hint": "Sign in with the Facebook account that manages your business. We set up WhatsApp for you — no tokens to copy.",
+        "hint": "Opens a Facebook window — that is how Meta authorises the connection. Sign in with the account that manages your business. Your WhatsApp Business app keeps working on the phone, same number and same history.",
         "connected": "WhatsApp connected.",
         "connectedTo": "Connected to {name}.",
         "connectedNoInbound": "Connected, but Meta has not confirmed inbound delivery yet. Check the registration status below.",
