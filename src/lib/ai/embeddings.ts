@@ -18,7 +18,7 @@ import { providerHttpError, toNetworkError } from './providers/shared'
 /**
  * The dimension the knowledge base is built for. Matches the
  * `vector(1024)` column and the casts inside
- * `match_ai_knowledge_semantic` (migration 038) — changing it here
+ * `match_ai_knowledge_semantic` (migration 074) — changing it here
  * without changing those is a runtime failure, so they move together.
  *
  * 1024 because that is where the good open multilingual models sit

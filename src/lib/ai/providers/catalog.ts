@@ -109,7 +109,7 @@ export const PROVIDERS: readonly ProviderPreset[] = [
     embeddings: {
       baseUrl: 'https://openrouter.ai/api/v1',
       // Natively 1024-dimensional and explicitly multilingual, which is
-      // what the knowledge base is sized for (migration 038).
+      // what the knowledge base is sized for (migration 074).
       defaultModel: 'baai/bge-m3',
     },
   },

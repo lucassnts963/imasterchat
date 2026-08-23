@@ -1,5 +1,5 @@
 -- ============================================================
--- 038_embeddings_1024.sql — retarget the knowledge base to 1024 dims
+-- 074_embeddings_1024.sql — retarget the knowledge base to 1024 dims
 --
 -- Migration 030 sized the vector column for OpenAI's
 -- text-embedding-3-small (1536). That number, hard-coded in three

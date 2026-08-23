@@ -1,5 +1,5 @@
 -- ============================================================
--- 037_ai_open_providers.sql — provider becomes open vocabulary
+-- 073_ai_open_providers.sql — provider becomes open vocabulary
 --
 -- Migration 029 pinned `provider` to ('openai', 'anthropic') with a
 -- CHECK, and 033 repeated the same CHECK on the usage log. That made
@@ -64,4 +64,4 @@ COMMENT ON COLUMN ai_configs.base_url IS
 COMMENT ON COLUMN ai_configs.embeddings_base_url IS
   'Embeddings endpoint origin. Independent of the chat provider — Anthropic and DeepSeek have no embeddings endpoint, so those accounts point this elsewhere.';
 COMMENT ON COLUMN ai_configs.embeddings_model IS
-  'Embeddings model id. Must return vectors of the dimension the knowledge base is built for (see migration 038); the config route rejects a mismatch at save time.';
+  'Embeddings model id. Must return vectors of the dimension the knowledge base is built for (see migration 074); the config route rejects a mismatch at save time.';
