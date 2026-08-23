@@ -124,7 +124,7 @@ describe('retrieveKnowledge', () => {
 describe('ingestDocument', () => {
   it('embeds chunks when a key is present', async () => {
     const { db, state } = makeDb()
-    await ingestDocument(db, 'acct', { apiKey: 'sk-x', baseUrl: 'https://emb.test/v1', model: 'bge' }, 'doc-1', 'hello world')
+    await ingestDocument(db, 'acct', { apiKey: 'sk-x', baseUrl: 'https://emb.test/v1', model: 'bge' }, { documentId: 'doc-1' }, 'hello world')
     expect(h.embedTexts).toHaveBeenCalledTimes(1)
     expect(state.deletedFor).toBe('doc-1')
     expect(state.inserted).toHaveLength(1)
@@ -134,14 +134,14 @@ describe('ingestDocument', () => {
 
   it('stores chunks without embeddings when there is no key', async () => {
     const { db, state } = makeDb()
-    await ingestDocument(db, 'acct', null, 'doc-1', 'hello world')
+    await ingestDocument(db, 'acct', null, { documentId: 'doc-1' }, 'hello world')
     expect(h.embedTexts).not.toHaveBeenCalled()
     expect(state.inserted![0].embedding).toBeNull()
   })
 
   it('deletes existing chunks and inserts nothing for empty content', async () => {
     const { db, state } = makeDb()
-    await ingestDocument(db, 'acct', { apiKey: 'sk-x', baseUrl: 'https://emb.test/v1', model: 'bge' }, 'doc-1', '   ')
+    await ingestDocument(db, 'acct', { apiKey: 'sk-x', baseUrl: 'https://emb.test/v1', model: 'bge' }, { documentId: 'doc-1' }, '   ')
     expect(state.deletedFor).toBe('doc-1')
     expect(state.inserted).toBeNull()
     expect(h.embedTexts).not.toHaveBeenCalled()
@@ -151,7 +151,7 @@ describe('ingestDocument', () => {
     const { db, state } = makeDb()
     h.embedTexts.mockRejectedValueOnce(new Error('rate limited'))
     await expect(
-      ingestDocument(db, 'acct', { apiKey: 'sk-x', baseUrl: 'https://emb.test/v1', model: 'bge' }, 'doc-1', 'hello world'),
+      ingestDocument(db, 'acct', { apiKey: 'sk-x', baseUrl: 'https://emb.test/v1', model: 'bge' }, { documentId: 'doc-1' }, 'hello world'),
     ).rejects.toThrow('rate limited')
     // Chunks were inserted (lexical search works) despite the embed failure…
     expect(state.inserted).toHaveLength(1)

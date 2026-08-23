@@ -1,4 +1,10 @@
 import { NextResponse, after } from 'next/server'
+import {
+  claimWebhookEvents,
+  enqueueWebhookEvents,
+  markProcessed,
+  releaseWithError,
+} from '@/lib/webhooks/inbound-queue'
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
@@ -8,11 +14,20 @@ import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import {
+  handleInboundAudio,
+  type InboundAudioOutcome,
+} from '@/lib/audio/inbound'
+import { applyAudioSideEffect } from '@/lib/audio/side-effect'
+import { isReopening, reopenPatch } from '@/lib/conversations/reopen'
+import { previewText, sendPushToAccount } from '@/lib/push/send'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
+import { accountAllowsSideEffects } from '@/lib/billing/side-effects'
 import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
 } from '@/lib/whatsapp/template-webhook'
+import { recordEvent } from '@/lib/observability/events'
 
 // The `after()` callback in POST runs within this route's max duration.
 // Inbound processing can fan out to per-media Meta verification calls, so
@@ -190,6 +205,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
+  // GRAVA ANTES DE CONFIRMAR.
+  //
+  // O `after()` abaixo continua existindo e continua fazendo o trabalho
+  // na mesma requisição — a latência não muda. O que mudou é de onde vem
+  // a durabilidade: a linha já está no banco quando o 200 sai, então um
+  // container que morra no meio do processamento não leva a mensagem
+  // junto. E ela não voltaria: o 200 já foi dado, e a Meta não reentrega
+  // o que confirmamos.
+  //
+  // Se a gravação falhar, NÃO respondemos 200. Um 500 faz a Meta
+  // reentregar (por até 7 dias), que é exatamente o que se quer quando
+  // não conseguimos guardar — e é o oposto do que fazíamos antes, quando
+  // um banco fora do ar virava mensagem perdida em silêncio.
+  let enqueued = { queued: 0, total: 0 }
+  try {
+    enqueued = await enqueueWebhookEvents(supabaseAdmin(), body)
+  } catch (err) {
+    console.error('[webhook] falha ao enfileirar — devolvendo 500 para a Meta reentregar:', err)
+    return NextResponse.json({ error: 'queue unavailable' }, { status: 500 })
+  }
+
+  // Nada enfileirável (evento de template, ou um tipo que não tratamos):
+  // segue pelo caminho direto de sempre.
+  if (enqueued.total === 0) {
+    after(async () => {
+      try {
+        await processWebhook(body)
+      } catch (error) {
+        console.error('Error processing webhook:', error)
+      }
+    })
+    return NextResponse.json({ status: 'received' }, { status: 200 })
+  }
+
   // Process AFTER the response so we ack Meta within their ~20s timeout
   // (a slow ack triggers Meta retries + duplicate inserts), while still
   // guaranteeing the work runs to completion.
@@ -206,13 +255,63 @@ export async function POST(request: Request) {
   // maxDuration).
   after(async () => {
     try {
-      await processWebhook(body)
+      await drainWebhookEvents()
     } catch (error) {
-      console.error('Error processing webhook:', error)
+      console.error('Error draining webhook queue:', error)
     }
   })
 
   return NextResponse.json({ status: 'received' }, { status: 200 })
+}
+
+/**
+ * Drena a fila: pega o que falta e manda para o MESMO processador de
+ * sempre, reconstruindo a forma que ele espera.
+ *
+ * Serial de propósito. Em paralelo, duas mensagens da mesma conversa
+ * entram fora de ordem — o que bagunça a tela e o contexto que o agente
+ * lê. A ordem é por `received_at`, que é a ordem em que a Meta entregou.
+ *
+ * Exportada para o cron chamar: ele é a rede para o que ficou para trás
+ * quando uma execução morreu no meio.
+ */
+export async function drainWebhookEvents(limit = 200): Promise<{
+  processed: number
+  failed: number
+}> {
+  const db = supabaseAdmin()
+  const events = await claimWebhookEvents(db, limit)
+  let processed = 0
+  let failed = 0
+
+  for (const event of events) {
+    try {
+      await processWebhook({
+        entry: [
+          {
+            id: '',
+            changes: [
+              {
+                field: event.kind,
+                value: event.payload as WhatsAppWebhookEntry['changes'][number]['value'],
+              },
+            ],
+          },
+        ],
+      })
+      await markProcessed(db, event.id)
+      processed++
+    } catch (err) {
+      failed++
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`[webhook] evento ${event.id} falhou (tentativa ${event.attempts}):`, message)
+      // Solta para outro dreno tentar. Não some da fila — e é a
+      // profundidade da fila que a ronda de saúde vigia.
+      await releaseWithError(db, event.id, message)
+    }
+  }
+
+  return { processed, failed }
 }
 
 async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
@@ -267,11 +366,36 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       }
 
       if (!configRows || configRows.length === 0) {
-        console.error('No config found for phone_number_id:', phoneNumberId)
+        // O cliente reconfigura o número na Meta, o phone_number_id
+        // muda, e 100% das mensagens passam a entrar e ser
+        // descartadas. Sem conta a que atribuir — é por isso que
+        // `account_id` do evento é nulável.
+        await recordEvent({
+          accountId: null,
+          source: 'whatsapp',
+          code: 'unknown_phone_number_id',
+          severity: 'critical',
+          message:
+            'Chegou mensagem para um phone_number_id que não pertence a nenhuma conta — a mensagem foi descartada.',
+          context: { phoneNumberId },
+        })
         continue
       }
 
       if (configRows.length > 1) {
+        await recordEvent({
+          accountId: configRows[0].account_id,
+          source: 'whatsapp',
+          code: 'duplicate_phone_number_id',
+          severity: 'critical',
+          message: `${configRows.length} contas reivindicam o mesmo phone_number_id — a mensagem foi descartada.`,
+          context: {
+            phoneNumberId,
+            accounts: configRows
+              .map((r: { account_id: string }) => r.account_id)
+              .join(', '),
+          },
+        })
         console.error(
           `Multiple configs (${configRows.length}) found for phone_number_id:`,
           phoneNumberId,
@@ -666,11 +790,33 @@ async function processMessage(
     .eq('sender_type', 'customer')
   const isFirstInboundMessage = (priorCustomerMsgCount ?? 0) === 0
 
+  // Áudio: decidir ANTES do insert.
+  //
+  // Quando a política é transcrever, o texto vira o `content_text` desta
+  // linha, e o áudio deixa de ser caso especial em todo o resto —
+  // contexto, keyword_match, guardrails e agendamento passam a
+  // funcionar sem nenhuma alteração. Fazer isso num update depois daria
+  // o mesmo banco e um produto pior: a automação já teria disparado com
+  // string vazia.
+  let audioOutcome: InboundAudioOutcome | null = null
+  let effectiveText = contentText
+  if (message.type === 'audio' && message.audio?.id) {
+    audioOutcome = await handleInboundAudio({
+      db: supabaseAdmin(),
+      accountId,
+      mediaId: message.audio.id,
+      accessToken,
+    })
+    if (audioOutcome.action.action === 'text') {
+      effectiveText = audioOutcome.action.text
+    }
+  }
+
   const { error: msgError } = await supabaseAdmin().from('messages').insert({
     conversation_id: conversation.id,
     sender_type: 'customer',
     content_type: contentType,
-    content_text: contentText,
+    content_text: effectiveText,
     media_url: mediaUrl,
     message_id: message.id,
     status: 'delivered',
@@ -688,6 +834,13 @@ async function processMessage(
   }
 
   // Update conversation
+  //
+  // O `reopenPatch` entra no MESMO update, e não num segundo: o
+  // auto-reply roda depois, no `after()`, e relê a conversa do banco.
+  // Em dois updates haveria uma janela em que ele leria o dono antigo e
+  // desistiria de responder — a thread reabriria calada, que é
+  // exatamente o sintoma que isto conserta.
+  const reopening = isReopening(conversation.status)
   const { error: convError } = await supabaseAdmin()
     .from('conversations')
     .update({
@@ -695,17 +848,48 @@ async function processMessage(
       last_message_at: new Date().toISOString(),
       unread_count: (conversation.unread_count || 0) + 1,
       updated_at: new Date().toISOString(),
+      ...reopenPatch(conversation.status),
     })
     .eq('id', conversation.id)
 
   if (convError) {
     console.error('Error updating conversation:', convError)
+  } else if (reopening) {
+    // Um assinante externo que só ouvia `conversation.created` nunca
+    // ficava sabendo que uma thread adormecida voltou à vida.
+    await dispatchWebhookEvent(supabaseAdmin(), accountId, 'conversation.reopened', {
+      conversation_id: conversation.id,
+      contact_id: contactRecord.id,
+    })
   }
 
   // If this contact was a recent broadcast recipient, flag the reply
   // so the broadcast's `replied_count` advances (via the aggregate
   // trigger installed in migration 003).
   await flagBroadcastReplyIfAny(accountId, contactRecord.id)
+
+  // ============================================================
+  // Manual-billing gate (migration 037).
+  //
+  // Everything above this line has already run: the contact,
+  // conversation, and message rows are persisted for gated accounts
+  // too, so approving or unblocking one restores a complete history.
+  // What follows is the paid surface — flows, automations, and AI
+  // auto-replies, all of which SEND WhatsApp messages on the
+  // operator's behalf — and that stops for `pending` / `blocked`
+  // accounts. The lookup fails open (see accountAllowsSideEffects).
+  //
+  // The public-API webhook dispatch further down is deliberately NOT
+  // gated: it notifies the operator's own endpoint and messages
+  // nobody, so silencing it would just create an unexplained gap in
+  // their event stream.
+  // ============================================================
+  const sideEffectsAllowed = await accountAllowsSideEffects(accountId)
+  if (!sideEffectsAllowed) {
+    console.warn(
+      `[billing] account ${accountId} is gated — inbound stored, side effects skipped`,
+    )
+  }
 
   // ============================================================
   // Flow runner dispatch.
@@ -726,7 +910,9 @@ async function processMessage(
   // no active flows take the runner's early-exit "no_match" path
   // basically for free (one indexed SELECT for the active run).
   // ============================================================
-  const flowResult = await dispatchInboundToFlows({
+  const flowResult = !sideEffectsAllowed
+    ? { consumed: false }
+    : await dispatchInboundToFlows({
     accountId,
     userId: configOwnerUserId,
     contactId: contactRecord.id,
@@ -745,7 +931,7 @@ async function processMessage(
             meta_message_id: message.id,
           },
     isFirstInboundMessage,
-  })
+      })
   const flowConsumed = flowResult.consumed
 
   // Fire any automations that react to this webhook event. All dispatches
@@ -753,7 +939,7 @@ async function processMessage(
   // message all exist before any step — including send_message — runs.
   // Fire-and-forget: a slow or failing automation must not block the
   // webhook's 200 OK response to Meta.
-  const inboundText = contentText ?? message.text?.body ?? ''
+  const inboundText = effectiveText ?? message.text?.body ?? ''
   const automationTriggers: (
     | 'new_contact_created'
     | 'first_inbound_message'
@@ -789,7 +975,7 @@ async function processMessage(
   // logging zero steps. `runAutomationsForTrigger` owns its own try/catch
   // and never throws; the `.catch` is belt-and-braces so one trigger
   // type's failure can't skip the rest of the loop.
-  for (const triggerType of automationTriggers) {
+  for (const triggerType of sideEffectsAllowed ? automationTriggers : []) {
     await runAutomationsForTrigger({
       accountId,
       triggerType,
@@ -804,12 +990,54 @@ async function processMessage(
     }).catch((err) => console.error('[automations] dispatch failed:', err))
   }
 
+  // Push for a new inbound message, to whoever asked for every one.
+  // Sent BEFORE the auto-reply runs, not after: the point is reaching
+  // someone whose app is closed, and the agent loop can take tens of
+  // seconds. Anyone on 'human_needed' hears nothing here — they are
+  // reached by the handoff, if it comes.
+  //
+  // Fire-and-forget; `sendPushToAccount` never throws and must not
+  // delay the 200 owed to Meta.
+  if (sideEffectsAllowed && inboundText.trim()) {
+    void sendPushToAccount(supabaseAdmin(), {
+      accountId,
+      urgency: 'all',
+      payload: {
+        title: contactRecord.name?.trim() || contactRecord.phone,
+        body: previewText(inboundText),
+        url: `/inbox?c=${conversation.id}`,
+        // One notification per conversation that updates in place — a
+        // customer sending five lines should not produce five alerts
+        // to dismiss.
+        tag: `msg:${conversation.id}`,
+      },
+    })
+  }
+
+  // As políticas de áudio que FALAM com o cliente. Depois do insert e
+  // da conversa atualizada, pelo mesmo motivo do aviso de transferência:
+  // não prometer nada sobre um estado que ainda não existe.
+  if (audioOutcome && sideEffectsAllowed) {
+    await applyAudioSideEffect({
+      action: audioOutcome.action,
+      accountId,
+      conversationId: conversation.id,
+      contactId: contactRecord.id,
+      configOwnerUserId,
+    })
+  }
+
   // AI auto-reply. Runs only for plain-text inbound the deterministic
   // flow runner did NOT consume (flows win over the LLM), and only when
   // the account has enabled it. Awaited inside `after()` (same reason as
   // the webhook dispatch below); `dispatchInboundToAiReply` owns its
   // eligibility gates + try/catch and never throws.
-  if (!flowConsumed && !interactiveReplyId && inboundText.trim()) {
+  if (
+    sideEffectsAllowed &&
+    !flowConsumed &&
+    !interactiveReplyId &&
+    inboundText.trim()
+  ) {
     await dispatchInboundToAiReply({
       accountId,
       conversationId: conversation.id,

@@ -6,6 +6,7 @@ import {
 } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
+import { isAudioPolicy } from '@/lib/audio/policy'
 import { validateAiCredentials } from '@/lib/ai/validate'
 import { validateEmbeddingsTarget } from '@/lib/ai/embeddings'
 import { AiError } from '@/lib/ai/types'
@@ -25,6 +26,14 @@ function bad(message: string) {
  * whether AI is set up. The encrypted key is NEVER returned — only a
  * `has_key` flag; the settings form shows a masked placeholder.
  */
+/** Inteiro dentro de um intervalo, com queda para o padrão. Espelha os
+ *  CHECK do banco para o app não mandar o que o banco recusaria. */
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, Math.floor(n)))
+}
+
 export async function GET() {
   try {
     const { supabase, accountId } = await getCurrentAccount()
@@ -34,7 +43,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key, embeddings_base_url, embeddings_model',
+        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, embeddings_base_url, embeddings_model, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, audio_notice_text, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -50,11 +59,12 @@ export async function GET() {
     if (!data) return NextResponse.json({ configured: false })
     // The keys are selected only to derive the has_* flags; neither is
     // returned to the client.
-    const { api_key, embeddings_api_key, ...safe } = data
+    const { api_key, embeddings_api_key, elevenlabs_api_key, ...safe } = data
     return NextResponse.json({
       configured: true,
       has_key: !!api_key,
       has_embeddings_key: !!embeddings_api_key,
+      has_elevenlabs_key: !!elevenlabs_api_key,
       ...safe,
     })
   } catch (err) {
@@ -95,6 +105,22 @@ export async function POST(request: Request) {
         : null
     const isActive = body.is_active === true
     const autoReplyEnabled = body.auto_reply_enabled === true
+    // `!== false` e não `=== true`: a coluna nasce ligada, e um PUT
+    // parcial que não mande o campo não pode desligá-la por omissão.
+    const contextTimestamps = body.context_timestamps !== false
+    // `=== true` aqui, ao contrário do timestamps: a coluna nasce
+    // DESLIGADA, e um PUT parcial não pode ligar sozinho algo que faz o
+    // bot falar com o cliente.
+    const handoffNoticeEnabled = body.handoff_notice_enabled === true
+    // Limites espelham o CHECK da 059. `readInt` fora do intervalo cai
+    // no padrão em vez de 400: é um número de ajuste fino, e recusar o
+    // salvo inteiro por causa dele seria desproporcional.
+    const newSessionHours = clampInt(body.new_session_hours, 1, 168, 8)
+    const handoffNoticeText =
+      typeof body.handoff_notice_text === 'string' &&
+      body.handoff_notice_text.trim()
+        ? body.handoff_notice_text.trim().slice(0, 300)
+        : null
 
     let maxPer = Number(body.auto_reply_max_per_conversation)
     if (!Number.isFinite(maxPer)) maxPer = 3
@@ -117,6 +143,20 @@ export async function POST(request: Request) {
         .maybeSingle()
       if (!member) return bad('handoff_agent_id must be a member of this account')
       handoffAgentId = rawHandoff
+    }
+
+    // Monthly AI budget in USD (migration 040): a positive number sets
+    // it, an explicit null clears it, absent leaves it unchanged — the
+    // same partial-save contract as handoff_agent_id.
+    const budgetProvided = 'monthly_budget_usd' in body
+    let monthlyBudgetUsd: number | null = null
+    if (budgetProvided && body.monthly_budget_usd !== null) {
+      const rawBudget = Number(body.monthly_budget_usd)
+      if (!Number.isFinite(rawBudget) || rawBudget <= 0) {
+        return bad('monthly_budget_usd must be a positive number or null')
+      }
+      // numeric(10,2) column — round to cents and stay inside precision.
+      monthlyBudgetUsd = Math.min(99_999_999, Math.round(rawBudget * 100) / 100)
     }
 
     const rawKey = typeof body.api_key === 'string' ? body.api_key.trim() : ''
@@ -240,11 +280,16 @@ export async function POST(request: Request) {
       system_prompt: systemPrompt,
       is_active: isActive,
       auto_reply_enabled: autoReplyEnabled,
+      context_timestamps: contextTimestamps,
+      handoff_notice_enabled: handoffNoticeEnabled,
+      handoff_notice_text: handoffNoticeText,
+      new_session_hours: newSessionHours,
       auto_reply_max_per_conversation: maxPer,
     }
     // Only touch the handoff target when the form actually sent the field,
     // so a partial save (e.g. flipping a toggle) doesn't wipe it.
     if (handoffProvided) shared.handoff_agent_id = handoffAgentId
+    if (budgetProvided) shared.monthly_budget_usd = monthlyBudgetUsd
     if (rawEmbeddingsKey) {
       shared.embeddings_api_key = encrypt(rawEmbeddingsKey)
       shared.embeddings_base_url = embeddingsBaseUrl
@@ -295,6 +340,97 @@ export async function POST(request: Request) {
  * Removes the account's AI config (turns everything off and forgets the
  * key). Also used to recover from a corrupted encrypted key.
  */
+// ============================================================
+// PATCH — muda só o que veio
+//
+// O POST acima exige `provider`, `model` e trata `api_key` ausente como
+// "apagar", porque ele é o formulário inteiro de configuração. Uma tela
+// que quer mexer em UM número não pode passar por ele: teria que
+// reenviar tudo, e a chave nem volta no GET — reenviá-la vazia a
+// apagaria.
+//
+// Daí o PATCH. Campo ausente é campo intocado, e nada aqui toca em
+// credencial.
+// ============================================================
+export async function PATCH(request: Request) {
+  try {
+    const { supabase, accountId } = await requireRole('admin')
+    const body = (await request.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null
+    if (!body || typeof body !== 'object') return bad('Invalid request body')
+
+    const patch: Record<string, unknown> = {}
+    if ('new_session_hours' in body) {
+      patch.new_session_hours = clampInt(body.new_session_hours, 1, 168, 8)
+    }
+    if ('audio_policy' in body && isAudioPolicy(body.audio_policy)) {
+      patch.audio_policy = body.audio_policy
+    }
+    if ('audio_transcription_provider' in body) {
+      patch.audio_transcription_provider =
+        body.audio_transcription_provider === 'elevenlabs' ? 'elevenlabs' : 'local'
+    }
+    if ('audio_notice_text' in body) {
+      patch.audio_notice_text =
+        typeof body.audio_notice_text === 'string' && body.audio_notice_text.trim()
+          ? body.audio_notice_text.trim().slice(0, 300)
+          : null
+    }
+    if ('transcription_vocabulary' in body) {
+      patch.transcription_vocabulary =
+        typeof body.transcription_vocabulary === 'string' &&
+        body.transcription_vocabulary.trim()
+          ? body.transcription_vocabulary.trim().slice(0, 500)
+          : null
+    }
+    if ('elevenlabs_api_key' in body) {
+      // Cifrada como as outras chaves. String vazia apaga; ausente não
+      // mexe — senão salvar a política de áudio apagaria a chave.
+      const raw =
+        typeof body.elevenlabs_api_key === 'string'
+          ? body.elevenlabs_api_key.trim()
+          : ''
+      patch.elevenlabs_api_key = raw ? encrypt(raw) : null
+    }
+    if ('context_message_limit' in body) {
+      // Nulo é escolha válida aqui, e não ausência: significa "volte a
+      // usar o que o servidor manda". Por isso não passa pelo clamp.
+      patch.context_message_limit =
+        body.context_message_limit === null
+          ? null
+          : clampInt(body.context_message_limit, 4, 60, 20)
+    }
+    if ('context_timestamps' in body) {
+      patch.context_timestamps = body.context_timestamps !== false
+    }
+    if ('handoff_notice_enabled' in body) {
+      patch.handoff_notice_enabled = body.handoff_notice_enabled === true
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return bad('Nothing to update')
+    }
+
+    const { error } = await supabase
+      .from('ai_configs')
+      .update(patch)
+      .eq('account_id', accountId)
+
+    if (error) {
+      console.error('[ai/config PATCH] error:', error)
+      return NextResponse.json(
+        { error: 'Failed to update AI configuration' },
+        { status: 500 },
+      )
+    }
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    return toErrorResponse(err)
+  }
+}
+
 export async function DELETE() {
   try {
     const { supabase, accountId } = await requireRole('admin')

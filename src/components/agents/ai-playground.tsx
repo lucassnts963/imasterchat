@@ -1,19 +1,46 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Bot, RotateCcw, Send, Loader2, UserCircle2, ArrowRight } from 'lucide-react';
+import {
+  Bot,
+  RotateCcw,
+  Send,
+  Loader2,
+  UserCircle2,
+  ArrowRight,
+  Wrench,
+  AlertTriangle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+
+/** One tool the agent ran while producing a turn. */
+interface Step {
+  tool: string;
+  arguments: Record<string, unknown>;
+  result: string;
+  is_error: boolean;
+  duration_ms: number;
+}
 
 interface Turn {
   role: 'user' | 'assistant';
   content: string;
   /** assistant-only: the agent signalled a human handoff on this turn. */
   handoff?: boolean;
+  /**
+   * assistant-only: what the agent DID before answering. Rendering it
+   * is what makes this a harness rather than a demo — the booking
+   * dialogue gets tuned here, against the same code path production
+   * runs, instead of against a real customer.
+   */
+  steps?: Step[];
 }
 
 export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
+  const t = useTranslations('Agents.playground');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -43,9 +70,9 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (data.code === 'ai_not_configured') {
-          toast.error('No agent configured yet — finish Setup first.');
+          toast.error(t('notConfiguredError'));
         } else {
-          toast.error(data.error ?? "Couldn't get a reply.");
+          toast.error(data.error ?? t('noReplyError'));
         }
         // Roll the unsent user turn back so the transcript stays clean.
         setTurns(turns);
@@ -61,10 +88,11 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
               ? data.reply
               : '',
           handoff: Boolean(data.handoff),
+          steps: Array.isArray(data.steps) ? (data.steps as Step[]) : undefined,
         },
       ]);
     } catch {
-      toast.error("Couldn't reach the agent.");
+      toast.error(t('unreachableError'));
       setTurns(turns);
       setInput(text);
     } finally {
@@ -85,9 +113,9 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <Bot className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-foreground">Playground</span>
+          <span className="text-sm font-medium text-foreground">{t('title')}</span>
           <span className="text-xs text-muted-foreground">
-            — test replies as if you were a customer
+            {t('subtitle')}
           </span>
         </div>
         <Button
@@ -97,7 +125,7 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
           disabled={turns.length === 0 || sending}
           className="text-muted-foreground"
         >
-          <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reset
+          <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> {t('reset')}
         </Button>
       </div>
 
@@ -106,10 +134,9 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
         {turns.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center text-sm text-muted-foreground">
             <Bot className="mb-2 h-8 w-8 text-muted-foreground/60" />
-            <p>Send a message to see how your agent would reply.</p>
+            <p>{t('emptyTitle')}</p>
             <p className="mt-1 text-xs">
-              It uses your knowledge base and behaves exactly like the
-              auto-reply bot — including handoff.
+              {t('emptyHint')}
             </p>
             {onGoToSetup && (
               <Button
@@ -118,54 +145,95 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
                 onClick={onGoToSetup}
                 className="mt-1 h-auto p-0 text-xs"
               >
-                Not set up yet? Go to Setup <ArrowRight className="ml-1 h-3 w-3" />
+                {t('goToSetup')} <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             )}
           </div>
         )}
 
-        {turns.map((t, i) => (
-          <div
-            key={i}
-            className={cn(
-              'flex gap-2',
-              t.role === 'user' ? 'justify-end' : 'justify-start',
+        {turns.map((turn, i) => (
+          <div key={i} className="space-y-2">
+            {/* Tools ran before the answer, so they read above it. */}
+            {turn.role === 'assistant' && turn.steps && turn.steps.length > 0 && (
+              <div className="ml-7 space-y-1.5">
+                {turn.steps.map((step, s) => (
+                  <details
+                    key={s}
+                    className={cn(
+                      'rounded-lg border px-2.5 py-1.5 text-xs',
+                      step.is_error
+                        ? 'border-amber-500/40 bg-amber-500/5'
+                        : 'border-border bg-muted/40',
+                    )}
+                  >
+                    <summary className="flex cursor-pointer items-center gap-1.5 text-muted-foreground">
+                      {step.is_error ? (
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      ) : (
+                        <Wrench className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      )}
+                      <span className="font-mono text-foreground">{step.tool}</span>
+                      <span className="ml-auto tabular-nums">{step.duration_ms}ms</span>
+                    </summary>
+                    <div className="mt-1.5 space-y-1.5 border-t border-border/50 pt-1.5">
+                      <pre className="overflow-x-auto font-mono text-[11px] text-muted-foreground">
+                        {JSON.stringify(step.arguments, null, 2)}
+                      </pre>
+                      <p className="whitespace-pre-wrap text-foreground/80">
+                        {step.result}
+                      </p>
+                    </div>
+                  </details>
+                ))}
+              </div>
             )}
-          >
-            {t.role === 'assistant' && (
-              <Bot className="mt-1 h-5 w-5 shrink-0 text-primary" />
-            )}
+
             <div
               className={cn(
-                'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm',
-                t.role === 'user'
-                  ? 'rounded-br-sm bg-primary text-primary-foreground'
-                  : 'rounded-bl-sm bg-muted text-foreground',
+                'flex gap-2',
+                turn.role === 'user' ? 'justify-end' : 'justify-start',
               )}
             >
-              {t.content && <p className="whitespace-pre-wrap">{t.content}</p>}
-              {t.role === 'assistant' && t.handoff && (
-                <p
+              {turn.role === 'assistant' && (
+                <Bot className="mt-1 h-5 w-5 shrink-0 text-primary" />
+              )}
+              {/* A pure-handoff turn has no text; skip the empty bubble. */}
+              {(turn.content || turn.role === 'user' || turn.handoff) && (
+                <div
                   className={cn(
-                    'flex items-center gap-1 text-xs text-amber-500',
-                    t.content && 'mt-1.5 border-t border-border/50 pt-1.5',
+                    'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm',
+                    turn.role === 'user'
+                      ? 'rounded-br-sm bg-primary text-primary-foreground'
+                      : 'rounded-bl-sm bg-muted text-foreground',
                   )}
                 >
-                  <UserCircle2 className="h-3.5 w-3.5" />
-                  Would hand off to a human here
-                </p>
+                  {turn.content && (
+                    <p className="whitespace-pre-wrap">{turn.content}</p>
+                  )}
+                  {turn.role === 'assistant' && turn.handoff && (
+                    <p
+                      className={cn(
+                        'flex items-center gap-1 text-xs text-amber-500',
+                        turn.content && 'mt-1.5 border-t border-border/50 pt-1.5',
+                      )}
+                    >
+                      <UserCircle2 className="h-3.5 w-3.5" />
+                      {t('handoff')}
+                    </p>
+                  )}
+                </div>
+              )}
+              {turn.role === 'user' && (
+                <UserCircle2 className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
               )}
             </div>
-            {t.role === 'user' && (
-              <UserCircle2 className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
-            )}
           </div>
         ))}
 
         {sending && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Bot className="h-5 w-5 text-primary" />
-            <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
+            <Loader2 className="h-4 w-4 animate-spin" /> {t('thinking')}
           </div>
         )}
       </div>
@@ -176,7 +244,7 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type a customer message…"
+          placeholder={t('inputPlaceholder')}
           rows={1}
           className="flex-1 resize-none rounded-xl border border-border bg-muted px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50"
         />

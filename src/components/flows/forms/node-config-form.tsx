@@ -48,6 +48,20 @@ import {
 import { cn } from "@/lib/utils";
 import { uploadAccountMedia, MEDIA_MAX_BYTES } from "@/lib/storage/upload-media";
 import { slugify, type BuilderNode } from "../shared";
+
+/**
+ * O rótulo do valor escolhido.
+ *
+ * `<SelectValue />` do Base UI imprime o VALOR cru quando não recebe
+ * função de formatação nem `items` na raiz — então o gatilho mostrava
+ * "contact_field" onde deveria estar "Campo do contato". Um mapa por
+ * select resolve sem duplicar os rótulos em outro lugar.
+ */
+function labelOf(
+  map: Record<string, string>,
+): (value: unknown) => string {
+  return (value) => map[String(value ?? '')] ?? String(value ?? '')
+}
 import { NextNodeRow, NodeKeySelect, TextRow } from "./fields";
 
 interface NodeConfigFormProps {
@@ -634,7 +648,13 @@ function ConditionForm({
             }
           >
             <SelectTrigger className="bg-muted">
-              <SelectValue />
+              <SelectValue>
+                {labelOf({
+                  var: t("capturedVariable"),
+                  tag: t("contactHasTag"),
+                  contact_field: t("contactField"),
+                })}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="var">{t("capturedVariable")}</SelectItem>
@@ -710,7 +730,14 @@ function ConditionForm({
             }
           >
             <SelectTrigger className="bg-muted">
-              <SelectValue />
+              <SelectValue>
+                {labelOf({
+                  present: t("isPresent"),
+                  absent: t("isAbsent"),
+                  equals: t("equals"),
+                  contains: t("contains"),
+                })}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="present">{t("isPresent")}</SelectItem>
@@ -789,7 +816,9 @@ function SetTagForm({
             }
           >
             <SelectTrigger className="bg-muted">
-              <SelectValue />
+              <SelectValue>
+                {labelOf({ add: t("addTag"), remove: t("removeTag") })}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="add">{t("addTag")}</SelectItem>
@@ -961,7 +990,13 @@ function SendMediaForm({
           }}
         >
           <SelectTrigger className="bg-muted">
-            <SelectValue />
+            <SelectValue>
+              {labelOf({
+                image: t("imageLabel"),
+                video: t("videoLabel"),
+                document: t("documentLabel"),
+              })}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="image">{t("imageLabel")}</SelectItem>

@@ -121,6 +121,14 @@ export interface Tag {
   name: string;
   color: string;
   created_at: string;
+  /**
+   * O agente pode aplicar esta etiqueta? (migração 067, padrão false)
+   *
+   * Só as marcadas entram no enum da ferramenta `add_tag`. É a defesa
+   * contra injeção de prompt: quem escreve a mensagem que chega ao
+   * modelo é o cliente, no WhatsApp.
+   */
+  ai_selectable?: boolean;
 }
 
 export interface ContactTag {
@@ -170,6 +178,15 @@ export interface Conversation {
   updated_at: string;
   contact?: Contact;
   /**
+   * Em qual fila a conversa está (migração 065).
+   *
+   * Toda conversa está sempre em exatamente uma — o gatilho da 066 põe
+   * a fila padrão da conta nas que chegam sem. Fica opcional no tipo
+   * porque conta criada antes da 065 e não migrada pode não ter fila
+   * nenhuma, e a interface degrada para "sem fila" em vez de quebrar.
+   */
+  queue_id?: string | null;
+  /**
    * AI auto-reply state for this thread (migration 029 + 033):
    *  - `ai_autoreply_disabled` — the bot is paused here (a human took
    *    over, or the model handed off). Sticky until re-enabled.
@@ -199,8 +216,17 @@ export interface Notification {
   contact_id?: string;
   /** Who triggered it. Null when an automation/system assigned it. */
   actor_user_id?: string;
-  title: string;
-  body?: string;
+  /** Nome de quem atribuiu, congelado no momento do fato (055). Null
+   *  quando não foi uma pessoa. */
+  actor_name?: string | null;
+  /** Nome do contato, congelado no momento do fato (055). */
+  contact_name?: string | null;
+  /**
+   * LEGADO: frase pronta em inglês, escrita pelo gatilho até a 055.
+   * Linhas novas nascem nulas e a tela monta o texto traduzido.
+   */
+  title?: string | null;
+  body?: string | null;
   read_at?: string;
   created_at: string;
 }

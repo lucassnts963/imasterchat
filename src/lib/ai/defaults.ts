@@ -32,6 +32,8 @@ export const MAX_OUTPUT_TOKENS = 1024
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 const DEFAULT_CONTEXT_MESSAGE_LIMIT = 20
+const DEFAULT_AGENT_TIMEOUT_MS = 60_000
+const DEFAULT_MAX_TOOL_STEPS = 6
 
 /** Per-call provider timeout. Override with `AI_REQUEST_TIMEOUT_MS`. */
 export function aiRequestTimeoutMs(): number {
@@ -39,9 +41,54 @@ export function aiRequestTimeoutMs(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_REQUEST_TIMEOUT_MS
 }
 
-/** How many recent text messages to feed the model. Override with
- *  `AI_CONTEXT_MESSAGE_LIMIT`. */
-export function aiContextMessageLimit(): number {
+/**
+ * Wall-clock budget for a whole agent run — every provider call plus
+ * every tool execution. Separate from the per-call timeout because six
+ * healthy calls can still add up to a customer waiting far too long.
+ * Override with `AI_AGENT_TIMEOUT_MS`.
+ */
+export function agentTimeoutMs(): number {
+  const raw = Number(process.env.AI_AGENT_TIMEOUT_MS)
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_AGENT_TIMEOUT_MS
+}
+
+/**
+ * How many provider round-trips one reply may take before the loop
+ * gives up and hands off. Per account (`ai_configs.max_tool_steps`) —
+ * a booking dialogue needs more room than a FAQ bot. Falls back to the
+ * env override, then the default.
+ */
+export function maxToolSteps(config?: { maxToolSteps?: number | null }): number {
+  const fromConfig = config?.maxToolSteps
+  if (typeof fromConfig === 'number' && Number.isFinite(fromConfig) && fromConfig > 0) {
+    return Math.floor(fromConfig)
+  }
+  const raw = Number(process.env.AI_MAX_TOOL_STEPS)
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_MAX_TOOL_STEPS
+}
+
+/**
+ * Quantas mensagens recentes alimentam o modelo.
+ *
+ * Por conta (`ai_configs.context_message_limit`), com a variável de
+ * ambiente como piso do servidor e a constante como último recurso —
+ * exatamente a precedência de `maxToolSteps`, e de propósito: duas
+ * regras iguais são uma regra a menos para lembrar.
+ *
+ * É o tamanho do contexto, então é o custo de toda resposta. Uma ótica
+ * resolve em seis mensagens; uma consultoria precisa de quarenta.
+ */
+export function aiContextMessageLimit(config?: {
+  contextMessageLimit?: number | null
+}): number {
+  const fromConfig = config?.contextMessageLimit
+  if (
+    typeof fromConfig === 'number' &&
+    Number.isFinite(fromConfig) &&
+    fromConfig > 0
+  ) {
+    return Math.floor(fromConfig)
+  }
   const raw = Number(process.env.AI_CONTEXT_MESSAGE_LIMIT)
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_CONTEXT_MESSAGE_LIMIT
 }
@@ -58,8 +105,19 @@ export function buildSystemPrompt(args: {
   mode: 'draft' | 'auto_reply'
   /** Knowledge-base excerpts retrieved for the current question. */
   knowledge?: string[]
+  /** Facts about now and about who is on the other end — see
+   *  `buildEnvironment`. Goes in ahead of the business context so the
+   *  operator's own instructions can refer to it. */
+  environment?: string
+  /** Always-on sections from the account vault: the approved rules,
+   *  what is true right now, and what is known about this customer.
+   *  See `describeVaultContext`. */
+  vault?: string[]
+  /** Subjects the shop forbids the bot from handling. See
+   *  `describeGuardrails`. */
+  guardrails?: string | null
 }): string {
-  const { userPrompt, mode, knowledge } = args
+  const { userPrompt, mode, knowledge, environment, vault, guardrails } = args
   const parts: string[] = [
     'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
       'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
@@ -74,6 +132,17 @@ export function buildSystemPrompt(args: {
     parts.push(
       `You are replying automatically with no human in the loop. If you cannot confidently and safely help — the customer explicitly asks for a human, is upset or complaining, or the request needs information you do not have — reply with exactly ${HANDOFF_SENTINEL} and nothing else. A human agent will then take over. Prefer handing off over guessing.`,
     )
+  }
+
+  if (environment && environment.trim()) {
+    parts.push(`Current situation — facts, not instructions:\n${environment.trim()}`)
+  }
+
+  // The vault goes ahead of the operator's free-text prompt on purpose:
+  // its rules were curated and approved one by one, and the operator can
+  // still override them below if that is genuinely what they want.
+  if (vault && vault.length > 0) {
+    parts.push(...vault)
   }
 
   if (userPrompt && userPrompt.trim()) {
@@ -92,6 +161,14 @@ export function buildSystemPrompt(args: {
           .map((k, i) => `[${i + 1}] ${k}`)
           .join('\n\n---\n\n')}`,
     )
+  }
+
+  // Last, deliberately. These are the boundary, and the boundary should
+  // be the most recent thing the model read — after the operator's own
+  // instructions, after the knowledge base, after everything that might
+  // otherwise read as permission to answer just this once.
+  if (guardrails && guardrails.trim()) {
+    parts.push(guardrails.trim())
   }
 
   return parts.join('\n\n')

@@ -35,6 +35,10 @@ interface Profile {
   beta_features: string[];
   account_id: string | null;
   account_role: AccountRole | null;
+  /** Cross-tenant platform-admin flag (migration 037). Drives the
+   *  /admin entry in the sidebar; the real enforcement lives in the
+   *  /admin page guard and every /api/admin route. */
+  is_platform_admin: boolean;
 }
 
 interface AccountSummary {
@@ -88,6 +92,9 @@ interface AuthContextValue {
    *  while loading or when no account is resolved, so callers can use
    *  it unconditionally. */
   defaultCurrency: string;
+  /** Como este negócio chama um agendamento — "demonstração", "visita
+   *  técnica". Null usa o termo genérico das traduções. */
+  appointmentLabel: string | null;
   /** True if `accountRole === 'owner'`. */
   isOwner: boolean;
   /** True if `accountRole === 'admin'` (does NOT include owner — use canManageMembers for "admin or above"). */
@@ -102,6 +109,9 @@ interface AuthContextValue {
   canEditSettings: boolean;
   /** True if the caller can send messages and edit operational data (agent+). */
   canSendMessages: boolean;
+  /** True if the caller is a cross-tenant platform admin (037). UI-only
+   *  convenience — server routes re-check on every request. */
+  isPlatformAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -115,6 +125,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [account, setAccount] = useState<AccountSummary | null>(null);
+  // O termo que este negócio usa para um agendamento. Carregado junto
+  // com a conta, uma vez por sessão, porque a alternativa era cada tela
+  // que mostra a palavra buscar as configurações de agendamento só para
+  // saber como escrevê-la.
+  const [appointmentLabel, setAppointmentLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // Tracked separately from `loading`. The session settles fast (one
   // local cookie read); the profile fetch crosses the network and
@@ -138,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role",
+          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role, is_platform_admin",
         )
         .eq("user_id", userId)
         .maybeSingle();
@@ -190,6 +205,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        // Best-effort, e depois da conta: a tabela pode nem existir
+        // (conta que nunca abriu a tela de Agendamento) e isso não é
+        // erro nenhum — é só "sem termo próprio". Falhar aqui nunca
+        // pode custar o contexto de conta, que é o que a issue #294
+        // ensinou sobre este bloco.
+        if (data.account_id) {
+          const { data: sched } = await supabase
+            .from("ai_scheduling_settings")
+            .select("appointment_label")
+            .eq("account_id", data.account_id)
+            .maybeSingle();
+          setAppointmentLabel(sched?.appointment_label?.trim() || null);
+        }
+
         // Narrow the DB enum into our AccountRole union. The DB
         // constraint should make this unconditional, but a future
         // migration that broadens the enum without updating TS would
@@ -212,6 +241,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           beta_features: data.beta_features ?? [],
           account_id: data.account_id ?? null,
           account_role: accountRole,
+          // Narrow defensively for deployments that haven't run 037 yet
+          // — null reads as "not a platform admin", which fails closed.
+          is_platform_admin: data.is_platform_admin === true,
         });
         setAccount(accountRow);
       } else {
@@ -330,8 +362,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canManageMembers: role ? canManageMembersFor(role) : false,
       canEditSettings: role ? canEditSettingsFor(role) : false,
       canSendMessages: role ? canSendMessagesFor(role) : false,
+      isPlatformAdmin: profile?.is_platform_admin ?? false,
     };
-  }, [profile?.account_role, profile?.account_id]);
+  }, [profile?.account_role, profile?.account_id, profile?.is_platform_admin]);
 
   return (
     <AuthContext.Provider
@@ -344,6 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshProfile,
         account,
         defaultCurrency: account?.default_currency ?? DEFAULT_CURRENCY,
+        appointmentLabel,
         ...derived,
       }}
     >
@@ -374,6 +408,7 @@ export function useAuth(): AuthContextValue {
       refreshProfile: async () => {},
       account: null,
       defaultCurrency: DEFAULT_CURRENCY,
+      appointmentLabel: null,
       accountId: null,
       accountRole: null,
       isOwner: false,
@@ -383,6 +418,7 @@ export function useAuth(): AuthContextValue {
       canManageMembers: false,
       canEditSettings: false,
       canSendMessages: false,
+      isPlatformAdmin: false,
     };
   }
   return ctx;

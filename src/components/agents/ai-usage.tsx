@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { BarChart3, Bot, PencilLine } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
@@ -23,6 +24,7 @@ import { Skeleton } from '@/components/dashboard/skeleton';
 import { BarChart } from '@/components/tremor/bar-chart';
 import { formatCompactNumber } from '@/lib/currency';
 import { format, parseISO } from 'date-fns';
+import { formatDayMonth } from '@/lib/time/format';
 
 interface UsageResponse {
   window_days: number;
@@ -33,17 +35,20 @@ interface UsageResponse {
     completion_tokens: number;
     total_tokens: number;
   };
-  by_mode: {
-    auto_reply: { calls: number; tokens: number };
-    draft: { calls: number; tokens: number };
-  };
+  /** Keyed by mode. Open on purpose — the set grows (agent, playground)
+   *  and a screen that hardcodes two of them silently stops showing
+   *  where the money went. */
+  by_mode: Record<string, { calls: number; tokens: number } | undefined>;
   by_model: {
     model: string;
     provider: string;
     calls: number;
     tokens: number;
   }[];
-  daily: { date: string; tokens: number; calls: number }[];
+  daily: { date: string; tokens: number; calls: number; cost_usd: number }[];
+  cost_usd: number;
+  price_fallback: boolean;
+  exchange_rate: { rate: number; ageDays: number } | null;
 }
 
 const WINDOWS = [7, 30, 90] as const;
@@ -53,13 +58,38 @@ const WINDOWS = [7, 30, 90] as const;
  * billing-class), mirroring the `ai_usage_log` SELECT policy and the
  * `GET /api/ai/usage` route. Renders nothing for non-admins.
  */
+/** Daily spend is often fractions of a cent; two decimals would
+ *  render every bar as US$ 0,00 and teach the reader nothing. */
+/** Daily spend is often fractions of a cent, so two decimals would
+ *  render every bar as zero and teach the reader nothing. Falls back
+ *  to dollars when no exchange rate is set — inventing one would be
+ *  worse than showing the currency the provider actually bills in. */
+function formatMoney(value: number, inBrl: boolean): string {
+  if (value === 0) return inBrl ? 'R$ 0' : 'US$ 0';
+  const digits = value < 0.01 ? 4 : 2;
+  return inBrl
+    ? new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      }).format(value)
+    : `US$ ${value.toFixed(digits)}`;
+}
+
 export function AiUsageCard() {
+  const t = useTranslations('Agents.usage');
+  const locale = useLocale();
   const { accountId, accountRole, profileLoading } = useAuth();
   const canView = accountRole ? canEditSettings(accountRole) : false;
 
   const [days, setDays] = useState<number>(30);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<UsageResponse | null>(null);
+  // Money first. A shop owner reading "48.2k tokens" learns nothing;
+  // "US$ 0,37" is the question they were actually asking. Tokens stay
+  // one click away for whoever is tuning the prompt.
+  const [unit, setUnit] = useState<'cost' | 'tokens'>('cost');
   const loadedRef = useRef<string | null>(null);
 
   const fetchUsage = useCallback(async (windowDays: number) => {
@@ -70,18 +100,18 @@ export function AiUsageCard() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
-        toast.error(json?.error ?? 'Failed to load usage');
+        toast.error(json?.error ?? t('loadError'));
         setData(null);
         return;
       }
       setData(json as UsageResponse);
     } catch {
-      toast.error('Failed to load usage');
+      toast.error(t('loadError'));
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!canView || !accountId) return;
@@ -94,8 +124,17 @@ export function AiUsageCard() {
 
   if (profileLoading || !canView) return null;
 
+  const tokensLabel = t('tokensCategory');
+  const costLabel = t('costCategory');
+  const label = unit === 'cost' ? costLabel : tokensLabel;
   const chartData =
-    data?.daily.map((d) => ({ day: format(parseISO(d.date), 'MMM d'), Tokens: d.tokens })) ??
+    data?.daily.map((d) => ({
+      day: formatDayMonth(parseISO(d.date), locale),
+      [label]:
+        unit === 'cost'
+          ? Number((d.cost_usd * (data?.exchange_rate?.rate ?? 1)).toFixed(4))
+          : d.tokens,
+    })) ??
     [];
   const hasSpend = (data?.totals.total_tokens ?? 0) > 0;
 
@@ -105,11 +144,10 @@ export function AiUsageCard() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <BarChart3 className="h-4 w-4 text-primary" /> Token usage
+              <BarChart3 className="h-4 w-4 text-primary" /> {t('title')}
             </CardTitle>
             <CardDescription>
-              Tokens spent on your provider key by drafts and the auto-reply
-              bot. Counts only — no message content is stored here.
+              {t('description')}
             </CardDescription>
           </div>
           <Select
@@ -117,12 +155,14 @@ export function AiUsageCard() {
             onValueChange={(v) => setDays(Number(v))}
           >
             <SelectTrigger className="w-32 flex-shrink-0">
-              <SelectValue />
+              <SelectValue>
+                {(v) => t('lastDays', { days: Number(v) })}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {WINDOWS.map((w) => (
                 <SelectItem key={w} value={String(w)}>
-                  Last {w} days
+                  {t('lastDays', { days: w })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -135,38 +175,70 @@ export function AiUsageCard() {
         ) : !hasSpend ? (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground">
             <BarChart3 className="h-8 w-8 opacity-40" />
-            <p>No AI usage in the last {data.window_days} days yet.</p>
+            <p>{t('emptyTitle', { days: data.window_days })}</p>
             <p className="text-xs">
-              This fills in as the assistant drafts and auto-replies.
+              {t('emptyHint')}
             </p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Total tokens" value={formatCompactNumber(data.totals.total_tokens)} />
-              <Stat label="LLM calls" value={String(data.totals.calls)} />
+              <Stat label={t('statTotalTokens')} value={formatCompactNumber(data.totals.total_tokens)} />
+              <Stat label={t('statLlmCalls')} value={String(data.totals.calls)} />
               <Stat
-                label="Auto-reply"
-                value={formatCompactNumber(data.by_mode.auto_reply.tokens)}
+                label={t('statAutoReply')}
+                // The agent loop is still an auto-reply from the shop's
+                // point of view — it just cost several calls instead of
+                // one. Splitting them here would answer a question nobody
+                // asked; the modes stay separate in the data, where the
+                // per-reply cost is actually computed.
+                value={formatCompactNumber(
+                  (data.by_mode.auto_reply?.tokens ?? 0) +
+                    (data.by_mode.agent?.tokens ?? 0),
+                )}
                 icon={Bot}
               />
               <Stat
-                label="Drafts"
-                value={formatCompactNumber(data.by_mode.draft.tokens)}
+                label={t('statDrafts')}
+                value={formatCompactNumber(
+                  (data.by_mode.draft?.tokens ?? 0) +
+                    (data.by_mode.playground?.tokens ?? 0),
+                )}
                 icon={PencilLine}
               />
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-medium text-muted-foreground">
-                Tokens per day
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {unit === 'cost' ? t('costPerDay') : t('tokensPerDay')}
+                </p>
+                <div className="flex rounded-lg border border-border p-0.5">
+                  {(['cost', 'tokens'] as const).map((u) => (
+                    <button
+                      key={u}
+                      onClick={() => setUnit(u)}
+                      className={
+                        unit === u
+                          ? 'rounded-md bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground'
+                          : 'rounded-md px-2.5 py-1 text-[11px] text-muted-foreground'
+                      }
+                    >
+                      {u === 'cost' ? t('unitCost') : t('unitTokens')}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <BarChart
                 data={chartData}
                 index="day"
-                categories={['Tokens']}
+                categories={[label]}
                 colors={['violet']}
-                valueFormatter={(v) => formatCompactNumber(v)}
+                valueFormatter={(v) =>
+                  unit === 'cost'
+                    ? formatMoney(v, Boolean(data?.exchange_rate))
+                    : formatCompactNumber(v)
+                }
                 showLegend={false}
                 yAxisWidth={48}
                 className="h-[200px]"
@@ -176,7 +248,7 @@ export function AiUsageCard() {
             {data.by_model.length > 0 && (
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground">
-                  By model
+                  {t('byModel')}
                 </p>
                 <ul className="divide-y divide-border rounded-md border border-border">
                   {data.by_model.map((m) => (
@@ -191,8 +263,10 @@ export function AiUsageCard() {
                         </span>
                       </span>
                       <span className="flex-shrink-0 tabular-nums text-muted-foreground">
-                        {formatCompactNumber(m.tokens)} tok · {m.calls}{' '}
-                        {m.calls === 1 ? 'call' : 'calls'}
+                        {t('modelStats', {
+                          tokens: formatCompactNumber(m.tokens),
+                          count: m.calls,
+                        })}
                       </span>
                     </li>
                   ))}
@@ -202,8 +276,7 @@ export function AiUsageCard() {
 
             {data.truncated && (
               <p className="text-xs text-muted-foreground">
-                Showing a partial window — usage is high enough that only the
-                most recent records are summarized here.
+                {t('truncated')}
               </p>
             )}
           </>

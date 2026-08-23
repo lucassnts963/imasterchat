@@ -29,17 +29,20 @@ import type {
 import { MetricCard } from '@/components/dashboard/metric-card'
 import { SkeletonCard } from '@/components/dashboard/skeleton'
 import { QuickActions } from '@/components/dashboard/quick-actions'
+import { AiCostCard } from '@/components/dashboard/ai-cost-card'
 import { ConversationsChart } from '@/components/dashboard/conversations-chart'
 import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
+import { PwaInstallCard } from '@/components/pwa/install-card'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 type RangeDays = 7 | 30 | 90
 
 export default function DashboardPage() {
   const t = useTranslations('Dashboard.page')
+  const locale = useLocale()
   const { defaultCurrency } = useAuth()
   const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(true)
@@ -131,6 +134,10 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Some sozinho quando já está instalado, quando o aparelho não
+          tem caminho de instalação, ou quando já foi dispensado. */}
+      <PwaInstallCard />
+
       {/* Metric cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricsLoading || !metrics ? (
@@ -166,7 +173,7 @@ export default function DashboardPage() {
             />
             <MetricCard
               title={t('openDealsValue')}
-              value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
+              value={formatCurrency(metrics.openDealsValue, defaultCurrency, locale)}
               icon={DollarSign}
               subtitle={t('openDeals', { count: metrics.openDealsCount })}
             />
@@ -190,6 +197,9 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <QuickActions />
+
+      {/* AI spend vs budget (admins; hidden when AI isn't configured) */}
+      <AiCostCard />
 
       {/* Charts row */}
       {/* items-stretch (the grid default) stretches the two columns to

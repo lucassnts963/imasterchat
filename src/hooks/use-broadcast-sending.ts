@@ -4,35 +4,25 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Contact, MessageTemplate } from '@/types';
+import {
+  fetchCustomValueIndex,
+  resolveVariables as resolveVars,
+  type AudienceConfig,
+  type VariableMapping,
+} from '@/lib/broadcast/variables';
 
-export type CustomFieldOperator = 'is' | 'is_not' | 'contains';
-
-export interface CustomFieldFilter {
-  fieldId: string;
-  operator: CustomFieldOperator;
-  value: string;
-}
-
-export interface AudienceConfig {
-  type: 'all' | 'tags' | 'custom_field' | 'csv';
-  tagIds?: string[];
-  customField?: CustomFieldFilter;
-  csvContacts?: { phone: string; name?: string }[];
-  /** Contacts carrying any of these tags are subtracted from the result. */
-  excludeTagIds?: string[];
-}
-
-/**
- * Variable mapping — each template placeholder (by key, usually "1",
- * "2", …) is resolved at send time. `field` maps to a built-in contact
- * field (name/phone/email/company); `custom_field` maps to a
- * contact_custom_values.value row keyed by the custom_fields.id stored
- * in `value`.
- */
-export type VariableMapping =
-  | { type: 'static'; value: string }
-  | { type: 'field'; value: string }
-  | { type: 'custom_field'; value: string };
+// Os tipos e a resolução de variáveis vivem em `@/lib/broadcast/variables`
+// desde a onda 5.4: o envio saiu do navegador para o servidor, e uma
+// segunda cópia da regra de `{{1}}` → "Ana" divergiria — aparecendo como
+// mensagem enviada ao cliente com o nome errado.
+export type {
+  CustomFieldOperator,
+  CustomFieldFilter,
+  AudienceConfig,
+  VariableMapping,
+} from '@/lib/broadcast/variables';
+import type { CustomFieldFilter } from '@/lib/broadcast/variables';
+export { resolveVariables } from '@/lib/broadcast/variables';
 
 interface BroadcastPayload {
   name: string;
@@ -54,97 +44,60 @@ interface UseBroadcastSendingReturn {
   progress: number;
 }
 
-/**
- * Meta rate-limit buffer. 10 per batch + 1 s pause matches the spec
- * and keeps us comfortably under Meta's per-phone-number messaging
- * rate so a large broadcast never trips the upstream limiter.
- */
-const SEND_BATCH_SIZE = 10;
-const SEND_BATCH_DELAY_MS = 1000;
-
-/** `broadcast_recipients` inserts are independent of the send rate. */
+// O ritmo de ENVIO (lotes de 10 com 1s de pausa) e o resultado por
+// destinatário mudaram de casa junto com o laço: agora vivem em
+// `@/lib/broadcast/drain`, do lado do servidor. Deixá-los aqui seria
+// deixar a receita de um bolo que esta cozinha não faz mais.
+//
+// A gravação dos destinatários continua aqui — é o que só o navegador
+// pode fazer, porque é ele que resolveu o público.
 const INSERT_BATCH_SIZE = 200;
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-interface BroadcastApiResult {
-  phone: string;
-  status: 'sent' | 'failed';
-  whatsapp_message_id?: string;
-  error?: string;
-}
 
 /** contactId → (customFieldId → value). */
 type CustomValueIndex = Map<string, Map<string, string>>;
 
 /**
- * Per-contact resolution of custom-field placeholders. Static and
- * built-in-field mappings resolve synchronously; custom fields read
- * from a pre-built index to avoid N+1 queries during the send loop.
+ * Uma linha de `broadcast_recipients` com o contato embutido, como a
+ * consulta paginada do passo 4 a devolve. Só os campos que o laço de
+ * envio realmente toca — o `*` traz mais, e tipar o resto seria
+ * convidar a divergência com o schema.
  */
-export function resolveVariables(
-  variables: Record<string, VariableMapping>,
-  contact: Contact,
-  customValues?: Map<string, string>,
-): string[] {
-  // Keys are typically "1","2",... — numeric-aware sort keeps
-  // {{1}} before {{10}}.
-  const keys = Object.keys(variables).sort((a, b) => {
-    const an = Number(a);
-    const bn = Number(b);
-    if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
-    return a.localeCompare(b);
-  });
-
-  return keys.map((key) => {
-    const v = variables[key];
-    if (v.type === 'static') return v.value;
-
-    if (v.type === 'field') {
-      const fieldMap: Record<string, string | undefined> = {
-        name: contact.name,
-        phone: contact.phone,
-        email: contact.email,
-        company: contact.company,
-      };
-      return fieldMap[v.value] ?? '';
-    }
-
-    // custom_field
-    return customValues?.get(v.value) ?? '';
-  });
+interface BroadcastRecipientRow {
+  id: string;
+  contact?: Contact | null;
 }
 
 /**
- * Bulk-fetch contact_custom_values for a set of contacts. Returns an
- * index keyed by contact_id → field_id → value.
+ * Lê uma tabela inteira em páginas.
+ *
+ * O PostgREST corta toda resposta em `PGRST_DB_MAX_ROWS` (1000 nesta
+ * instalação) sem erro e sem aviso — quem não pagina simplesmente recebe
+ * menos linhas do que existe e nunca fica sabendo.
+ *
+ * A página é menor que o teto de propósito, para o app não depender de
+ * conhecer a configuração do servidor.
  */
-async function fetchCustomValueIndex(
+async function fetchAllPaginated<T>(
   supabase: ReturnType<typeof createClient>,
-  contactIds: string[],
-): Promise<CustomValueIndex> {
-  const index: CustomValueIndex = new Map();
-  if (contactIds.length === 0) return index;
-
-  // Supabase PostgREST caps the .in(...) IN-clause roughly at 1000
-  // values. Page through to stay safe.
+  table: string,
+): Promise<T[]> {
   const PAGE = 500;
-  for (let i = 0; i < contactIds.length; i += PAGE) {
-    const slice = contactIds.slice(i, i + PAGE);
-    const { data } = await supabase
-      .from('contact_custom_values')
-      .select('contact_id, custom_field_id, value')
-      .in('contact_id', slice);
-
-    for (const row of data ?? []) {
-      const bucket = index.get(row.contact_id) ?? new Map<string, string>();
-      bucket.set(row.custom_field_id, row.value ?? '');
-      index.set(row.contact_id, bucket);
-    }
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      // Ordem estável entre páginas: sem ela o Postgres pode repetir ou
+      // pular linhas, e repetir um contato aqui é mandar a mesma
+      // mensagem duas vezes para a mesma pessoa.
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Failed to fetch ${table}: ${error.message}`);
+    if (!data?.length) break;
+    out.push(...(data as T[]));
+    if (data.length < PAGE) break;
   }
-  return index;
+  return out;
 }
 
 export function useBroadcastSending(): UseBroadcastSendingReturn {
@@ -158,9 +111,13 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     let contacts: Contact[] = [];
 
     if (audience.type === 'all') {
-      const { data, error } = await supabase.from('contacts').select('*');
-      if (error) throw new Error(`Failed to fetch contacts: ${error.message}`);
-      contacts = data ?? [];
+      // Paginado pelo mesmo motivo da leitura de destinatários: o teto
+      // de linhas do PostgREST é silencioso, então "todos os contatos"
+      // eram no máximo os 1000 primeiros — e o disparo saía parecendo
+      // completo. Aqui o corte era ainda mais traiçoeiro, porque
+      // acontecia ANTES de os destinatários serem gravados: nem a
+      // contagem no banco denunciava.
+      contacts = await fetchAllPaginated<Contact>(supabase, 'contacts');
     } else if (
       audience.type === 'tags' &&
       audience.tagIds &&
@@ -417,151 +374,28 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         }
       }
 
-      // ── Step 4: Fetch recipients (joined contact) + preload custom values
-      setProgress(30);
-      const { data: recipients, error: recipientsFetchError } = await supabase
-        .from('broadcast_recipients')
-        .select('*, contact:contacts(*)')
-        .eq('broadcast_id', broadcast.id);
-
-      if (recipientsFetchError || !recipients) {
-        throw new Error('Failed to fetch broadcast recipients');
-      }
-
-      // One bulk fetch of custom values for every contact in this
-      // broadcast, avoiding N+1 during the send loop.
-      const contactIds = recipients
-        .map((r) => r.contact?.id)
-        .filter((id): id is string => Boolean(id));
-      const customValueIndex = await fetchCustomValueIndex(
-        supabase,
-        contactIds,
-      );
-
-      let failedCount = 0;
-      const totalRecipients = recipients.length;
-
-      // Media-header templates (image/video/document) require a media
-      // URL on every send. Collected in the personalize step and applied
-      // to all recipients; falls back to the template's stored URL on the
-      // server when omitted.
-      const headerType = payload.template.header_type;
-      const isMediaHeader =
-        headerType === 'image' ||
-        headerType === 'video' ||
-        headerType === 'document';
-      const headerMediaUrl = payload.headerMediaUrl?.trim();
-      const messageParams =
-        isMediaHeader && headerMediaUrl ? { headerMediaUrl } : undefined;
-
-      for (let i = 0; i < recipients.length; i += SEND_BATCH_SIZE) {
-        const batch = recipients.slice(i, i + SEND_BATCH_SIZE);
-
-        const apiRecipients = batch
-          .filter((r) => r.contact?.phone)
-          .map((r) => ({
-            phone: r.contact!.phone as string,
-            params: r.contact
-              ? resolveVariables(
-                  payload.variables,
-                  r.contact,
-                  customValueIndex.get(r.contact.id),
-                )
-              : [],
-            ...(messageParams ? { messageParams } : {}),
-          }));
-
-        if (apiRecipients.length === 0) continue;
-
-        try {
-          const res = await fetch('/api/whatsapp/broadcast', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              recipients: apiRecipients,
-              template_name: payload.template.name,
-              template_language: payload.template.language ?? 'en_US',
-            }),
-          });
-
-          const data = await res.json();
-
-          if (!res.ok) {
-            throw new Error(data.error || 'Broadcast API request failed');
-          }
-
-          const resultsByPhone = new Map<string, BroadcastApiResult>();
-          for (const r of (data.results ?? []) as BroadcastApiResult[]) {
-            resultsByPhone.set(r.phone, r);
-          }
-
-          for (const recipient of batch) {
-            const phone = recipient.contact?.phone;
-            const result = phone ? resultsByPhone.get(phone) : undefined;
-
-            if (!result) {
-              failedCount++;
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: 'failed',
-                  error_message: 'No phone number on contact',
-                })
-                .eq('id', recipient.id);
-              continue;
-            }
-
-            if (result.status === 'sent') {
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: 'sent',
-                  sent_at: new Date().toISOString(),
-                  whatsapp_message_id: result.whatsapp_message_id ?? null,
-                  error_message: null,
-                })
-                .eq('id', recipient.id);
-            } else {
-              failedCount++;
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: 'failed',
-                  error_message: result.error ?? 'Unknown error',
-                })
-                .eq('id', recipient.id);
-            }
-          }
-        } catch (err) {
-          for (const recipient of batch) {
-            failedCount++;
-            await supabase
-              .from('broadcast_recipients')
-              .update({
-                status: 'failed',
-                error_message: err instanceof Error ? err.message : 'Unknown error',
-              })
-              .eq('id', recipient.id);
-          }
-        }
-
-        const progressPct =
-          30 + Math.round(((i + batch.length) / totalRecipients) * 60);
-        setProgress(progressPct);
-
-        if (i + SEND_BATCH_SIZE < recipients.length) {
-          await sleep(SEND_BATCH_DELAY_MS);
-        }
-      }
-
-      // ── Step 5: Finalize status ───────────────────────────────────
-      // Aggregate counts are maintained by the DB trigger (migration
-      // 003); we only flip the final status here.
-      setProgress(95);
-      const finalStatus = failedCount === totalRecipients ? 'failed' : 'sent';
+      // ── Step 4: entregar o envio ao SERVIDOR ──────────────────────
+      //
+      // O laço de envio vivia aqui, no navegador de quem clicou. Fechar
+      // a aba interrompia o disparo pela metade — sem retomada, sem
+      // aviso, e com os destinatários que faltavam simplesmente não
+      // recebendo. A rede do atendente era variável do produto.
+      //
+      // Agora o navegador faz o que só ele pode fazer (resolver o
+      // público e gravar as linhas) e marca `sending`. Quem envia é o
+      // dreno do cron, a cada 5 minutos, em lotes — e retomar é de graça
+      // porque o estado já está em `broadcast_recipients.status`: "o que
+      // falta" é uma consulta, não um ponteiro que pode se perder.
+      //
+      // A barra de progresso não acompanha mais o envio em tempo real,
+      // e isso é honesto: ela acompanhava um trabalho que agora não é
+      // mais desta aba. Os contadores da tela de disparos continuam
+      // certos — são mantidos pelo gatilho do banco a partir das linhas
+      // de destinatário.
+      setProgress(90);
       await supabase
         .from('broadcasts')
-        .update({ status: finalStatus })
+        .update({ status: 'sending' })
         .eq('id', broadcast.id);
 
       setProgress(100);

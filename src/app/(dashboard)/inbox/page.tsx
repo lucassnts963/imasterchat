@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 // Remembers the agent's show/hide choice for the desktop contact panel
 // across reloads and sessions (device-scoped, like the theme prefs).
-const CONTACT_PANEL_STORAGE_KEY = "wacrm:inbox:contact-panel-open";
+const CONTACT_PANEL_STORAGE_KEY = "imasterchat:inbox:contact-panel-open";
 
 // `useSearchParams` (the `?c=<id>` deep link below) requires a Suspense
 // boundary or the production build bails to CSR and errors out. Thin
@@ -40,8 +40,16 @@ function InboxPageInner() {
    * `?c=<id>` deep-link support. Used when landing here from the
    * dashboard's recent-conversations list so the right thread opens
    * automatically instead of showing the empty center panel.
+   *
+   * `?conversation=` é aceito como sinônimo porque metade dos geradores
+   * de link usava essa grafia — e um aviso de transferência que abre o
+   * inbox sem abrir a conversa é pior que não ter aviso. Os geradores
+   * foram uniformizados para `?c=`, mas os avisos JÁ ENTREGUES no
+   * celular de alguém carregam a grafia antiga para sempre: quem tocar
+   * num push de semana passada precisa cair na conversa certa.
    */
-  const deepLinkConvId = searchParams.get("c");
+  const deepLinkConvId =
+    searchParams.get("c") ?? searchParams.get("conversation");
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] =

@@ -1,4 +1,4 @@
-import { AiError, type AiUsage, type ChatMessage } from '../types'
+import { AiError, type AiUsage, type ChatMessage, type ToolSpec } from '../types'
 
 // ============================================================
 // Bits shared by the OpenAI + Anthropic adapters.
@@ -17,6 +17,20 @@ export interface ProviderArgs {
   systemPrompt: string
   messages: ChatMessage[]
   timeoutMs: number
+  /** Tools the model may call. Omitted / empty → the request goes out
+   *  exactly as it did before tool calling existed. */
+  tools?: ToolSpec[]
+  /**
+   * `auto` (the default) lets the model answer in prose instead of
+   * acting. `required` forbids that.
+   *
+   * It matters wherever prose is not an outcome. The vault keeper has
+   * nobody to talk to — text it writes instead of calling a tool is
+   * discarded and the wiki learns nothing — so a chatty model turns the
+   * whole run into a silent no-op. Any catalogue used with `required`
+   * needs a tool that means "done", or the loop only ends on the cap.
+   */
+  toolChoice?: 'auto' | 'required'
 }
 
 /**
@@ -89,28 +103,122 @@ export async function providerHttpError(
         ? `${provider} rate limit reached`
         : `${provider} API error (${status})`
 
-  return new AiError(detail ? `${base}: ${detail}` : base, {
+  const error = new AiError(detail ? `${base}: ${detail}` : base, {
     code,
     // Surface an auth failure as 401 so the settings "Test key" button
     // can show "invalid key"; everything else is an upstream 502.
     status: code === 'invalid_key' ? 401 : 502,
   })
+
+  // Quanto esperar, quando o provedor diz.
+  //
+  // Tanto a OpenAI quanto a Anthropic mandam `Retry-After` num 429 — e
+  // nós descartávamos. O 429 virava erro tipado e a resposta era
+  // PERDIDA, não adiada: um cliente sem resposta porque o provedor
+  // pediu para esperar dois segundos.
+  //
+  // A Anthropic ainda avisa que um aumento brusco de tráfego dispara 429
+  // de "acceleration limit" MESMO abaixo do teto do plano — ou seja,
+  // acontece justamente no pico, que é quando ninguém pode ficar sem
+  // resposta.
+  // Leitura defensiva: nem toda coisa que chega aqui é um `Response`
+  // completo — um mock, ou um cliente HTTP que devolva outra forma,
+  // deixaria `headers` indefinido. Estourar aqui trocaria um erro claro
+  // ("chave inválida") por um TypeError sem diagnóstico, que é
+  // exatamente o oposto do que esta função existe para fazer.
+  error.retryAfterMs = parseRetryAfter(
+    res.headers?.get?.('retry-after') ?? null,
+  )
+  return error
+}
+
+/**
+ * `Retry-After` em milissegundos, ou `null`.
+ *
+ * O cabeçalho aceita duas formas: segundos ("2") ou uma data HTTP. As
+ * duas aparecem na prática, e tratar só a primeira faria a segunda virar
+ * `NaN` — que somado a um `Date.now()` produz uma espera de tempo
+ * indeterminado, pior que não esperar.
+ *
+ * Teto de 60s: um provedor pedindo mais que isso não cabe no orçamento
+ * de 60s da rota do webhook, e nesse caso é melhor a conversa ir para a
+ * fila de espera da IA, onde o relógio de 5 minutos vale.
+ */
+export function parseRetryAfter(header: string | null): number | null {
+  if (!header) return null
+  const trimmed = header.trim()
+
+  const seconds = Number(trimmed)
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(seconds * 1000, 60_000)
+  }
+
+  const when = Date.parse(trimmed)
+  if (!Number.isNaN(when)) {
+    return Math.min(Math.max(0, when - Date.now()), 60_000)
+  }
+
+  return null
 }
 
 /**
  * Collapse consecutive same-role turns into one (joined with blank
  * lines). Anthropic requires strictly alternating roles; merging is
  * also harmless for OpenAI and keeps the transcript compact.
+ *
+ * Only plain text turns merge. A turn carrying `toolCalls`, a tool
+ * result, or anything with the `tool` role is passed through untouched:
+ * folding one into its neighbour would break the id pairing both
+ * providers use to match a call to its result, and the API would reject
+ * the payload (or worse, silently answer the wrong call).
  */
 export function mergeConsecutive(messages: ChatMessage[]): ChatMessage[] {
+  const mergeable = (m: ChatMessage): boolean =>
+    m.role !== 'tool' && !m.toolCalls?.length && !m.toolCallId
+
   const out: ChatMessage[] = []
   for (const m of messages) {
     const last = out[out.length - 1]
-    if (last && last.role === m.role) {
+    if (last && last.role === m.role && mergeable(last) && mergeable(m)) {
       last.content = `${last.content}\n\n${m.content}`
     } else {
-      out.push({ role: m.role, content: m.content })
+      out.push({ ...m })
     }
   }
   return out
+}
+
+/**
+ * Parse the arguments a model wrote for a tool call. OpenAI hands them
+ * over as a JSON string composed token by token, so malformed JSON is a
+ * real (if uncommon) outcome — and one the loop recovers from by
+ * telling the model, rather than by throwing. Returns `{}` plus an
+ * explanation when it can't parse.
+ */
+export function parseToolArguments(raw: unknown): {
+  arguments: Record<string, unknown>
+  argumentsError?: string
+} {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return { arguments: raw as Record<string, unknown> }
+  }
+  if (typeof raw !== 'string' || !raw.trim()) {
+    // No arguments at all is legitimate for a zero-parameter tool.
+    return { arguments: {} }
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {
+        arguments: {},
+        argumentsError: 'Tool arguments must be a JSON object.',
+      }
+    }
+    return { arguments: parsed as Record<string, unknown> }
+  } catch {
+    return {
+      arguments: {},
+      argumentsError: 'Tool arguments were not valid JSON.',
+    }
+  }
 }

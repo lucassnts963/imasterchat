@@ -56,6 +56,9 @@ interface AiThreadBannerProps {
   /** Called after a successful toggle so the parent can patch its local
    *  conversation state (the realtime UPDATE also arrives, but this keeps
    *  the banner instant). */
+  /** Avisa a tela quando o assistente está no comando (ativo, sem
+   *  pausa e sem dono) — é quando o compositor precisa ficar travado. */
+  onHoldingChange?: (holding: boolean) => void;
   onChange?: (patch: {
     ai_autoreply_disabled: boolean;
     assigned_agent_id?: string | null;
@@ -77,6 +80,7 @@ export function AiThreadBanner({
   assignedAgentId,
   currentUserId,
   onChange,
+  onHoldingChange,
 }: AiThreadBannerProps) {
   const t = useTranslations("Inbox.aiBanner");
   const { accountId } = useAuth();
@@ -134,6 +138,18 @@ export function AiThreadBanner({
     [conversationId, currentUserId, onChange, t],
   );
 
+  // O assistente está no comando: conta com resposta automática ligada,
+  // sem pausa nesta conversa e sem dono. É exatamente quando a tarja
+  // oferece "Assumir" — e exatamente quando o compositor precisa estar
+  // travado, para não haver duas vozes na mesma conversa.
+  // `!!` porque `assignedAgentId` é `string | null | undefined`: sem a
+  // coerção o valor vaza como `boolean | null` e o compositor receberia
+  // "não sei" onde precisa de uma decisão.
+  const holding = !!autoReplyOn && !paused && !assignedAgentId;
+  useEffect(() => {
+    onHoldingChange?.(holding);
+  }, [holding, onHoldingChange]);
+
   // Account has no auto-reply → nothing to show. (Still loading → nothing.)
   if (!autoReplyOn) return null;
 
@@ -156,8 +172,34 @@ export function AiThreadBanner({
     );
   }
 
-  // Active, but a human already owns it → the bot won't fire; no banner.
-  if (assignedAgentId) return null;
+  // Sem pausa, mas com dono: alguém está atendendo.
+  //
+  // Aqui ficava `return null` — nenhuma tarja. Fazia sentido quando ter
+  // dono era raro: só acontecia por atribuição explícita, e quem
+  // atribuiu sabia o que tinha feito.
+  //
+  // Deixou de fazer sentido quando responder pelo painel passou a
+  // ASSUMIR a conversa: a atendente manda uma mensagem e, no gesto
+  // seguinte, a tarja some levando junto o botão de devolver para a IA.
+  // Some justamente o estado em que ela é mais necessária.
+  if (assignedAgentId) {
+    const mine = !!currentUserId && assignedAgentId === currentUserId;
+    return (
+      <Banner tone="muted">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-foreground">
+            {mine ? t("youAreHandling") : t("someoneIsHandling")}
+          </p>
+          <p className="truncate text-muted-foreground">
+            {t("handlingHint")}
+          </p>
+        </div>
+        <BannerButton onClick={() => toggle(false)} busy={busy} icon={Undo2}>
+          {t("giveBack")}
+        </BannerButton>
+      </Banner>
+    );
+  }
 
   // Active on this thread.
   return (

@@ -489,6 +489,18 @@ export async function sendMessageToConversation(
     })
     .eq('id', conversationId);
 
+  // NÃO atribui a conversa a quem responde.
+  //
+  // Isso chegou a existir e foi removido a pedido de quem opera. A
+  // intenção era boa — impedir a IA de responder por cima da atendente —
+  // mas o efeito foi pior que o problema: cada resposta silenciava o bot
+  // naquela conversa para sempre, sem que ninguém tivesse pedido, e
+  // "por que o agente parou?" virou a pergunta do dia.
+  //
+  // O gesto de assumir passou a ser explícito e obrigatório: o compositor
+  // fica travado enquanto o assistente estiver ativo e a conversa não
+  // tiver dono. Um clique consciente é melhor que um efeito colateral.
+
   // Pause any active Flow run for this contact — the agent stepping in
   // is the strongest "yield, human is here" signal. Best-effort.
   try {

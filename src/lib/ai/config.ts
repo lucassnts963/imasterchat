@@ -11,16 +11,28 @@ interface AiConfigRow {
   base_url: string | null
   system_prompt: string | null
   is_active: boolean
+  monthly_budget_usd: number | null
+  ai_concurrency_limit: number | null
+  ai_max_wait_seconds: number | null
+  budget_exceeded_action: string | null
   auto_reply_enabled: boolean
   auto_reply_max_per_conversation: number
   handoff_agent_id: string | null
   embeddings_api_key: string | null
   embeddings_base_url: string | null
   embeddings_model: string | null
+  max_tool_steps: number | null
+  context_timestamps: boolean
+  handoff_notice_enabled: boolean
+  handoff_notice_text: string | null
+  new_session_hours: number
+  context_message_limit: number | null
+  audio_policy: string
+  transcription_vocabulary: string | null
 }
 
 const CONFIG_COLUMNS =
-  'provider, model, api_key, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, embeddings_base_url, embeddings_model'
+  'provider, model, api_key, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, embeddings_base_url, embeddings_model, max_tool_steps, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, transcription_vocabulary, monthly_budget_usd, ai_concurrency_limit, ai_max_wait_seconds, budget_exceeded_action'
 
 /**
  * Load and decrypt the account's AI config for *use* (draft or
@@ -81,12 +93,24 @@ export async function loadAiConfig(
     baseUrl: row.base_url,
     systemPrompt: row.system_prompt,
     isActive: row.is_active,
+    monthlyBudgetUsd: row.monthly_budget_usd,
+    aiConcurrencyLimit: row.ai_concurrency_limit ?? 5,
+    aiMaxWaitSeconds: row.ai_max_wait_seconds ?? 300,
+    budgetExceededAction: row.budget_exceeded_action ?? 'block_and_handoff',
     autoReplyEnabled: row.auto_reply_enabled,
     autoReplyMaxPerConversation: row.auto_reply_max_per_conversation,
     handoffAgentId: row.handoff_agent_id,
     embeddingsApiKey,
     embeddingsBaseUrl: row.embeddings_base_url,
     embeddingsModel: row.embeddings_model,
+    maxToolSteps: row.max_tool_steps,
+    contextTimestamps: row.context_timestamps,
+    handoffNoticeEnabled: row.handoff_notice_enabled,
+    handoffNoticeText: row.handoff_notice_text,
+    newSessionHours: row.new_session_hours,
+    contextMessageLimit: row.context_message_limit,
+    audioPolicy: row.audio_policy,
+    transcriptionVocabulary: row.transcription_vocabulary,
   }
 }
 

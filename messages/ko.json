@@ -1,5 +1,6 @@
 {
   "LoginPage": {
+    "privacyPolicy": "개인정보 처리방침",
     "titleAccept": "로그인하여 수락하기",
     "titleWelcome": "다시 오신 것을 환영합니다",
     "descAccept": "로그인하시면 초대 페이지로 이동합니다.",
@@ -15,7 +16,7 @@
     "createAccount": "계정 만들기"
   },
   "Sidebar": {
-    "title": "WhatsApp용 CRM 템플릿",
+    "title": "iMasterChat",
     "dashboard": "대시보드",
     "inbox": "인박스",
     "notifications": "알림",
@@ -26,6 +27,7 @@
     "flows": "플로우",
     "aiAgents": "AI 에이전트",
     "settings": "설정",
+    "platformAdmin": "플랫폼 관리",
     "beta": "베타",
     "unreadConversations": "읽지 않은 대화 {count}건",
     "unreadNotifications": "읽지 않은 알림 {count}건",
@@ -38,7 +40,8 @@
     "defaultAvatar": "아바타",
     "menuProfile": "프로필",
     "menuSettings": "설정",
-    "menuSignOut": "로그아웃"
+    "menuSignOut": "로그아웃",
+    "agenda": "일정"
   },
   "Header": {
     "dashboard": "대시보드",
@@ -55,7 +58,11 @@
     "defaultAvatar": "아바타",
     "menuProfile": "프로필",
     "menuSettings": "설정",
-    "menuSignOut": "로그아웃"
+    "menuSignOut": "로그아웃",
+    "agenda": "일정",
+    "platformAdmin": "Administration",
+    "flows": "Flows",
+    "aiAgents": "AI Agents"
   },
   "ModeToggle": {
     "switchMode": "{mode} 모드로 전환"
@@ -72,6 +79,16 @@
       "vsYesterday": "어제 대비",
       "openDeals": "진행 중인 딜 {count}건",
       "noChange": "변동 없음 {suffix}"
+    },
+    "aiCost": {
+      "title": "AI 비용 (이번 달)",
+      "estimatedBadge": "추정치",
+      "ofBudget": "/ {budget}",
+      "usedOfBudget": "월 예산의 {pct}% 사용됨",
+      "nearBudget": "AI 잔액이 얼마 남지 않았습니다 — 월 예산의 {pct}% 사용됨",
+      "overBudget": "월 AI 예산을 초과했습니다",
+      "noBudget": "월 예산이 설정되지 않았습니다 — AI 에이전트 → 설정에서 예산을 정하면 잔액이 소진되기 전에 알려드립니다.",
+      "manage": "AI 관리"
     },
     "quickActions": {
       "newContact": "새 연락처",
@@ -142,7 +159,12 @@
       "clearAll": "모두 지우기",
       "noConversations": "대화를 찾을 수 없습니다",
       "noMessagesYet": "아직 메시지가 없습니다",
-      "unknown": "알 수 없음"
+      "unknown": "알 수 없음",
+      "filterMine": "내 대화",
+      "queues": "대기열",
+      "allQueues": "모든 대기열",
+      "filters": "필터",
+      "clearFilters": "필터 지우기"
     },
     "messageThread": {
       "backToConversations": "대화 목록으로 돌아가기",
@@ -166,7 +188,9 @@
       "selectConversation": "대화를 선택하세요",
       "selectConversationHint": "왼쪽에서 대화를 선택해 메시지를 시작하세요",
       "today": "오늘",
-      "yesterday": "어제"
+      "yesterday": "어제",
+      "loadOlder": "이전 메시지 불러오기",
+      "loadingOlder": "불러오는 중…"
     },
     "sessionTimer": {
       "expired": "만료됨",
@@ -202,7 +226,8 @@
       "send": "보내기",
       "quickReplyNamePrompt": "이 빠른 답장의 이름을 지정하세요:",
       "quickReplySaved": "빠른 답장으로 저장되었습니다.",
-      "quickReplySaveError": "빠른 답장을 저장하지 못했습니다."
+      "quickReplySaveError": "빠른 답장을 저장하지 못했습니다.",
+      "aiHoldingHint": "어시스턴트가 이 대화를 처리 중입니다. 위의 '대화 맡기'를 눌러 직접 답장하세요."
     },
     "bubble": {
       "photo": "사진",
@@ -216,7 +241,8 @@
       "interactiveReply": "[인터랙티브 응답]",
       "unsupported": "[지원되지 않는 메시지 형식]",
       "aiBadge": "AI",
-      "aiBadgeTitle": "AI 어시스턴트가 자동으로 전송함"
+      "aiBadgeTitle": "AI 어시스턴트가 자동으로 전송함",
+      "transcript": "전사"
     },
     "actions": {
       "reply": "답장",
@@ -271,7 +297,11 @@
       "tookOver": "이 대화를 직접 처리하기 시작했습니다.",
       "resumed": "AI가 재개되었습니다.",
       "updateError": "AI 어시스턴트를 업데이트하지 못했습니다.",
-      "networkError": "서버에 연결할 수 없습니다."
+      "networkError": "서버에 연결할 수 없습니다.",
+      "youAreHandling": "내가 응대 중",
+      "someoneIsHandling": "동료가 응대 중",
+      "handlingHint": "대화에 담당자가 있는 동안에는 어시스턴트가 응답하지 않습니다.",
+      "giveBack": "AI에게 돌려주기"
     }
   },
   "Contacts": {
@@ -798,7 +828,8 @@
         "updateError": "업데이트하지 못했습니다",
         "duplicateError": "복제하지 못했습니다",
         "deleteError": "삭제하지 못했습니다"
-      }
+      },
+      "never": "없음"
     },
     "edit": {
       "loading": "불러오는 중...",
@@ -939,7 +970,7 @@
         "tagLabel": "태그",
         "modeLabel": "모드",
         "modes": {
-          "round_robin": "순차 배정",
+          "round_robin": "팀원 아무나",
           "specific": "특정 상담원"
         },
         "agentLabel": "상담원",
@@ -974,7 +1005,8 @@
         "matchContains": "포함",
         "matchExact": "정확히 일치",
         "closeConversationHint": "대화 상태를 \"닫힘\"으로 설정합니다. 추가 설정이 필요 없습니다."
-      }
+      },
+      "delete": "삭제"
     }
   },
   "Flows": {
@@ -1197,6 +1229,23 @@
       "modeRemove": "제거",
       "tagPicked": "{tag} 태그 {mode}…",
       "tagNone": "태그 {mode} (선택된 태그 없음)"
+    },
+    "header": {
+      "backToFlows": "플로우 목록으로",
+      "flowName": "플로우 이름",
+      "unsavedChanges": "저장되지 않은 변경 사항 — 저장을 눌러 반영하세요",
+      "edited": "수정됨",
+      "runs": "실행",
+      "delete": "삭제",
+      "pause": "일시중지",
+      "fixIssues": "활성화하기 전에 아래 문제를 해결하세요",
+      "activate": "활성화",
+      "save": "저장",
+      "descriptionPlaceholder": "짧은 설명 추가 (내부용 — 고객에게 표시되지 않음)",
+      "flowDescription": "플로우 설명",
+      "statusDraft": "초안",
+      "statusActive": "활성",
+      "statusArchived": "보관됨"
     }
   },
   "Settings": {
@@ -1276,7 +1325,8 @@
       "labelTooLong": "라벨은 {max}자 이하여야 합니다",
       "copied": "초대 링크가 복사되었습니다",
       "clipboardBlocked": "클립보드 접근이 차단되었습니다 — 링크를 직접 복사하세요",
-      "whatsappMessage": "이 링크(유효 기간 {expiresInDays}일)로 wacrm의 {accountName}에 참여하세요: {url}"
+      "whatsappMessage": "이 링크(유효 기간 {expiresInDays}일)로 iMasterChat의 {accountName}에 참여하세요: {url}",
+      "accountFallback": "저희 계정"
     },
     "tagsAndFields": {
       "title": "필드 & 태그",
@@ -1311,7 +1361,9 @@
         "blue": "파랑",
         "violet": "보라",
         "pink": "분홍"
-      }
+      },
+      "aiSelectableTitle": "에이전트가 붙일 수 있는 태그",
+      "aiSelectableHint": "어시스턴트가 스스로 사용하길 원하는 것만 켜세요. 나머지는 수동으로 남습니다."
     },
     "templates": {
       "title": "메시지 템플릿",
@@ -1387,8 +1439,8 @@
       "saveResubmit": "저장 & 재제출",
       "submitApproval": "승인 요청",
       "deleteDialogTitle": "템플릿을 삭제하시겠습니까?",
-      "deleteMetaDesc": "\"{name}\"이(가) Meta와 wacrm에서 삭제됩니다. 이 템플릿을 사용하는 활성 브로드캐스트는 다음 전송부터 실패하기 시작합니다. 되돌릴 수 없습니다.",
-      "deleteLocalDesc": "\"{name}\"이(가) wacrm에서 삭제됩니다. Meta에 제출된 적이 없으므로 별도의 원격 정리가 필요하지 않습니다.",
+      "deleteMetaDesc": "\"{name}\"이(가) Meta와 iMasterChat에서 삭제됩니다. 이 템플릿을 사용하는 활성 브로드캐스트는 다음 전송부터 실패하기 시작합니다. 되돌릴 수 없습니다.",
+      "deleteLocalDesc": "\"{name}\"이(가) iMasterChat에서 삭제됩니다. Meta에 제출된 적이 없으므로 별도의 원격 정리가 필요하지 않습니다.",
       "deleting": "삭제 중…",
       "delete": "삭제",
       "toastLoadFailed": "템플릿을 불러오지 못했습니다",
@@ -1429,7 +1481,7 @@
       "notConnected": "연결되지 않음",
       "connectedDesc": "액세스 토큰으로 Meta 인증이 완료되었습니다. 웹훅이 실제로 연결되었는지는 아래 등록 상태를 확인하세요.",
       "notConnectedDesc": "아래에서 Meta API 자격 증명을 설정해 WhatsApp 비즈니스 계정을 연결하세요.",
-      "registered": "등록됨 — Meta가 wacrm으로 이벤트를 전달합니다",
+      "registered": "등록됨 — Meta가 iMasterChat으로 이벤트를 전달합니다",
       "notRegistered": "등록되지 않음 — Meta가 이벤트를 전달하지 않습니다",
       "verifyWithMeta": "Meta로 확인",
       "subscribedSince": "{date}부터 구독 중입니다. 이벤트가 더 이상 도착하지 않으면 Meta로 확인을 클릭하세요.",
@@ -1453,7 +1505,7 @@
       "twoStepPin": "2단계 인증 PIN",
       "optional": "(선택)",
       "pinPlaceholder": "Meta WhatsApp 관리자에서 발급받은 6자리 PIN",
-      "pinHint": "프로덕션 번호의 수신 메시지를 연결하려면 필요합니다. Meta 비즈니스 관리자 → WhatsApp 계정 → 전화번호 → 2단계 인증에서 설정한 뒤 여기에 붙여넣으면 wacrm이 해당 번호를 구독할 수 있습니다 — 그렇지 않으면 Meta는 마지막으로 이 번호를 등록한 앱으로 수신 이벤트를 보냅니다(공유 WABA 하의 두 번째 번호에서 흔히 발생하는 증상입니다). Meta 테스트 번호는 PIN이 없고 이미 등록되어 있으므로 이 필드를 비워두세요. 비워두면 기존 등록도 그대로 유지됩니다.",
+      "pinHint": "프로덕션 번호의 수신 메시지를 연결하려면 필요합니다. Meta 비즈니스 관리자 → WhatsApp 계정 → 전화번호 → 2단계 인증에서 설정한 뒤 여기에 붙여넣으면 iMasterChat이 해당 번호를 구독할 수 있습니다 — 그렇지 않으면 Meta는 마지막으로 이 번호를 등록한 앱으로 수신 이벤트를 보냅니다(공유 WABA 하의 두 번째 번호에서 흔히 발생하는 증상입니다). Meta 테스트 번호는 PIN이 없고 이미 등록되어 있으므로 이 필드를 비워두세요. 비워두면 기존 등록도 그대로 유지됩니다.",
       "webhookTitle": "웹훅 설정",
       "webhookDesc": "Meta 앱 대시보드의 웹훅 콜백으로 이 URL을 사용하세요.",
       "webhookUrl": "웹훅 콜백 URL",
@@ -1483,7 +1535,49 @@
       "step4_3": "위의 <strong class=\"text-foreground\">웹훅 콜백 URL</strong>을 붙여넣기",
       "step4_4": "여기서 설정한 것과 동일한 <strong class=\"text-foreground\">인증 토큰</strong>을 입력",
       "step4_5": "\"messages\" 웹훅 필드를 구독",
-      "metaDocs": "Meta WhatsApp API 문서"
+      "metaDocs": "Meta WhatsApp API 문서",
+      "confirmReset": "현재 WhatsApp 설정을 삭제하고 다시 입력할 수 있게 합니다. 계속할까요?",
+      "errors": {
+        "loadFailed": "WhatsApp 설정을 불러오지 못했습니다",
+        "phoneNumberIdRequired": "Phone Number ID는 필수입니다",
+        "accessTokenRequired": "초기 설정에는 Access Token이 필요합니다",
+        "reenterAccessToken": "변경 사항을 저장하려면 Access Token을 다시 입력하세요",
+        "saveFailed": "설정을 저장하지 못했습니다",
+        "savedButRegisterFailed": "자격 증명은 저장되었지만 수신 등록에 실패했습니다. 아래 등록 상태를 확인하세요.",
+        "connectionFailed": "API 연결에 실패했습니다",
+        "connectionTestFailed": "연결 테스트에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.",
+        "notFullyRegistered": "번호가 완전히 등록되지 않았습니다. 아래 검사에서 실패한 단계를 확인하세요.",
+        "verificationUnreachable": "검증 엔드포인트에 연결할 수 없습니다.",
+        "resetFailed": "설정을 초기화하지 못했습니다"
+      },
+      "success": {
+        "registrationSkipped": "자격 증명이 저장되고 확인되었습니다. PIN이 없어 수신 등록은 건너뛰었습니다 — 아래 등록 상태를 확인하세요.",
+        "liveWithName": "라이브 — {name}이(가) 이제 이벤트를 수신할 수 있습니다.",
+        "connected": "WhatsApp이 연결되었습니다. 1분 이내에 이벤트가 들어오기 시작합니다.",
+        "connectedTo": "{name}에 연결됨",
+        "connectionOk": "API 연결에 성공했습니다",
+        "numberWired": "번호가 완전히 연결되었습니다 — Meta가 이벤트를 전달하고 있습니다.",
+        "configCleared": "설정이 초기화되었습니다. 이제 자격 증명을 다시 입력할 수 있습니다.",
+        "webhookCopied": "Webhook URL이 클립보드에 복사되었습니다"
+      },
+      "embeddedSignup": {
+        "cta": "WhatsApp 연결",
+        "connecting": "연결 중…",
+        "hint": "Facebook 창이 열립니다 — Meta는 그곳에서 연결을 승인합니다. 비즈니스를 관리하는 계정으로 로그인하세요. 휴대폰의 WhatsApp Business 앱은 같은 번호와 기록으로 계속 작동합니다.",
+        "connected": "WhatsApp이 연결되었습니다.",
+        "connectedTo": "{name}에 연결되었습니다.",
+        "connectedNoInbound": "연결되었지만 Meta가 아직 수신 전달을 확인하지 않았습니다. 아래 등록 상태를 확인하세요.",
+        "errorGeneric": "연결을 완료하지 못했습니다. 다시 시도하세요.",
+        "errorNumberClaimed": "이 전화번호는 이미 다른 계정에 연결되어 있습니다.",
+        "errorAmbiguous": "WhatsApp 계정에 번호가 여러 개 있습니다. Facebook 창에서 하나를 선택하거나 아래 수동 설정을 사용하세요.",
+        "errorNotConfigured": "이 배포는 아직 Tech Provider로 설정되지 않았습니다.",
+        "manualTitle": "또는 수동으로 설정",
+        "title": "빠른 연결",
+        "errorFromMeta": "Meta가 연결을 거부했습니다: {message}",
+        "errorCancelledAt": "Meta 창의 \"{step}\" 단계에서 연결이 중단되었습니다. 비즈니스 포트폴리오가 활성 상태이고 본인이 관리자인지 확인한 뒤 다시 시도하세요.",
+        "errorNoWaba": "로그인은 승인되었지만 Meta가 앱에 WhatsApp Business 계정을 공유하지 않았습니다. Meta 창에서 흐름을 끝까지 진행하고 계정을 선택했는지 확인하세요. 번호를 방금 만들었다면 잠시 기다리세요. 계속되면 아래 수동 설정을 사용하세요.",
+        "errorNoNumber": "WhatsApp Business 계정은 공유되었지만 아직 사용할 수 있는 번호가 없습니다. Meta에서 번호 등록과 인증을 마친 뒤 다시 시도하세요."
+      }
     },
     "sections": {
       "overview": "개요",
@@ -1496,7 +1590,10 @@
       "fields": "필드 & 태그",
       "deals": "딜 & 통화",
       "members": "팀원",
-      "api": "API 키"
+      "api": "API 키",
+      "scheduling": "예약",
+      "push": "Device alerts",
+      "queues": "대기열"
     },
     "groups": {
       "account": "계정",
@@ -1618,7 +1715,7 @@
     },
     "aiConfig": {
       "title": "에이전트 설정",
-      "description": "직접 발급받은 OpenAI 또는 Anthropic 키를 사용하세요. wacrm은 회원님의 키로 공급자에 직접 요청하므로 좌석당 AI 비용이 없고 데이터도 온전히 회원님의 것입니다. 인박스의 AI 답장 초안, 자동 응답 봇, 플레이그라운드에 사용됩니다.",
+      "description": "직접 발급받은 OpenAI 또는 Anthropic 키를 사용하세요. iMasterChat은 회원님의 키로 공급자에 직접 요청하므로 좌석당 AI 비용이 없고 데이터도 온전히 회원님의 것입니다. 인박스의 AI 답장 초안, 자동 응답 봇, 플레이그라운드에 사용됩니다.",
       "adminOnlyConfig": "관리자와 소유자만 AI 설정을 변경할 수 있습니다.",
       "loadFailed": "AI 설정을 불러오지 못했습니다",
       "providerAndKey": "공급자 & 키",
@@ -1645,6 +1742,10 @@
       "handoffTo": "인계 대상",
       "handoffToDesc": "봇이 도움을 줄 수 없거나 응답 한도에 도달하면 일시 중지하고 무슨 일이 있었는지 짧은 메모와 함께 이 대상에게 대화를 넘깁니다.",
       "handoffQueue": "미배정 대기열 (모든 상담원이 처리 가능)",
+      "monthlyBudget": "월 AI 예산 (US$)",
+      "monthlyBudgetDesc": "OpenAI/Anthropic은 미국 달러로 청구합니다. 대시보드가 이번 달 지출을 추정하고 이 금액에 가까워지면 경고합니다. 비워 두면 예산이 없습니다.",
+      "monthlyBudgetPlaceholder": "50.00",
+      "invalidBudget": "양수 예산 금액을 입력하세요 (또는 비워 두세요).",
       "remove": "제거",
       "save": "저장",
       "missingModel": "모델 이름을 입력하세요.",
@@ -1659,7 +1760,19 @@
       "embeddingsHintOtherProvider": "{provider}에는 임베딩 엔드포인트가 없으므로, 의미 기반 검색에는 이를 제공하는 공급자의 키가 필요합니다 — OpenRouter는 baai/bge-m3를 제공합니다. 비워두면 키워드 검색을 사용합니다.",
       "embeddingsEndpoint": "임베딩 엔드포인트",
       "embeddingsModel": "임베딩 모델",
-      "embeddingsDimensionHint": "모델은 지식베이스가 저장하는 {dimensions}차원 벡터를 반환해야 합니다. 저장할 때 확인합니다."
+      "embeddingsDimensionHint": "모델은 지식베이스가 저장하는 {dimensions}차원 벡터를 반환해야 합니다. 저장할 때 확인합니다.",
+      "modelSearch": "Search models…",
+      "modelCustom": "Use “{model}”",
+      "modelPrice": "US$ {input} / {output} per 1M",
+      "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher.",
+      "loading": "Loading the AI configuration…",
+      "contextTimestamps": "대화 컨텍스트에 시각 표시",
+      "contextTimestampsDesc": "각 메시지에 발화 시각을 표시해 상담원이 어제와 오늘을 구분할 수 있게 합니다. 없으면 어제 말한 \"내일\"을 여전히 내일로 읽습니다. 응답당 약 100~160토큰이 듭니다 — 예약 기능을 쓰지 않으면 끄세요.",
+      "handoffNotice": "전환 시 고객에게 안내",
+      "handoffNoticeDesc": "대화가 담당자에게 넘어갈 때 봇이 조용해지기 전에 메시지를 보냅니다. 끄면 지금까지처럼 그냥 응답을 멈춥니다.",
+      "handoffNoticeTextLabel": "안내 메시지",
+      "handoffNoticePlaceholder": "담당 부서로 전달하겠습니다. 곧 이곳으로 연락드리겠습니다.",
+      "handoffNoticeTextHint": "비워두면 위 문구를 사용합니다. \"사람을 연결해 드릴게요\"라는 표현은 피하세요 — 고객이 상대를 알 필요는 없고, 즉시 연결을 약속하면 대기열이 감당하지 못합니다."
     },
     "aiKnowledge": {
       "loadFailed": "지식베이스를 불러오지 못했습니다",
@@ -1687,6 +1800,759 @@
       "reindex": "재색인",
       "reindexTooltip": "모든 문서를 다시 임베딩합니다 (예: 임베딩 키 추가 후)",
       "loading": "불러오는 중…"
+    },
+    "quickReplies": {
+      "title": "빠른 응답",
+      "description": "받은편지함 작성창에서 상담원이 삽입할 수 있는 재사용 가능한 스니펫 — 일반 텍스트 또는 저장된 인터랙티브 메시지입니다.",
+      "newButton": "새 빠른 응답",
+      "empty": "아직 빠른 응답이 없습니다. 하나 만들어 여러 대화에서 재사용하세요.",
+      "editTitle": "빠른 응답 편집",
+      "createTitle": "새 빠른 응답",
+      "nameLabel": "이름",
+      "namePlaceholder": "예: 영업 시간",
+      "tabText": "텍스트",
+      "tabInteractive": "인터랙티브",
+      "textPlaceholder": "삽입할 메시지 텍스트",
+      "deleteConfirm": "이 빠른 응답을 삭제할까요?",
+      "cancel": "취소",
+      "save": "저장",
+      "errors": {
+        "nameRequired": "빠른 응답의 이름을 입력하세요.",
+        "saveFailed": "빠른 응답을 저장하지 못했습니다.",
+        "deleteFailed": "빠른 응답을 삭제하지 못했습니다."
+      },
+      "success": {
+        "created": "빠른 응답이 생성되었습니다.",
+        "updated": "빠른 응답이 업데이트되었습니다."
+      }
+    },
+    "scheduling": {
+      "title": "Scheduling",
+      "description": "Connect Google Calendar and set the rules the server enforces when the agent books.",
+      "loading": "Loading...",
+      "loadError": "Could not load the settings.",
+      "connectionTitle": "Google Calendar",
+      "connectionDesc": "Google Calendar is the source of truth for availability. Blocking a day there is enough — the bot respects it immediately.",
+      "notConfigured": "This deployment has no Google credentials. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and NEXT_PUBLIC_SITE_URL.",
+      "connect": "Connect Google Calendar",
+      "disconnect": "Disconnect",
+      "connectedUnknownAccount": "Google account connected",
+      "calendarLabel": "Calendar: {id}",
+      "connectSuccess": "Google Calendar connected.",
+      "connectFailed": "Could not connect ({code}).",
+      "disconnected": "Google Calendar disconnected.",
+      "disconnectError": "Could not disconnect.",
+      "rulesTitle": "Scheduling rules",
+      "rulesDesc": "The server checks every booking against these. The model picks the time; it does not pick whether the time is legal.",
+      "activeLabel": "Let the agent book on its own",
+      "activeHint": "Off, the scheduling tools do not even appear to the model.",
+      "activeWithoutCalendar": "Without Google Calendar connected, days the shop blocks directly in Google are invisible to the bot.",
+      "connectedButInactive": "Google Calendar is connected and the rules are saved, but the agent will not book anything: the switch above is off, and with it off the scheduling tools do not even appear to the model.",
+      "timezone": "Timezone",
+      "timezoneHint": "Sets the shop clock: times offered, booked and displayed all follow this zone.",
+      "timezonePlaceholder": "Choose a timezone…",
+      "timezoneSearch": "Search city or zone…",
+      "timezoneEmpty": "No timezone found.",
+      "slotMinutes": "소요 시간(분)",
+      "leadTime": "Minimum notice (minutes)",
+      "leadTimeHint": "Nothing inside this window is offered.",
+      "maxAdvance": "Book up to this many days ahead",
+      "hours": "Opening hours",
+      "hoursHint": "Windows on the shop clock. A day with no window is a closed day.",
+      "closed": "Closed",
+      "addWindow": "Add window",
+      "removeWindow": "Remove window",
+      "save": "Save",
+      "saved": "Rules saved.",
+      "saveError": "Could not save.",
+      "dayNames": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ],
+      "labelTitle": "무엇이라고 부르시나요?",
+      "labelDesc": "상담원이 고객과 대화할 때 사용하는 단어이며, 화면에도 표시됩니다. 비워두면 \"예약\"이 됩니다.",
+      "labelPlaceholder": "시연, 현장 방문, 상담…",
+      "tokenRevoked": "Google가 이 액세스를 거부했습니다 — 에이전트가 예약을 멈췄습니다. 다시 연결하세요. 7일마다 반복되면 Google Cloud에서 동의 화면을 게시하세요."
+    },
+    "push": {
+      "title": "Device alerts",
+      "description": "Alerts on your phone or computer while the app is closed. With the app open, messages already arrive on their own.",
+      "thisDevice": "This device",
+      "perDevice": "The choice applies to this device only. Your phone can alert on everything while your computer stays quiet.",
+      "loading": "Loading…",
+      "saving": "Saving…",
+      "saved": "Preference saved.",
+      "turnedOff": "Notifications off on this device.",
+      "saveError": "Could not save.",
+      "permissionDenied": "You need to allow notifications in the browser.",
+      "blocked": "The browser is blocking notifications for this site. Allow them in browser settings and come back.",
+      "unsupported": "This browser does not support push notifications.",
+      "notConfigured": "This deployment has no notification keys (VAPID) configured yet.",
+      "modeOff": "Off",
+      "modeOffHint": "No alerts on this device.",
+      "modeHuman": "Only what needs a person",
+      "modeHumanHint": "Alerts when the agent stops and calls a human — a complaint, a blocked subject, a booking that failed. Most people want this.",
+      "modeAll": "Every message",
+      "modeAllHint": "Alerts on every customer message. In a busy shop that is all day.",
+      "iosNote": "On iPhone the app must be installed to the home screen before notifications work (iOS 16.4 or newer)."
+    },
+    "queues": {
+      "title": "상담 대기열",
+      "description": "모든 대화는 항상 하나의 대기열에 있으며, 대기열이 담당자를 결정합니다.",
+      "loading": "대기열 불러오는 중…",
+      "badgeDefault": "기본",
+      "descriptionLabel": "설명",
+      "descriptionHint": "어시스턴트가 라우팅을 결정할 때 읽는 문장입니다. 고객이 쓰는 표현으로 적으세요.",
+      "responsibleLabel": "책임자",
+      "responsibleHint": "이 대기열을 담당하는 사람. 한 사람이 여러 대기열을 맡을 수 있습니다.",
+      "noResponsible": "없음 (공용 대기실)",
+      "autoAssignLabel": "책임자에게 배정",
+      "autoAssignOn": "켜짐",
+      "autoAssignOff": "꺼짐",
+      "autoAssignHint": "켜면 도착 즉시 책임자의 대화가 되고, 어시스턴트는 응답을 멈춥니다.",
+      "newTitle": "새 대기열",
+      "newNamePlaceholder": "결제",
+      "newDescriptionPlaceholder": "청구서, 재발행, 결제, 할부",
+      "newHint": "세네 개로 시작하세요. 쓰지 않는 대기열은 어시스턴트를 혼란시키고 매 응답마다 비용이 듭니다.",
+      "create": "대기열 만들기",
+      "created": "대기열이 생성되었습니다",
+      "deleted": "대기열이 삭제되었습니다",
+      "delete": "대기열 삭제",
+      "confirmDelete": "\"{name}\" 대기열을 삭제할까요? 해당 대화는 대기열이 없어지고, 이력은 보존됩니다.",
+      "errorDuplicate": "같은 이름의 대기열이 이미 있습니다.",
+      "slaLabel": "경고 시간(분)",
+      "slaPlaceholder": "경고 없음",
+      "slaHint": "비워두면 경고 없음. 값을 넣으면 이 시간을 넘겨 대기할 때 알립니다.",
+      "overflowLabel": "아무도 안 맡으면 보낼 곳",
+      "noOverflow": "이동 없음",
+      "overflowHint": "이 시간이 지나면 대화가 스스로 대기열을 옮깁니다. 한 번만.",
+      "overflowAfterLabel": "이동 시간(분)",
+      "distributionLabel": "담당 배정",
+      "rosterLabel": "순환 대상",
+      "skipOfflineLabel": "오프라인인 사람 건너뛰기",
+      "skipOfflineHint": "순환 대상이 모두 오프라인이면 대화는 대기열에 남습니다.",
+      "distribution": {
+        "responsible": "책임자",
+        "round_robin": "팀 순환",
+        "least_busy": "열린 대화가 가장 적은 사람",
+        "none": "없음 (대기실)"
+      },
+      "distributionHint": {
+        "responsible": "모두 위에서 선택한 사람에게 갑니다.",
+        "round_robin": "순서대로 번갈아 갑니다. 예측 가능합니다.",
+        "least_busy": "공평해 보이지만 부작용이 있습니다.",
+        "none": "팀에게 보이고 누군가 가져갑니다."
+      }
+    }
+  },
+  "SignupPage": {
+    "privacyPolicy": "개인정보 처리방침",
+    "emailAlreadyRegistered": "이 이메일로 이미 계정이 있습니다. 비밀번호로 로그인하거나 ‘비밀번호 찾기’를 이용하세요.",
+    "titleJoin": "계정 생성 후 참여",
+    "title": "계정 만들기",
+    "descJoin": "이메일을 인증한 다음 초대를 수락해 팀에 참여하세요.",
+    "desc": "WhatsApp용 CRM Template을 시작하세요",
+    "passwordsMismatch": "비밀번호가 일치하지 않습니다",
+    "passwordTooShort": "비밀번호는 6자 이상이어야 합니다",
+    "checkEmailTitle": "이메일을 확인하세요",
+    "checkEmailDesc": "<strong>{email}</strong>(으)로 확인 링크를 보냈습니다. 받은 편지함을 확인하고 링크를 클릭해 계정을 인증하세요.",
+    "backToSignIn": "로그인으로 돌아가기",
+    "fullNameLabel": "이름",
+    "fullNamePlaceholder": "홍길동",
+    "emailLabel": "이메일",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "비밀번호",
+    "passwordPlaceholder": "6자 이상",
+    "confirmPasswordLabel": "비밀번호 확인",
+    "confirmPasswordPlaceholder": "비밀번호를 다시 입력하세요",
+    "creatingAccount": "계정 생성 중...",
+    "createAccount": "계정 만들기",
+    "haveAccount": "이미 계정이 있으신가요?",
+    "signIn": "로그인",
+    "acceptTerms": "<terms>이용약관</terms> 및 <privacy>개인정보처리방침</privacy>을 읽었으며 이에 동의합니다."
+  },
+  "ForgotPasswordPage": {
+    "title": "비밀번호 재설정",
+    "desc": "이메일을 입력하면 재설정 링크를 보내드립니다",
+    "checkEmailTitle": "이메일을 확인하세요",
+    "checkEmailDesc": "<strong>{email}</strong>(으)로 비밀번호 재설정 링크를 보냈습니다. 받은 편지함을 확인하세요.",
+    "backToSignIn": "로그인으로 돌아가기",
+    "emailLabel": "이메일",
+    "emailPlaceholder": "you@example.com",
+    "sending": "전송 중...",
+    "sendResetLink": "재설정 링크 보내기"
+  },
+  "JoinPage": {
+    "verifying": "초대 확인 중…",
+    "fail": {
+      "notFound": {
+        "title": "초대를 찾을 수 없습니다",
+        "body": "이 링크는 유효한 초대와 일치하지 않습니다. URL을 다시 확인하거나 초대한 사람에게 새 링크를 요청하세요."
+      },
+      "used": {
+        "title": "이미 사용된 초대입니다",
+        "body": "이 초대는 이미 수락되었습니다. 본인이 아니라면 계정 관리자에게 새 링크를 요청하세요."
+      },
+      "expired": {
+        "title": "만료된 초대입니다",
+        "body": "이 초대는 만료되었습니다. 계정 관리자에게 새 초대를 요청하세요 — 생성하는 데 몇 초면 됩니다."
+      },
+      "serverError": {
+        "title": "문제가 발생했습니다",
+        "body": "지금은 이 초대를 확인할 수 없습니다. 잠시 후 페이지를 새로고침해 보세요."
+      }
+    },
+    "tryAgain": "다시 시도",
+    "createNewAccountInstead": "대신 새 계정 만들기",
+    "signIn": "로그인",
+    "invitedTitle": "<account>{name}</account>에 초대되었습니다",
+    "invitedDesc": "<role>{roleName}</role> 역할로 참여합니다. 링크는 {date}까지 유효합니다.",
+    "roleAdmin": "관리자",
+    "roleAgent": "상담원",
+    "roleViewer": "뷰어",
+    "accepting": "수락 중…",
+    "acceptInvitation": "초대 수락",
+    "acceptNote": "수락하면 로그인이 <account>{name}</account>(으)로 이동합니다. 가입 시 만든 빈 개인 계정은 정리됩니다.",
+    "toastWelcome": "팀에 오신 것을 환영합니다",
+    "toastAcceptFailed": "초대를 수락하지 못했습니다",
+    "toastServerUnreachable": "서버에 연결할 수 없습니다",
+    "conflictFallback": "이미 다른 계정에 속해 있습니다. 이 계정에 참여하려면 다른 이메일로 로그인하세요.",
+    "toastSignOutFailed": "로그아웃하지 못했습니다. 페이지를 새로고침해 보세요.",
+    "conflictTitle": "이 계정으로는 {name}에 참여할 수 없습니다",
+    "conflictHelp": "<account>{name}</account>에 참여하려면 로그아웃한 뒤 다른 이메일 주소로 다시 가입하세요. 초대 링크는 만료되기 전까지 유효합니다.",
+    "staySignedIn": "로그인 유지",
+    "signingOut": "로그아웃 중…",
+    "signOutUseDifferentEmail": "로그아웃하고 다른 이메일 사용",
+    "createAccountJoin": "계정 생성 후 참여",
+    "alreadyHaveAccount": "이미 계정이 있습니다"
+  },
+  "Shell": {
+    "loading": "로딩 중..."
+  },
+  "Agents": {
+    "page": {
+      "title": "AI 에이전트",
+      "description": "자체 API 키를 사용하는 AI 에이전트입니다 — 설정한 뒤 받은 편지함에서 고객에게 답장하기 전에 플레이그라운드에서 테스트해 보세요.",
+      "tabPlayground": "플레이그라운드",
+      "tabSetup": "설정",
+      "tabUsage": "사용량",
+      "vaultTab": "Network",
+      "guardrailsTab": "Limits",
+      "tabContext": "컨텍스트",
+      "tabRules": "규칙"
+    },
+    "playground": {
+      "notConfiguredError": "아직 구성된 에이전트가 없습니다 — 먼저 설정을 완료하세요.",
+      "noReplyError": "응답을 받지 못했습니다.",
+      "unreachableError": "에이전트에 연결할 수 없습니다.",
+      "title": "플레이그라운드",
+      "subtitle": "— 고객이 된 것처럼 응답을 테스트하세요",
+      "reset": "초기화",
+      "emptyTitle": "메시지를 보내 에이전트가 어떻게 답하는지 확인해 보세요.",
+      "emptyHint": "지식 베이스를 사용하며 자동 응답 봇과 똑같이 동작합니다 — 상담원 전환 포함.",
+      "goToSetup": "아직 설정하지 않았나요? 설정으로 이동",
+      "handoff": "여기서 상담원에게 전환됩니다",
+      "thinking": "생각 중…",
+      "inputPlaceholder": "고객 메시지를 입력하세요…"
+    },
+    "usage": {
+      "loadError": "사용량을 불러오지 못했습니다",
+      "title": "토큰 사용량",
+      "description": "초안과 자동 응답 봇이 제공자 키에서 사용한 토큰입니다. 개수만 집계하며 메시지 내용은 저장되지 않습니다.",
+      "lastDays": "최근 {days}일",
+      "emptyTitle": "최근 {days}일 동안 AI 사용량이 아직 없습니다.",
+      "emptyHint": "어시스턴트가 초안을 작성하고 자동 응답하면 채워집니다.",
+      "statTotalTokens": "총 토큰",
+      "statLlmCalls": "LLM 호출",
+      "statAutoReply": "자동 응답",
+      "statDrafts": "초안",
+      "tokensPerDay": "일별 토큰",
+      "tokensCategory": "토큰",
+      "byModel": "모델별",
+      "modelStats": "{tokens} 토큰 · 호출 {count}회",
+      "truncated": "일부 기간만 표시 중입니다 — 사용량이 많아 가장 최근 기록만 요약되어 있습니다.",
+      "costPerDay": "Cost per day",
+      "costCategory": "Cost",
+      "unitCost": "Money",
+      "unitTokens": "Tokens"
+    },
+    "vault": {
+      "loadError": "Could not load the vault.",
+      "actionError": "Could not complete the action.",
+      "approved": "Page approved — it counts in replies now.",
+      "rejected": "Page rejected.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "archive": "Archive",
+      "showDrafts": "Show drafts in the graph",
+      "noDrafts": "Nothing waiting for approval. The agent proposes pages when conversations end.",
+      "noPages": "No approved pages yet.",
+      "tabs": {
+        "graph": "Network",
+        "drafts": "Approval",
+        "pages": "Pages",
+        "health": "Health",
+        "keeper": "키퍼"
+      },
+      "graph": {
+        "hint": "Drag to move, scroll to zoom, hover to light up the connections. A hollow node is a draft — it does not count in replies yet.",
+        "empty": "The vault is empty. As the agent works, it proposes pages here — and the network grows.",
+        "connections": "{count, plural, =0 {no connections} =1 {1 connection} other {# connections}}",
+        "kind": {
+          "rule": "Rule",
+          "entity_customer": "Customer",
+          "entity_business": "Business",
+          "concept": "Concept",
+          "state": "Right now"
+        }
+      },
+      "healthy": "Nothing to fix. The wiki is consistent.",
+      "lint": {
+        "contradiction": "Contradiction",
+        "stale": "Stale",
+        "duplicate": "Duplicate",
+        "orphan": "Orphan",
+        "gap": "Gap"
+      },
+      "edit": "Edit",
+      "editTitle": "Page title",
+      "editHint": "Saving approves the page with your version — that is what the agent will use in replies.",
+      "cancelEdit": "Discard",
+      "saveEdit": "Save",
+      "saveAndApprove": "Save and approve",
+      "saved": "Page saved and approved.",
+      "keeper": {
+        "description": "키퍼는 90분 이상 조용한 대화를 읽고 위키 페이지를 제안합니다. 밤에 자동으로 실행되며, 여기서 그 결정을 볼 수 있습니다 — 아무것도 저장하지 않기로 한 경우도 포함해서요.",
+        "runNow": "지금 실행",
+        "running": "실행 중…",
+        "loading": "불러오는 중…",
+        "empty": "이 계정에서 키퍼가 아직 실행되지 않았습니다.",
+        "runError": "키퍼를 실행할 수 없습니다.",
+        "runProposed": "{count}개 페이지가 제안되었습니다 — 승인 탭을 확인하세요.",
+        "runNothingDurable": "대화 {count}건을 읽었지만 저장할 만한 내용이 없었습니다.",
+        "runTooRecent": "준비된 대화가 없습니다: {count}건이 아직 진행 중입니다. 90분간 조용해야 읽습니다.",
+        "runAlreadyRead": "새로운 것이 없습니다 — 해당 기간의 대화 {count}건은 이미 읽었습니다.",
+        "runNoConversations": "지난 7일간 읽을 대화가 없습니다.",
+        "operation": {
+          "proposed": "페이지를 제안함",
+          "no_action": "실행했지만 도구를 호출하지 않음",
+          "finished": "저장하지 않기로 결정함"
+        }
+      },
+      "newPage": {
+        "button": "새 페이지",
+        "title": "페이지 작성",
+        "description": "대화에서 언급된 적 없는, 비즈니스가 아는 내용입니다. 승인된 상태로 추가되어 답변에 반영됩니다.",
+        "kind": "종류",
+        "pageTitle": "제목",
+        "pageTitlePlaceholder": "반품 정책",
+        "content": "내용",
+        "contentPlaceholder": "영수증 지참 시 30일 이내 반품 가능.",
+        "contentHint": "짧고 정확하게. 규칙은 모든 답변에 들어갑니다 — 여기가 틀리면 상담원이 그대로 반복합니다.",
+        "cancel": "취소",
+        "save": "페이지 만들기",
+        "created": "페이지가 생성되고 승인되었습니다.",
+        "error": "페이지를 만들 수 없습니다.",
+        "kinds": {
+          "rule": "규칙",
+          "entity_customer": "고객 정보",
+          "entity_business": "비즈니스 정보",
+          "concept": "개념",
+          "state": "현재 상태"
+        },
+        "kindHints": {
+          "rule": "모두에게 적용되며 자주 바뀌지 않습니다. 모든 답변에 들어가니 짧게 쓰세요.",
+          "entity_customer": "한 사람에 대한 사실: 선호, 제약, 구매 이력.",
+          "entity_business": "무엇을 팔고, 얼마를 받고, 무엇을 하고 안 하는지.",
+          "concept": "상담원이 여러분 방식대로 이해해야 하는 업계 용어.",
+          "state": "지금은 사실이지만 바뀔 내용: 이달 프로모션, 인력 부족."
+        }
+      }
+    },
+    "guardrails": {
+      "title": "When to call a person",
+      "description": "Subjects the agent may not handle on its own. Everything else it keeps answering normally.",
+      "loading": "Loading…",
+      "loadError": "Could not load the rules.",
+      "saveError": "Could not save.",
+      "added": "Rule added.",
+      "remove": "Remove rule",
+      "builtin": "default",
+      "topicsTitle": "By subject",
+      "topicsDesc": "The agent reads it and decides whether the conversation went there. Catches the customer who negotiates without ever saying “discount” — and, resting on its judgement, can be wrong.",
+      "keywordsTitle": "By word",
+      "keywordsDesc": "Checked before the agent replies, spending no call. It cannot be talked out of it — and it misses anyone who phrased it differently.",
+      "noTopics": "No blocked subjects.",
+      "noKeywords": "No blocked words.",
+      "addTitle": "Add a rule",
+      "addDesc": "Use a subject for something a customer can phrase many ways; a word for an exact term that must never get through.",
+      "kindTopic": "Subject",
+      "kindKeyword": "Word",
+      "valueTopicLabel": "Subject that requires a person",
+      "valueTopicPlaceholder": "e.g. lens replacement outside warranty",
+      "valueKeywordLabel": "Word or phrase",
+      "valueKeywordPlaceholder": "e.g. complaint",
+      "noteLabel": "Note for the attendant (optional)",
+      "notePlaceholder": "e.g. check the invoice before replying",
+      "noteHint": "Shows in the note the attendant reads before opening the thread.",
+      "add": "Add"
+    },
+    "costProjection": {
+      "title": "Projected cost per message",
+      "description": "Assembled from the same pieces the agent actually loads — it moves on its own when the vault grows or a rule is added.",
+      "loading": "Calculating…",
+      "notConfigured": "Configure the agent to see the projection.",
+      "perReply": "Per reply",
+      "perMonth": "Per month",
+      "basedOn": "{count} inbound messages in 30 days",
+      "promptTokens": "Tokens sent",
+      "steps": "Calls per reply",
+      "stepsHint": "With tools, the prompt is re-sent on every step",
+      "breakdown": "Where the cost is",
+      "everyMessage": "All of this is re-sent on every message, in every conversation. That is why cutting what is always loaded is worth more than cutting what is retrieved.",
+      "estimateWarning": "Tokens start as a character estimate and are corrected by what the provider actually charged on this account.",
+      "noMeasurement": "No calls recorded yet to compare against. Once the agent answers customers, the measured figure appears here.",
+      "priceFallback": "This model is not in the price table — we used its class, so the figure is rougher still.",
+      "sections": {
+        "scaffold": "Fixed base",
+        "system_prompt": "Your prompt",
+        "environment": "Current context",
+        "vault": "Vault",
+        "guardrails": "Limits",
+        "knowledge": "Knowledge base",
+        "tools": "Tools",
+        "transcript": "Conversation history"
+      },
+      "calibrated": "Corrected using {calls} real calls: the character estimate said {raw} tokens and was {drift}% off the measured figure. The number above is already adjusted.",
+      "calibratedMatch": "Checked against {calls} real calls — the estimate matched.",
+      "fxNote": "BRL figures are approximate at R$ {rate} per dollar ({age}). The provider charges in dollars on the card, with tax and spread on top.",
+      "fxToday": "today's rate",
+      "fxDays": "rate from {days} days ago"
+    },
+    "tools": {
+      "title": "What the agent can do",
+      "description": "The tools it can use. A tool that is off does not become “unavailable” — it stops existing for the model, which never offers it.",
+      "loading": "Loading…",
+      "loadError": "Could not load the tools.",
+      "saveError": "Could not save.",
+      "alwaysOn": "Always on",
+      "alwaysOnWhy": "Cannot be switched off: it is the only way the agent can stop and call a person.",
+      "absentNote": "A tool that is off also leaves the prompt — it stops costing tokens on every message.",
+      "descriptions": {
+        "request_human": "Stops the conversation and hands it to a person, with a reason.",
+        "check_availability": "Looks up genuinely free slots, crossing Google Calendar with what is already booked here.",
+        "book_appointment": "Books the appointment at the time the customer chose.",
+        "reschedule_appointment": "Moves the customer's appointment to another free slot.",
+        "cancel_appointment": "Cancels the customer's appointment and frees the slot.",
+        "route_to_queue": "대화를 담당 팀으로 보내고 응답을 멈춥니다. 각 대기열에 적은 설명을 보고 고릅니다.",
+        "add_tag": "허용한 태그 중 하나를 연락처에 붙입니다. 허용한 것만 제시됩니다."
+      },
+      "requirements": {
+        "scheduling_off": "Unavailable: switch on “let the agent book on its own” in Settings → Scheduling.",
+        "google_disconnected": "Unavailable: connect Google Calendar in Settings → Scheduling.",
+        "calendar_unusable": "Unavailable: the Google Calendar connection must be reconnected.",
+        "no_human_queue": "사용 불가: 설정 → 대기열에서 사람 대기열을 하나 이상 만드세요.",
+        "no_selectable_tag": "사용 불가: 설정 → 필드 및 태그에서 에이전트가 쓸 태그를 하나 이상 허용하세요."
+      },
+      "names": {
+        "request_human": "Call a person",
+        "check_availability": "Check free slots",
+        "book_appointment": "Book an appointment",
+        "reschedule_appointment": "Reschedule an appointment",
+        "cancel_appointment": "Cancel an appointment",
+        "route_to_queue": "대기열로 전달",
+        "add_tag": "연락처에 태그"
+      }
+    },
+    "context": {
+      "loading": "컨텍스트를 구성하는 중…",
+      "notConfigured": "먼저 AI를 설정하세요 — 키와 모델이 없으면 구성할 컨텍스트가 없습니다.",
+      "description": "상담원이 답변 전에 읽는 내용 그대로이며, 실제 경로와 동일한 코드로 구성됩니다. 여기가 잘못되면 고객이 그대로 듣게 됩니다.",
+      "totalTokens": "응답당 토큰",
+      "sectionEmpty": "비어 있음",
+      "emptyDetail": "이 섹션에는 내용이 없습니다. 기대한 내용이 있다면 설정이 빠진 것입니다.",
+      "editAt": "설정 위치",
+      "knowledgeNote": "지식 베이스는 질문에 따라 달라지므로 여기 표시되지 않습니다 — 답변 시점에 최대 5개 조각이 선택됩니다. 있을 때 총합에 더해집니다.",
+      "sections": {
+        "scaffold": "고정 스캐폴드",
+        "environment": "현재 상황",
+        "vault": "볼트(항상 포함되는 페이지)",
+        "business_prompt": "비즈니스 지침",
+        "guardrails": "가드레일",
+        "tools": "사용 가능한 도구",
+        "transcript": "대화"
+      },
+      "hints": {
+        "scaffold": "모든 계정에 적용되는 규칙. 설정 불가.",
+        "environment": "현재 날짜와 시각, 시간대, 영업 시간, 고객과 예약 정보.",
+        "vault": "모든 답변에 포함되는 승인된 페이지.",
+        "business_prompt": "비즈니스에 대해 직접 작성한 자유 텍스트.",
+        "guardrails": "봇이 다루면 안 되는 주제.",
+        "tools": "답변 외에 할 수 있는 것.",
+        "transcript": "최근 메시지. 대화를 선택하지 않아 비어 있습니다."
+      }
+    },
+    "rules": {
+      "loading": "불러오는 중…",
+      "save": "규칙 저장",
+      "saved": "규칙이 저장되었습니다.",
+      "saveError": "저장할 수 없습니다. 예약이 아직 설정되지 않았다면 설정 → 예약을 먼저 여세요.",
+      "description": "상담원의 대화 방식을 결정하는 숫자입니다. 각각은 트레이드오프이며, 주황색 문구가 값을 올릴 때 치르는 대가입니다.",
+      "sections": {
+        "conversation": "대화",
+        "scheduling": "예약",
+        "audio": "음성"
+      },
+      "fields": {
+        "new_session_hours": {
+          "label": "새 대화로 간주하는 침묵 시간",
+          "hint": "고객이 이 시간이 지난 뒤 돌아오면 새로운 문의로 취급합니다. 이전 주제를 가정하지 않고, 답변 없는 옛 질문 때문에 전환하지도 않습니다.",
+          "cost": "너무 크면 다음 날 복귀가 이어짐으로 읽힙니다. 너무 작으면 고객이 잠시 늦게 답했을 뿐인데 대화 중에 발동합니다."
+        },
+        "offer_slots_max": {
+          "label": "메시지당 제안 시간 수",
+          "hint": "봇이 한 번에 언급하는 시간의 개수입니다. 나머지는 다음 질문을 위해 남겨둡니다.",
+          "cost": "3을 넘으면 답변이 양식처럼 읽히기 시작합니다. 이 값이 컸던 것이 42개 시간이 담긴 메시지를 만들었습니다."
+        },
+        "lookahead_days": {
+          "label": "앞으로 검색할 일수",
+          "hint": "고객이 날짜를 말하지 않을 때 상담원이 얼마나 앞을 보는지.",
+          "cost": "일수가 많을수록 더 많은 슬롯을 가져오고 조회할 때마다 토큰이 더 듭니다."
+        },
+        "slot_fetch_limit": {
+          "label": "조회당 가져오는 슬롯 수",
+          "hint": "검색이 모델에 반환하는 슬롯 수입니다. 앞의 몇 개만 제안하지만 전부 알고 있어 \"목요일은요?\"에 재조회 없이 답합니다.",
+          "cost": "모든 슬롯이 컨텍스트에 실려 토큰으로 청구됩니다. 낮추면 절약되지만 대화 중 서버 왕복이 늘어납니다."
+        },
+        "context_message_limit": {
+          "label": "모델에 전달되는 이전 메시지 수",
+          "hint": "답변할 때 상담원이 보는 이전 대화 메시지 수입니다. 너무 적으면 맥락을 잃고, 너무 많아도 도움이 되지 않습니다.",
+          "cost": "컨텍스트 크기이므로 모든 응답의 비용입니다. 안경원은 6개면 충분하고, 컨설팅은 40개가 필요할 수 있습니다. 대화가 길고 주제가 바뀐다면 히스토리를 늘리기보다 볼트가 낫습니다."
+        }
+      },
+      "audio": {
+        "policyLabel": "고객이 음성을 보낼 때",
+        "policies": {
+          "ignore": {
+            "label": "아무것도 하지 않음",
+            "hint": "음성은 저장되고 대화에 표시되지만 상담원은 응답하지 않습니다. 이전 동작이며, 고객 입장에서는 침묵입니다."
+          },
+          "notice": {
+            "label": "텍스트로 요청",
+            "hint": "글로 적어달라고 답합니다. 저렴하고 침묵을 없애지만 고객에게 수고를 넘깁니다."
+          },
+          "transcribe": {
+            "label": "전사 후 응답",
+            "hint": "전사해 텍스트처럼 처리합니다. 이후 컨텍스트, 키워드, 예약 모두 작동합니다. 전사가 실패하면 텍스트 요청으로 넘어갑니다."
+          },
+          "handoff": {
+            "label": "담당자에게 전달",
+            "hint": "이해를 시도하지 않고 바로 넘깁니다. 위험을 감수하기보다 직접 듣고 싶은 경우에 적합합니다."
+          }
+        },
+        "noticeLabel": "음성을 이해할 수 없을 때 보낼 메시지",
+        "noticePlaceholder": "음성 메시지를 받았습니다! 더 빠르게 도와드릴 수 있도록 필요한 내용을 적어주시겠어요?",
+        "noticeHint": "비워두면 위 문구를 사용합니다. 기술적 한계를 고백하지 마세요 — \"음성을 들을 수 없습니다\"는 고객이 문제 해결 대신 도구를 평가하게 만듭니다.",
+        "providerLabel": "전사 주체",
+        "providers": {
+          "local": {
+            "label": "우리 VPS의 Whisper",
+            "hint": "분당 비용이 없고 고객 음성이 외부로 나가지 않습니다. 더 느립니다: 7초 음성에 약 11초, 길이에 비례합니다."
+          },
+          "elevenlabs": {
+            "label": "ElevenLabs (API)",
+            "hint": "특히 잡음이 있는 휴대폰 음성에서 더 빠르고 정확합니다. 분당 과금되며 음성이 제3자에게 전송됩니다 — 민감한 대화라면 고려하세요."
+          }
+        },
+        "keyLabel": "ElevenLabs 키",
+        "keyPlaceholder": "sk_…",
+        "keySaved": "••• 키 저장됨 — 변경하려면 새로 입력",
+        "keyHint": "암호화하여 저장합니다. 비워두면 현재 키를 유지합니다.",
+        "vocabLabel": "업종 용어",
+        "vocabPlaceholder": "안경테, 반사방지 렌즈, 도수, 누진다초점, 레이밴",
+        "vocabHint": "전사가 자주 틀리는 제품명, 브랜드, 전문 용어. 쉼표로 구분하세요. 예약 관련 동사와 요일은 이미 포함되어 있습니다.",
+        "vocabCost": "로컬 Whisper에만 적용됩니다. 너무 길게 쓰지 마세요: 이 텍스트는 음성 자체와 공간을 다투므로, 긴 목록은 고치려던 것을 오히려 악화시킵니다. 실제로 틀린 것만 추가하세요."
+      }
+    }
+  },
+  "Notifications": {
+    "markReadError": "알림을 읽음으로 표시하지 못했습니다",
+    "markAllReadError": "모두 읽음으로 표시하지 못했습니다",
+    "retry": "다시 시도",
+    "title": "알림",
+    "description": "다른 팀원이 회원님에게 배정한 대화가 여기에 표시됩니다.",
+    "markAllRead": "모두 읽음으로 표시",
+    "emptyTitle": "아직 알림이 없습니다",
+    "emptyHint": "누군가 회원님에게 대화를 배정하면 여기에 알림이 표시됩니다.",
+    "unread": "읽지 않음",
+    "someContact": "연락처",
+    "assigned": {
+      "title": "새 대화가 배정되었습니다",
+      "byPerson": "{actor}님이 {contact}님과의 대화를 배정했습니다",
+      "bySystem": "{contact}님과의 대화가 배정되었습니다"
+    }
+  },
+  "Billing": {
+    "pendingTitle": "승인 대기 중인 계정",
+    "pendingDesc": "\"{accountName}\" 계정이 생성되어 팀의 활성화를 기다리고 있습니다. 승인되는 즉시 이용하실 수 있습니다.",
+    "blockedTitle": "계정이 일시적으로 정지됨",
+    "blockedDesc": "\"{accountName}\" 계정은 결제 미납으로 접근이 정지되었습니다. 결제를 완료하면 접근이 복구됩니다 — 데이터는 유지되며, 정지 중에도 수신 WhatsApp 메시지는 계속 저장됩니다.",
+    "pixLabel": "결제용 PIX 키",
+    "pixQrAlt": "PIX QR 코드 — 스캔하여 결제",
+    "contactCta": "지원팀에 문의",
+    "signOut": "로그아웃",
+    "pastDueBanner": "계정에 미납 청구서가 있습니다. 정지를 피하려면 결제를 완료해 주세요.",
+    "admin": {
+      "title": "플랫폼 관리자",
+      "subtitle": "모든 계정의 수동 결제 상태입니다. 변경 사항은 즉시 적용됩니다.",
+      "colAccount": "계정",
+      "colOwner": "소유자",
+      "colStatus": "상태",
+      "colPaidUntil": "결제 만료일",
+      "colMembers": "구성원",
+      "colNotes": "메모",
+      "statusPending": "승인 대기",
+      "statusActive": "활성",
+      "statusPastDue": "연체",
+      "statusBlocked": "차단됨",
+      "notesPlaceholder": "내부 메모 (계약, 금액, 연락처…)",
+      "saveNotes": "저장",
+      "loadError": "계정을 불러올 수 없습니다",
+      "updateError": "계정을 업데이트할 수 없습니다",
+      "updatedToast": "계정이 업데이트되었습니다",
+      "empty": "아직 계정이 없습니다",
+      "forbidden": "이 페이지에 접근할 권한이 없습니다.",
+      "refresh": "새로고침"
+    }
+  },
+  "Interactive": {
+    "replyButtons": "응답 버튼",
+    "list": "목록",
+    "body": "본문",
+    "bodyPlaceholder": "옵션 위에 고객이 읽게 될 내용",
+    "headerOptional": "헤더 (선택)",
+    "footerOptional": "푸터 (선택)",
+    "showReplyIds": "응답 ID 표시 (고급)",
+    "preview": "미리보기",
+    "buttonsCount": "버튼 ({count}/{max})",
+    "buttonLabelPlaceholder": "버튼 라벨",
+    "addButton": "버튼 추가",
+    "listButtonLabel": "목록 버튼 라벨",
+    "rowsCount": "행 ({count}/{max})",
+    "sectionTitlePlaceholder": "섹션 제목 (선택)",
+    "rowTitlePlaceholder": "행 제목",
+    "descriptionPlaceholder": "설명 (선택)",
+    "addRow": "행 추가",
+    "addSection": "섹션 추가",
+    "previewBodyPlaceholder": "메시지 본문…",
+    "previewButtonFallback": "버튼",
+    "previewMenuFallback": "메뉴"
+  },
+  "Agenda": {
+    "title": "Agenda",
+    "description": "Booked appointments — by the agent or by you. Availability comes from Google Calendar.",
+    "week": "Week",
+    "day": "Day",
+    "today": "Today",
+    "previous": "Previous period",
+    "next": "Next period",
+    "newButton": "New appointment",
+    "empty": "Nothing booked",
+    "loadError": "Could not load the agenda.",
+    "unknownContact": "Unnamed contact",
+    "viaAgent": "Booked by the agent",
+    "viaManual": "Booked by hand",
+    "notOnCalendar": "Not on Google Calendar",
+    "openConversation": "Open conversation",
+    "newDialog": {
+      "title": "New appointment",
+      "description": "Date and time in the shop timezone ({timezone}).",
+      "contact": "Customer",
+      "contactSearch": "Search by name or phone...",
+      "noContacts": "No contacts found.",
+      "date": "Date",
+      "time": "Time",
+      "duration": "Duration (minutes)",
+      "subject": "Subject",
+      "subjectPlaceholder": "시연, 견적, 현장 방문…",
+      "cancel": "Cancel",
+      "save": "Book",
+      "created": "Appointment created.",
+      "createdUnsynced": "Appointment created, but it did not reach Google Calendar. Check before confirming with the customer.",
+      "error": "Could not create the appointment."
+    },
+    "detail": {
+      "unknownContact": "Unnamed contact",
+      "viaAgent": "Booked by the agent",
+      "viaManual": "Booked by hand",
+      "status": {
+        "scheduled": "Confirmed",
+        "completed": "Showed up",
+        "no_show": "No-show",
+        "cancelled": "Cancelled"
+      },
+      "notOnCalendar": "This appointment never reached Google Calendar. The shop will not see it — sort it out before the time comes.",
+      "cancelledBecause": "Cancelled: {reason}",
+      "openConversation": "Open conversation",
+      "reschedule": "Reschedule",
+      "confirmReschedule": "Confirm new time",
+      "back": "Back",
+      "newDate": "New date",
+      "newTime": "New time",
+      "cancel": "Cancel appointment",
+      "cancelReason": "Cancellation reason",
+      "cancelReasonPlaceholder": "Optional",
+      "rescheduled": "Appointment moved.",
+      "cancelled": "Appointment cancelled.",
+      "unsyncedWarning": "Saved here, but Google Calendar was not updated.",
+      "error": "Could not update the appointment."
+    }
+  },
+  "Feedback": {
+    "open": "Feedback",
+    "close": "Close",
+    "title": "Something wrong?",
+    "subtitle": "Goes straight to whoever builds iMasterChat.",
+    "kind": {
+      "bug": "Problem",
+      "idea": "Idea",
+      "other": "Other"
+    },
+    "placeholder": {
+      "bug": "What you did, what you expected, what happened.",
+      "idea": "What would make your day here easier?",
+      "other": "Write freely."
+    },
+    "shotAdd": "Attach a picture of the screen",
+    "shotAttached": "Image attached",
+    "shotRemove": "Remove the image",
+    "shotUnsupported": "This device cannot capture the screen. Describe it in the text.",
+    "shotFailed": "Could not capture the screen.",
+    "shotWarning": "The image is optional. If you attach one, choose what to share — the screen may contain a customer's conversation.",
+    "shotWarningAttached": "Check that the image shows no customer data before sending.",
+    "back": "Back",
+    "send": "Send",
+    "sendError": "Could not send. Try again.",
+    "thanks": "Got it, thank you!",
+    "thanksHint": "If we need more detail, we'll reach you here.",
+    "sendAnother": "Send another"
+  },
+  "Pwa": {
+    "install": {
+      "title": "기기에 iMasterChat 설치하기",
+      "description": "홈 화면에 아이콘으로 추가되고, 브라우저 표시줄 없이 열리며, 앱이 닫혀 있을 때도 메시지 알림을 받을 수 있게 해줍니다.",
+      "action": "설치",
+      "installing": "여는 중…",
+      "stepsIos": "Safari에서: 공유 → 홈 화면에 추가.",
+      "stepsAndroid": "브라우저 메뉴(⋮)에서: 앱 설치.",
+      "stepsDesktop": "브라우저 주소 표시줄의 설치 아이콘을 클릭하세요.",
+      "never": "다시 표시하지 않기",
+      "close": "닫기"
     }
   }
 }

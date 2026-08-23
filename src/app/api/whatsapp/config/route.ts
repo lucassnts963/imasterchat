@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth/account'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import {
   registerPhoneNumber,
@@ -165,24 +166,18 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const accountId = await resolveAccountId(supabase, user.id)
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 },
-      )
-    }
+    // `admin`, e não apenas sessão válida.
+    //
+    // Esta rota substitui `phone_number_id`, `waba_id` e o token de
+    // acesso da conta inteira — trocar o número aqui redireciona todo o
+    // atendimento. O bloco anterior conferia só que havia sessão e
+    // conta, então um `viewer` conseguia refazer a conexão do WhatsApp
+    // do negócio.
+    //
+    // `POST /api/whatsapp/embedded-signup` já exigia `admin` para
+    // chegar ao MESMO resultado por outro caminho. Eram duas portas
+    // para o mesmo cômodo, uma com fechadura e outra sem.
+    const { supabase, accountId, userId } = await requireRole('admin')
 
     const body = await request.json()
     const { phone_number_id, waba_id, access_token, verify_token, pin } = body
@@ -388,7 +383,7 @@ export async function POST(request: Request) {
         .from('whatsapp_config')
         .insert({
           account_id: accountId,
-          user_id: user.id,
+          user_id: userId,
           ...baseRow,
         })
 

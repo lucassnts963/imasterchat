@@ -748,7 +748,19 @@ export function TemplateManager() {
                 }
               >
                 <SelectTrigger className="w-full bg-muted border-border text-foreground">
-                  <SelectValue />
+                  <SelectValue>
+                    {(v) =>
+                      v === 'text'
+                        ? t('headerText')
+                        : v === 'image'
+                          ? t('headerImage')
+                          : v === 'video'
+                            ? t('headerVideo')
+                            : v === 'document'
+                              ? t('headerDocument')
+                              : t('headerNone')
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
                   {HEADER_FORMATS.map((type) => (
@@ -956,7 +968,17 @@ export function TemplateManager() {
                           }}
                         >
                           <SelectTrigger className="w-40 bg-muted border-border text-foreground h-8 text-xs">
-                            <SelectValue />
+                            <SelectValue>
+                              {(v) =>
+                                v === 'URL'
+                                  ? t('btnUrl')
+                                  : v === 'PHONE_NUMBER'
+                                    ? t('btnPhone')
+                                    : v === 'COPY_CODE'
+                                      ? t('btnCopyCode')
+                                      : t('btnQuickReply')
+                              }
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="bg-popover border-border">
                             <SelectItem

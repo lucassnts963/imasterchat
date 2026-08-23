@@ -30,6 +30,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { hasMinRole, isAccountRole, type AccountRole } from "./roles";
+// Billing vocabulary lives in a dependency-free module so client
+// components can import it without dragging `next/headers` in through
+// this file. Re-exported here for the server-side callers that already
+// import their account plumbing from one place.
+import {
+  isBillingGated,
+  isBillingStatus,
+  type BillingStatus,
+} from "@/lib/billing/status";
+
+export {
+  BILLING_STATUSES,
+  isBillingGated,
+  isBillingStatus,
+  type BillingStatus,
+} from "@/lib/billing/status";
 
 // ------------------------------------------------------------
 // Errors
@@ -55,6 +71,25 @@ export class ForbiddenError extends Error {
 }
 
 /**
+ * The caller's account is gated by manual billing — either a fresh
+ * signup awaiting approval (`pending`) or an account suspended for
+ * non-payment (`blocked`). Maps to HTTP 402 so API clients can
+ * distinguish "pay/approve first" from auth (401) and role (403)
+ * failures. The dashboard layout catches this and redirects to
+ * /blocked.
+ */
+export class PaymentRequiredError extends Error {
+  readonly status = 402 as const;
+  constructor(
+    readonly billingStatus: BillingStatus,
+    message = "Account access is suspended",
+  ) {
+    super(message);
+    this.name = "PaymentRequiredError";
+  }
+}
+
+/**
  * Convert one of the typed errors above (or anything else) into a
  * `NextResponse`. Routes can do:
  *
@@ -67,7 +102,11 @@ export class ForbiddenError extends Error {
  * server internals out of the wire.
  */
 export function toErrorResponse(err: unknown): NextResponse {
-  if (err instanceof UnauthorizedError || err instanceof ForbiddenError) {
+  if (
+    err instanceof UnauthorizedError ||
+    err instanceof ForbiddenError ||
+    err instanceof PaymentRequiredError
+  ) {
     return NextResponse.json({ error: err.message }, { status: err.status });
   }
   console.error("[toErrorResponse] uncategorized error:", err);
@@ -87,8 +126,20 @@ export interface AccountContext {
   accountId: string;
   /** Caller's role within their account. */
   role: AccountRole;
-  /** Lightweight account meta — id + name. */
-  account: { id: string; name: string };
+  /** Lightweight account meta — id + name + manual billing state. */
+  account: { id: string; name: string; billingStatus: BillingStatus };
+  /** Cross-tenant platform-admin flag (profiles.is_platform_admin). */
+  isPlatformAdmin: boolean;
+}
+
+export interface GetCurrentAccountOptions {
+  /**
+   * Resolve the context even when the account is billing-gated
+   * (`pending` / `blocked`). Only the /blocked page, the admin
+   * surface, and logout should pass this — every ordinary route
+   * wants the default throw-402 behavior.
+   */
+  allowBlocked?: boolean;
 }
 
 /**
@@ -103,7 +154,9 @@ export interface AccountContext {
  * Use `requireRole(min)` instead when the route also needs a
  * minimum-role check — it's a thin wrapper over this.
  */
-export async function getCurrentAccount(): Promise<AccountContext> {
+export async function getCurrentAccount(
+  options: GetCurrentAccountOptions = {},
+): Promise<AccountContext> {
   const supabase = await createClient();
 
   const {
@@ -116,7 +169,7 @@ export async function getCurrentAccount(): Promise<AccountContext> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("account_id, account_role")
+    .select("account_id, account_role, is_platform_admin")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -149,7 +202,7 @@ export async function getCurrentAccount(): Promise<AccountContext> {
   // RLS, so it stays robust against cache staleness and older schemas.
   const { data: account, error: accountErr } = await supabase
     .from("accounts")
-    .select("id, name")
+    .select("id, name, billing_status")
     .eq("id", data.account_id)
     .maybeSingle();
 
@@ -163,12 +216,29 @@ export async function getCurrentAccount(): Promise<AccountContext> {
     throw new ForbiddenError("Profile is not linked to an account");
   }
 
+  // Manual-billing gate (migration 037). Rows that predate the
+  // migration can't reach here — deploying this version requires 037
+  // — but a NULL from a hand-inserted row degrades to 'active' rather
+  // than locking the tenant out over missing metadata.
+  const billingStatus: BillingStatus = isBillingStatus(account.billing_status)
+    ? account.billing_status
+    : "active";
+  if (isBillingGated(billingStatus) && !options.allowBlocked) {
+    throw new PaymentRequiredError(
+      billingStatus,
+      billingStatus === "pending"
+        ? "Account is awaiting approval"
+        : "Account access is suspended",
+    );
+  }
+
   return {
     supabase,
     userId: user.id,
     accountId: data.account_id,
     role: data.account_role,
-    account: { id: account.id, name: account.name },
+    account: { id: account.id, name: account.name, billingStatus },
+    isPlatformAdmin: data.is_platform_admin === true,
   };
 }
 
@@ -179,12 +249,30 @@ export async function getCurrentAccount(): Promise<AccountContext> {
  * `getCurrentAccount`, plus `ForbiddenError("Insufficient role")`
  * when the caller is below `min`.
  */
-export async function requireRole(min: AccountRole): Promise<AccountContext> {
-  const ctx = await getCurrentAccount();
+export async function requireRole(
+  min: AccountRole,
+  options: GetCurrentAccountOptions = {},
+): Promise<AccountContext> {
+  const ctx = await getCurrentAccount(options);
   if (!hasMinRole(ctx.role, min)) {
     throw new ForbiddenError(
       `This action requires the '${min}' role or higher`,
     );
+  }
+  return ctx;
+}
+
+/**
+ * Resolve the caller's context and require the cross-tenant
+ * platform-admin flag (profiles.is_platform_admin, migration 037).
+ * Used by the /admin panel and /api/admin routes. Passes
+ * `allowBlocked` so the platform owner can administer accounts even
+ * if their own account were ever gated.
+ */
+export async function requirePlatformAdmin(): Promise<AccountContext> {
+  const ctx = await getCurrentAccount({ allowBlocked: true });
+  if (!ctx.isPlatformAdmin) {
+    throw new ForbiddenError("Platform admin access required");
   }
   return ctx;
 }

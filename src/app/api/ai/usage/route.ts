@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { daysAgoStart, lastNDayKeys, localDayKey } from '@/lib/dashboard/date-utils'
+import { estimateCostUsd } from '@/lib/ai/pricing'
+import { loadExchangeRate, loadPriceOverrides } from '@/lib/ai/price-store'
 
 // Rows are aggregated in-process over a bounded window. An active
 // account writes a handful of rows per conversation, so 30 days sits
@@ -12,7 +14,13 @@ const DEFAULT_WINDOW_DAYS = 30
 
 interface UsageRow {
   created_at: string
-  mode: 'auto_reply' | 'draft'
+  /** Open on purpose. This used to be a two-value union that matched
+   *  the DB CHECK, and when the CHECK grew ('agent' in 042,
+   *  'playground' in 047) the aggregation below indexed a bucket that
+   *  did not exist and threw — so the whole screen went blank because
+   *  a new mode appeared. Modes are data; the code must survive one
+   *  it has not met. */
+  mode: string
   provider: string
   model: string
   prompt_tokens: number
@@ -69,6 +77,11 @@ export async function GET(request: Request) {
       )
     }
 
+    const [overrides, exchangeRate] = await Promise.all([
+      loadPriceOverrides(supabase),
+      loadExchangeRate(supabase, 'BRL'),
+    ])
+
     const all = (data ?? []) as UsageRow[]
     const truncated = all.length > MAX_ROWS
     const rows = truncated ? all.slice(0, MAX_ROWS) : all
@@ -78,10 +91,14 @@ export async function GET(request: Request) {
     let completionTokens = 0
     let totalTokens = 0
 
-    // Per-mode + per-model tallies.
-    const byMode = {
+    // Per-mode + per-model tallies. The known modes are seeded so the
+    // UI can show a zero rather than a gap; anything else is added as
+    // it turns up.
+    const byMode: Record<string, { calls: number; tokens: number }> = {
       auto_reply: { calls: 0, tokens: 0 },
       draft: { calls: 0, tokens: 0 },
+      agent: { calls: 0, tokens: 0 },
+      playground: { calls: 0, tokens: 0 },
     }
     const modelMap = new Map<
       string,
@@ -91,19 +108,28 @@ export async function GET(request: Request) {
     // Zero-filled daily buckets so the chart shows quiet days as gaps,
     // not missing points. Local-day keys, oldest → newest — the same
     // helper every other dashboard chart uses, so day boundaries agree.
-    const daily = new Map<string, { date: string; tokens: number; calls: number }>()
+    const daily = new Map<
+      string,
+      { date: string; tokens: number; calls: number; cost_usd: number }
+    >()
     for (const key of lastNDayKeys(days)) {
-      daily.set(key, { date: key, tokens: 0, calls: 0 })
+      daily.set(key, { date: key, tokens: 0, calls: 0, cost_usd: 0 })
     }
+    // Cost is summed per row, not derived from the totals: prices are
+    // per model, and an account that switched models mid-month would
+    // otherwise have every day priced at whichever model happened to
+    // be last.
+    let costUsd = 0
+    let priceFallback = false
 
     for (const r of rows) {
       promptTokens += r.prompt_tokens
       completionTokens += r.completion_tokens
       totalTokens += r.total_tokens
 
-      // `mode` is DB-CHECK-constrained to these two values.
-      byMode[r.mode].calls += 1
-      byMode[r.mode].tokens += r.total_tokens
+      const modeBucket = (byMode[r.mode] ??= { calls: 0, tokens: 0 })
+      modeBucket.calls += 1
+      modeBucket.tokens += r.total_tokens
 
       const mk = `${r.provider}:${r.model}`
       const m =
@@ -113,10 +139,20 @@ export async function GET(request: Request) {
       m.tokens += r.total_tokens
       modelMap.set(mk, m)
 
+      const rowCost = estimateCostUsd(
+        r.model,
+        r.prompt_tokens,
+        r.completion_tokens,
+        overrides,
+      )
+      costUsd += rowCost.usd
+      if (rowCost.fallback) priceFallback = true
+
       const bucket = daily.get(localDayKey(r.created_at))
       if (bucket) {
         bucket.tokens += r.total_tokens
         bucket.calls += 1
+        bucket.cost_usd += rowCost.usd
       }
     }
 
@@ -125,6 +161,9 @@ export async function GET(request: Request) {
     return NextResponse.json({
       window_days: days,
       truncated,
+      cost_usd: costUsd,
+      price_fallback: priceFallback,
+      exchange_rate: exchangeRate,
       totals: {
         calls: rows.length,
         prompt_tokens: promptTokens,

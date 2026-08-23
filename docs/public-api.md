@@ -48,6 +48,9 @@ it. Grant the minimum.
 | `contacts:read`      | List and read contacts                   |
 | `contacts:write`     | Create and update contacts               |
 | `conversations:read` | List and read conversations              |
+| `conversations:handoff` | Hand a conversation over to a human   |
+| `appointments:read`  | List and read appointments               |
+| `appointments:write` | Create, reschedule and cancel appointments |
 | `broadcasts:send`    | Launch broadcast campaigns               |
 | `webhooks:manage`    | Register and manage outbound webhooks    |
 
@@ -218,6 +221,80 @@ Paginated. Each message includes its `direction` (`inbound` /
 `outbound`), `status` (delivery state), `whatsapp_message_id`, and
 `content_*`. The conversation is verified to belong to your account
 first (`404` otherwise).
+
+### `POST /api/v1/conversations/{id}/handoff`
+
+Hand a conversation to a human. Scope: `conversations:handoff`.
+
+For external bots that need to stop and call a person. Does the same
+thing the in-app assistant's own handoff does, so the attendant's
+experience is identical whichever brain asked: the conversation moves to
+`pending`, the in-app auto-reply is disabled for that thread, and the
+reason is written as the internal note the inbox banner renders.
+
+```json
+{
+  "reason": "Cliente quer remarcar uma consulta existente",
+  "assign_to": "<user id, optional>"
+}
+```
+
+`reason` is required — an attendant opening a flagged thread should know
+why without re-reading the conversation. `assign_to` must be a member of
+your account and is ignored when a human already owns the thread (a
+handoff never steals an assignment).
+
+It does **not** message the customer. Telling them a person is coming is
+the bot's call, and it already has `messages:send`.
+
+### `GET` / `POST /api/v1/appointments`
+
+Booking records. Scopes: `appointments:read` / `appointments:write`.
+
+**Availability is not decided here.** This is the CRM-side record of a
+booking; whichever calendar you use remains the source of truth for
+what's free. Check availability there, create the event, then record it
+here so the history lives with the conversation that produced it.
+
+`POST` body:
+
+```json
+{
+  "contact_id": "<uuid>",
+  "conversation_id": "<uuid, optional>",
+  "starts_at": "2026-08-06T17:00:00.000Z",
+  "ends_at": "2026-08-06T17:30:00.000Z",
+  "title": "Exame de vista",
+  "notes": "Cliente pediu fim de tarde",
+  "google_event_id": "<optional>",
+  "google_calendar_id": "<optional>"
+}
+```
+
+Rejected with `409` when it collides: the slot already has a live
+booking, the contact already has one, or that calendar event is already
+recorded. Those are separate messages because a retrying workflow hits
+the first two for very different reasons — treat `409` as "read the
+message", not "retry".
+
+Rejected with `400` for a slot in the past, an `ends_at` at or before
+`starts_at`, or a duration over 8 hours.
+
+List supports `?contact_id=`, `?status=`, `?from=` and `?to=` (ISO
+datetimes filtering `starts_at`), and is paginated like every other
+collection.
+
+### `GET` / `PATCH /api/v1/appointments/{id}`
+
+Read, reschedule, or cancel. Scopes: `appointments:read` /
+`appointments:write`.
+
+Reschedule by sending `starts_at` **and** `ends_at` together — one
+without the other is a `400`, since accepting it would silently change
+the duration or invert the slot. Cancel with `{"status": "cancelled"}`.
+
+There is no `DELETE`: a cancelled appointment is the record that explains
+a gap in the calendar, and the client wants to keep it.
 
 ### `POST /api/v1/broadcasts`
 

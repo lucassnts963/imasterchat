@@ -4,9 +4,20 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit
 import { loadAiConfig } from '@/lib/ai/config'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { resolveEmbeddingsTarget } from '@/lib/ai/providers/catalog'
-import { generateReply } from '@/lib/ai/generate'
+import { runAgent } from '@/lib/ai/agent'
+import { buildEnvironment } from '@/lib/ai/environment'
+import {
+  describeVaultContext,
+  loadVaultContext,
+} from '@/lib/ai/vault/retrieve'
+import {
+  buildToolCatalog,
+  resolveSchedulingContext,
+} from '@/lib/ai/tools/registry'
+import { describeWeeklyHours } from '@/lib/scheduling/settings'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
 import { latestUserMessage } from '@/lib/ai/query'
+import { logAiUsage } from '@/lib/ai/usage'
 import { AiError, type ChatMessage } from '@/lib/ai/types'
 
 // Keep the tested transcript bounded, mirroring the live context window.
@@ -79,14 +90,84 @@ export async function POST(request: Request) {
       resolveEmbeddingsTarget(config),
       latestUserMessage(messages),
     )
+    const scheduling = await resolveSchedulingContext(supabase, accountId)
+
+    // No contact here — the environment block still carries the date and
+    // the shop hours, which is most of what makes a booking dialogue
+    // testable at all.
+    const environment = await buildEnvironment({
+      db: supabase,
+      accountId,
+      contactId: null,
+      timezone: scheduling?.settings.timezone,
+      openingHours: scheduling ? describeWeeklyHours(scheduling.settings) : null,
+      appointmentLabel: scheduling?.settings.appointmentLabel ?? null,
+    })
+    // Same wiki the live bot reads, so a rehearsal exercises the
+    // approved rules too — that is where a wrong rule shows up.
+    const vault = await loadVaultContext(supabase, accountId, null)
+
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
+      environment,
+      vault: describeVaultContext(vault),
     })
 
-    const { text, handoff } = await generateReply({ config, systemPrompt, messages })
-    return NextResponse.json({ reply: text, handoff })
+    // Same catalog the live bot gets. Tools that need a conversation
+    // report that they can't act rather than silently no-op'ing, so the
+    // operator sees where the dialogue would have taken a real action.
+    const tools = await buildToolCatalog({
+      db: supabase,
+      accountId,
+      conversationId: null,
+      scheduling,
+    })
+
+    const { text, handoff, usage, steps } = await runAgent({
+      config,
+      systemPrompt,
+      messages,
+      tools,
+      ctx: {
+        db: supabase,
+        accountId,
+        conversationId: null,
+        contactId: null,
+        config,
+        // Validate everything, write nothing. A rehearsal that booked
+        // for real would leave rehearsal events in the shop's own Google
+        // Calendar; one that could not book at all would stop short of
+        // the step most worth rehearsing.
+        dryRun: true,
+      },
+    })
+    // The Playground spends the account's own key like everything else,
+    // and until now spent it invisibly. Recorded under its own mode so
+    // rehearsal never inflates the cost of a real customer reply.
+    void logAiUsage(supabase, {
+      accountId,
+      conversationId: null,
+      mode: 'playground',
+      provider: config.provider,
+      model: config.model,
+      usage,
+    })
+
+    return NextResponse.json({
+      reply: text,
+      handoff,
+      // What the agent actually did, so the dialogue can be tuned here
+      // instead of on a real customer.
+      steps: steps.map((s) => ({
+        tool: s.toolName,
+        arguments: s.arguments,
+        result: s.result,
+        is_error: s.isError,
+        duration_ms: s.durationMs,
+      })),
+    })
   } catch (err) {
     if (err instanceof AiError) {
       return NextResponse.json(

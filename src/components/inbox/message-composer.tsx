@@ -38,6 +38,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useCan } from "@/hooks/use-can";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -112,6 +118,16 @@ interface MediaDraft {
 interface MessageComposerProps {
   conversationId: string;
   sessionExpired: boolean;
+  /**
+   * O assistente está no comando desta conversa e ninguém assumiu.
+   *
+   * Trava o compositor de propósito: enquanto o bot responde, duas vozes
+   * na mesma conversa é o pior resultado possível para o cliente.
+   * Assumir passou a ser um clique consciente — antes ele acontecia
+   * como efeito colateral de responder, e o efeito colateral confundia
+   * mais do que ajudava.
+   */
+  aiHolding?: boolean;
   onSend: (text: string, replyToId?: string) => void;
   onSendMedia: (payload: SendMediaPayload) => void;
   onSendInteractive: (payload: InteractiveMessagePayload, replyToId?: string) => void;
@@ -134,6 +150,7 @@ const OPUS_ENCODER_PATH = "/opus/encoderWorker.min.js";
 export function MessageComposer({
   conversationId,
   sessionExpired,
+  aiHolding = false,
   onSend,
   onSendMedia,
   onSendInteractive,
@@ -154,6 +171,8 @@ export function MessageComposer({
     useState<InteractiveMessagePayload>(blankButtonsPayload);
   const [savingQuickReply, setSavingQuickReply] = useState(false);
   const [quickReplyOpen, setQuickReplyOpen] = useState(false);
+  /** A folha do celular com as ações que no desktop são quatro botões. */
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   // Media attachment state. `draft` holds an uploaded-but-not-yet-sent
   // attachment; `busy` covers the upload/transcode window.
@@ -188,7 +207,7 @@ export function MessageComposer({
   // For solo users this is always true — single-owner accounts pass
   // every capability — so the disabled branch is a no-op there.
   const canSend = useCan("send-messages");
-  const readOnly = !canSend;
+  const readOnly = !canSend || aiHolding;
   // Media (like free-form text) is only allowed inside the 24h window.
   const inputsDisabled = readOnly || sessionExpired;
 
@@ -546,6 +565,11 @@ export function MessageComposer({
           />
         </div>
       )}
+      {aiHolding && (
+        <div className="mb-2 rounded-lg bg-primary/10 px-3 py-2">
+          <p className="text-xs text-primary">{t("aiHoldingHint")}</p>
+        </div>
+      )}
       {sessionExpired && (
         <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2">
           <p className="text-xs text-amber-400">
@@ -630,6 +654,11 @@ export function MessageComposer({
         </div>
       ) : (
         <div className="flex items-end gap-2">
+          {/* No celular estes quatro comiam ~144px de uma tela de 360 e
+              espremiam o campo de texto — que é o que a atendente usa o
+              tempo todo. Aqui eles somem; abaixo, um botão só abre a
+              mesma lista numa folha de baixo. */}
+          <div className="hidden items-end gap-2 sm:flex">
           {/* Attach menu — photo / video / document / voice. */}
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -725,6 +754,21 @@ export function MessageComposer({
               <Sparkles className="h-4 w-4" />
             )}
           </GatedButton>
+          </div>
+
+          {/* O mesmo conjunto no celular, atrás de um botão só. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={inputsDisabled && readOnly}
+            title={t("moreActions")}
+            aria-label={t("moreActions")}
+            onClick={() => setActionsOpen(true)}
+            className="h-9 w-9 shrink-0 p-0 text-muted-foreground sm:hidden"
+          >
+            <Plus className="h-5 w-5" />
+          </Button>
 
           <textarea
             ref={textareaRef}
@@ -767,10 +811,51 @@ export function MessageComposer({
           `items-end` buttons below the textarea. Indented to line up
           under the textarea left edge. */}
       {!draft && !recording && (
-        <p className="mt-1 pl-[5.5rem] text-[10px] text-muted-foreground">
+        // O recuo alinhava a dica sob o campo, contando os QUATRO botões
+        // do desktop. No celular há um só, e 5.5rem empurrava a dica
+        // para longe do que ela explica.
+        <p className="mt-1 pl-11 text-[10px] text-muted-foreground sm:pl-[5.5rem]">
           {t("draftHint")}
         </p>
       )}
+
+      {/* As ações do composer, no celular.
+          Folha de baixo e não menu suspenso: com o teclado aberto, um
+          menu ancorado num botão de 36px fica espremido contra o campo
+          e metade dos itens cai fora da tela. */}
+      <Sheet open={actionsOpen} onOpenChange={setActionsOpen}>
+        <SheetContent side="bottom" className="pb-8">
+          <SheetHeader>
+            <SheetTitle>{t("moreActions")}</SheetTitle>
+          </SheetHeader>
+          <div className="grid grid-cols-2 gap-2 px-4">
+            {[
+              { icon: ImageIcon, label: t("photo"), run: () => imageInputRef.current?.click(), off: busy },
+              { icon: Video, label: t("video"), run: () => videoInputRef.current?.click(), off: busy },
+              { icon: FileText, label: t("document"), run: () => documentInputRef.current?.click(), off: busy },
+              { icon: Mic, label: t("voiceNote"), run: () => void startRecording(), off: busy },
+              { icon: MessageSquareDashed, label: t("interactiveMessage"), run: () => openInteractiveBuilder(), off: inputsDisabled },
+              { icon: Zap, label: t("quickReplies"), run: () => setQuickReplyOpen(true), off: inputsDisabled },
+              { icon: LayoutTemplate, label: t("sendTemplate"), run: () => onOpenTemplates(), off: readOnly },
+              { icon: Sparkles, label: t("draftWithAI"), run: () => void handleDraft(), off: readOnly || drafting },
+            ].map(({ icon: Icon, label, run, off }) => (
+              <button
+                key={label}
+                type="button"
+                disabled={off}
+                onClick={() => {
+                  setActionsOpen(false);
+                  run();
+                }}
+                className="flex items-center gap-2.5 rounded-lg border border-border p-3 text-left text-sm text-foreground disabled:opacity-40"
+              >
+                <Icon className="size-4 shrink-0 text-muted-foreground" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Interactive-message builder dialog. */}
       <Dialog open={interactiveOpen} onOpenChange={setInteractiveOpen}>

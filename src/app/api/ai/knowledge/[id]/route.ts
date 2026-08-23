@@ -82,7 +82,7 @@ export async function PATCH(request: Request, { params }: Params) {
         accountId,
       )
       try {
-        await ingestDocument(supabase, accountId, embeddings, id, content)
+        await ingestDocument(supabase, accountId, embeddings, { documentId: id }, content)
       } catch (err) {
         const message = err instanceof AiError ? err.message : 'indexing failed'
         console.error('[ai/knowledge/[id] PATCH] ingest error:', err)

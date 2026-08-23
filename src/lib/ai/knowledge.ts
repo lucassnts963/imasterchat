@@ -14,7 +14,21 @@ interface MatchRow {
 }
 
 /**
- * (Re)build the chunks for one document. Deletes the document's
+ * What a chunk belongs to. Exactly one of the two — a knowledge-base
+ * document the operator pasted, or an approved vault page the agent
+ * maintains (046). The database enforces the exclusivity; this type
+ * makes it impossible to pass both.
+ */
+export type ChunkOwner = { documentId: string } | { vaultPageId: string }
+
+function ownerColumn(owner: ChunkOwner): { column: string; id: string } {
+  return 'documentId' in owner
+    ? { column: 'document_id', id: owner.documentId }
+    : { column: 'vault_page_id', id: owner.vaultPageId }
+}
+
+/**
+ * (Re)build the chunks for one document or vault page. Deletes its
  * existing chunks, re-chunks the content, and — when the account has an
  * embeddings key — embeds each chunk. Runs under whatever client the
  * caller passes (service-role for ingest routes).
@@ -28,16 +42,17 @@ export async function ingestDocument(
   accountId: string,
   /** null = no embeddings configured; store chunks for lexical search. */
   embeddings: EmbeddingsTarget | null,
-  documentId: string,
+  owner: ChunkOwner,
   content: string,
 ): Promise<void> {
   const chunks = chunkText(content)
+  const { column, id } = ownerColumn(owner)
 
   // Replace, don't append — re-ingest must be idempotent.
   const { error: delErr } = await db
     .from('ai_knowledge_chunks')
     .delete()
-    .eq('document_id', documentId)
+    .eq(column, id)
   if (delErr) throw delErr
 
   if (chunks.length === 0) return
@@ -59,7 +74,7 @@ export async function ingestDocument(
   }
 
   const rows = chunks.map((content, i) => ({
-    document_id: documentId,
+    [column]: id,
     account_id: accountId,
     chunk_index: i,
     content,

@@ -1,4 +1,5 @@
 import type { AutomationTriggerType } from '@/types'
+import { formatRelative as formatRelativeInLocale } from '@/lib/time/format'
 
 export interface TriggerMeta {
   label: string
@@ -50,14 +51,23 @@ export function triggerMeta(t: AutomationTriggerType | string): TriggerMeta {
   )
 }
 
-export function formatRelative(iso: string | null | undefined): string {
-  if (!iso) return 'never'
+/**
+ * Quanto tempo faz, na língua do app.
+ *
+ * A versão anterior era inglês fixo de ponta a ponta — 'never', 'just
+ * now', '5m ago' — e terminava num `toLocaleDateString()` sem locale,
+ * que usa o do NAVEGADOR. Duas formas de errar na mesma função.
+ *
+ * `null` devolve null em vez de uma palavra: só quem renderiza sabe
+ * como dizer "nunca" na língua certa, e inventar aqui foi o que
+ * plantou o inglês da primeira vez.
+ */
+export function formatRelative(
+  iso: string | null | undefined,
+  locale: string,
+): string | null {
+  if (!iso) return null
   const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return 'never'
-  const diffSec = Math.round((Date.now() - then) / 1000)
-  if (diffSec < 60) return 'just now'
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`
-  if (diffSec < 2_592_000) return `${Math.floor(diffSec / 86400)}d ago`
-  return new Date(iso).toLocaleDateString()
+  if (Number.isNaN(then)) return null
+  return formatRelativeInLocale(new Date(then), locale)
 }

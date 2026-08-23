@@ -695,6 +695,14 @@ const BarChart = React.forwardRef<HTMLDivElement, BarChartProps>(
               tick={{
                 transform:
                   layout !== "vertical" ? "translate(0, 6)" : undefined,
+                // The class has to be on the tick TEXT, not only on the
+                // axis group. Recharts forwards the axis `fill=""` down
+                // to each tick, an empty presentation attribute is
+                // invalid, and SVG's initial fill is black — which then
+                // beats the colour inherited from the group. A CSS class
+                // on the element outranks a presentation attribute on it,
+                // so this is what actually decides the colour.
+                className: "fill-muted-foreground",
               }}
               fill=""
               stroke=""
@@ -752,6 +760,9 @@ const BarChart = React.forwardRef<HTMLDivElement, BarChartProps>(
                   layout !== "vertical"
                     ? "translate(-3, 0)"
                     : "translate(0, 0)",
+                // Same reason as the X axis: without a class on the tick
+                // itself the label renders black on a dark background.
+                className: "fill-muted-foreground",
               }}
               {...(layout !== "vertical"
                 ? {

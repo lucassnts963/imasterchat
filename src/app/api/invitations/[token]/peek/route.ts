@@ -32,10 +32,13 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Best-effort client IP. The `x-forwarded-for` header is what
- * every reverse proxy (Vercel, Hostinger, Cloudflare) sets when
- * forwarding a request; we take the leftmost entry, which is
- * the original client.
+ * IP do cliente, na melhor aproximação disponível.
+ *
+ * Sem uma borda na frente, `x-forwarded-for` é o que todo proxy
+ * reverso preenche e a entrada mais à esquerda é o cliente original —
+ * mas ela é forjável, porque os proxies ACRESCENTAM à lista em vez de
+ * substituí-la. Por isso `cf-connecting-ip` vem primeiro quando
+ * existe: a Cloudflare reescreve esse header sempre.
  *
  * Falls back to a constant when no proxy is in front (e.g.
  * `localhost` during development) so rate-limit keys still
@@ -43,6 +46,15 @@ import { createClient } from "@/lib/supabase/server";
  * is fine for dev.
  */
 function getClientIp(request: Request): string {
+  // `CF-Connecting-IP` primeiro, quando existe. A Cloudflare SOBRESCREVE
+  // esse header a cada request, então o cliente não consegue plantar um
+  // valor nele. `X-Forwarded-For` ela apenas ACRESCENTA: quem manda
+  // `X-Forwarded-For: 1.2.3.4` faz a lista chegar como "1.2.3.4, <ip
+  // real>", e a leitura da esquerda pega o valor forjado — o que
+  // transforma o limite por IP em algo que se contorna trocando um
+  // header.
+  const cf = request.headers.get("cf-connecting-ip");
+  if (cf) return cf.trim();
   const xff = request.headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0].trim();
   const xri = request.headers.get("x-real-ip");

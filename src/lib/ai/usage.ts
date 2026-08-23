@@ -6,7 +6,13 @@ export interface LogAiUsageArgs {
   /** Null for a draft not tied to one thread, or when the row was
    *  deleted between generation and logging. */
   conversationId: string | null
-  mode: 'auto_reply' | 'draft'
+  /**
+   * `agent` is a run that used tools, `playground` is a rehearsal.
+   * Both are separable on purpose: mixing them into 'auto_reply'
+   * makes "what does a customer reply cost" unanswerable, and that
+   * is the number the monthly budget is set from.
+   */
+  mode: 'auto_reply' | 'draft' | 'agent' | 'playground'
   provider: AiProvider
   model: string
   /** Provider usage; a no-op when null (nothing worth recording). */

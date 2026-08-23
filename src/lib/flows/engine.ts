@@ -440,6 +440,21 @@ async function executeHandoff(
   const cfg = node.config as { assign_to?: string; note?: string };
   const convUpdate: Record<string, unknown> = {
     status: "pending",
+    // Desliga a resposta automática, como o handoff do agente de IA já
+    // fazia (`lib/conversations/handoff.ts`).
+    //
+    // Sem isto, o handoff de fluxo era mais fraco do que parecia: ele
+    // punha a conversa em `pending` e ia embora, mas o portão que cala o
+    // bot é `assigned_agent_id` OU `ai_autoreply_disabled` — e este
+    // caminho não escrevia nenhum dos dois quando não havia
+    // `assign_to`. Resultado: o fluxo dizia "vou chamar uma pessoa" e a
+    // IA respondia na mensagem seguinte, por cima da promessa.
+    ai_autoreply_disabled: true,
+    // A nota interna do nó vira o motivo que a tarja do inbox mostra.
+    // Antes ela era só gravada no log do fluxo, onde a atendente não
+    // olha — a tarja aparecia vazia, sem dizer por que a conversa
+    // chegou ali.
+    ai_handoff_summary: cfg.note?.trim() ? `🔀 ${cfg.note.trim()}` : null,
     updated_at: new Date().toISOString(),
   };
   if (cfg.assign_to) convUpdate.assigned_agent_id = cfg.assign_to;
@@ -1040,7 +1055,15 @@ async function handleReplyForActiveRun(
     if (run.conversation_id) {
       await db
         .from("conversations")
-        .update({ status: "pending", updated_at: new Date().toISOString() })
+        .update({
+          status: "pending",
+          // Mesmo motivo do `executeHandoff` acima: sem isto o fluxo
+          // desiste e a IA assume, o que é o oposto do que "esgotou o
+          // fallback" significa.
+          ai_autoreply_disabled: true,
+          ai_handoff_summary: "🔀 O fluxo não entendeu as respostas.",
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", run.conversation_id);
     }
     await logEvent(db, run.id, "handoff", run.current_node_key, {

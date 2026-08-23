@@ -53,7 +53,13 @@ export async function POST() {
     let reindexed = 0
     for (const doc of docs ?? []) {
       try {
-        await ingestDocument(supabase, accountId, embeddings, doc.id, doc.content)
+        await ingestDocument(
+          supabase,
+          accountId,
+          embeddings,
+          { documentId: doc.id },
+          doc.content,
+        )
         reindexed += 1
       } catch (err) {
         // One bad document (e.g. a mid-run embeddings rate-limit) should

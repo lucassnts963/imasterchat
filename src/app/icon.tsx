@@ -1,9 +1,14 @@
 import { ImageResponse } from "next/og";
 
-// Replaces the default Next.js favicon with the brand mark — Hostinger
-// violet rounded square + white chat-square glyph — matching the
-// sidebar logo in `src/components/layout/sidebar.tsx`. Next.js renders
-// this at build time and auto-injects <link rel="icon"> into <head>.
+// Replaces the default Next.js favicon with the iMasterChat brand mark
+// — brand-red rounded square + the white `>_` terminal-prompt glyph.
+//
+// The geometry mirrors `src/components/brand/logo.tsx`, which this file
+// deliberately does NOT import: ImageResponse renders in the edge
+// runtime at build time and only handles inline JSX/SVG, not app
+// components (cn/Tailwind classes never resolve here). Change one,
+// change the other. Stroke weight is bumped vs the component because
+// the glyph is rasterized at 32px.
 //
 // This route takes precedence over src/app/favicon.ico, which is the
 // Next.js default and can stay on disk harmlessly (or be removed).
@@ -22,21 +27,26 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#7c3aed", // primary (Hostinger-aligned purple)
+          background: "#E5484D", // primary (iMasterChat / elucas.dev red)
           borderRadius: 6,
         }}
       >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M6 7.5 L11 12 L6 16.5"
+            stroke="#ffffff"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <rect
+            x="12.6"
+            y="14.4"
+            width="6.4"
+            height="3"
+            rx="1.5"
+            fill="#ffffff"
+          />
         </svg>
       </div>
     ),

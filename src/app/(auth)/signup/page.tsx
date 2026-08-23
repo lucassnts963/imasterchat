@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MessageSquare, CheckCircle, UsersRound } from "lucide-react";
+import { CheckCircle, UsersRound } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless wrapped in Suspense — same pattern as /login.
@@ -34,10 +36,15 @@ function SignupPageInner() {
   // points back at /join/<token> so the user lands on the redeem
   // step after verifying instead of being dropped on /dashboard.
   const inviteToken = searchParams.get("invite");
+  const t = useTranslations("SignupPage");
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Caixa explícita, e não "ao criar conta você concorda" no rodapé.
+  // A diferença é o que sobra como prova: um gesto do usuário, e não
+  // uma afirmação nossa sobre o que ele deveria ter lido.
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,12 +56,12 @@ function SignupPageInner() {
     setError(null);
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("passwordsMismatch"));
       return;
     }
 
     if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("passwordTooShort"));
       return;
     }
 
@@ -68,7 +75,7 @@ function SignupPageInner() {
       ? `${window.location.origin}/join/${encodeURIComponent(inviteToken)}`
       : undefined;
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -80,11 +87,47 @@ function SignupPageInner() {
     });
 
     if (error) {
-      setError(error.message);
+      // With autoconfirm on, GoTrue reports a duplicate email as an
+      // explicit 422 instead of the anti-enumeration stub handled
+      // below — same user story, same translated message.
+      setError(
+        error.code === "user_already_exists"
+          ? t("emailAlreadyRegistered")
+          : error.message,
+      );
       setLoading(false);
       return;
     }
 
+    // With email confirmation disabled the signup already returned a
+    // session — go straight in. Full-page navigation (not router.push)
+    // for the same reason as /login: the fresh auth cookies must reach
+    // the middleware on a top-level request (issue #365). The billing
+    // gate routes a pending account to /blocked by itself.
+    if (data.session) {
+      // Gravado no servidor, que é quem observa o instante e a origem —
+      // os dois dados que fazem do aceite uma prova e que não podem vir
+      // de quem está sendo registrado. Não bloqueia a entrada: falhar
+      // aqui é uma lacuna a recuperar depois, não motivo para travar
+      // alguém na porta com a conta já criada.
+      await fetch("/api/terms/accept", { method: "POST" }).catch(() => {});
+      window.location.href = inviteToken
+        ? `/join/${encodeURIComponent(inviteToken)}`
+        : "/dashboard";
+      return;
+    }
+
+    // Anti-enumeration: for an already-registered email GoTrue returns
+    // success with a user stub whose identities array is empty and no
+    // session. Without this branch that lands on "check your email" —
+    // an email that will never arrive.
+    if (data.user && data.user.identities?.length === 0) {
+      setError(t("emailAlreadyRegistered"));
+      setLoading(false);
+      return;
+    }
+
+    // Real pending confirmation (production with SMTP configured).
     setSuccess(true);
     setLoading(false);
   };
@@ -98,12 +141,15 @@ function SignupPageInner() {
               <CheckCircle className="h-6 w-6 text-primary" />
             </div>
             <CardTitle className="text-xl text-foreground">
-              Check your email
+              {t("checkEmailTitle")}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              We&apos;ve sent a confirmation link to{" "}
-              <span className="text-foreground">{email}</span>. Please check your
-              inbox and click the link to verify your account.
+              {t.rich("checkEmailDesc", {
+                email,
+                strong: (chunks) => (
+                  <span className="text-foreground">{chunks}</span>
+                ),
+              })}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -118,7 +164,7 @@ function SignupPageInner() {
                 variant="outline"
                 className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
               >
-                Back to sign in
+                {t("backToSignIn")}
               </Button>
             </Link>
           </CardContent>
@@ -135,16 +181,14 @@ function SignupPageInner() {
             {inviteToken ? (
               <UsersRound className="h-6 w-6 text-primary" />
             ) : (
-              <MessageSquare className="h-6 w-6 text-primary" />
+              <LogoMark className="h-6 w-6 text-primary" />
             )}
           </div>
           <CardTitle className="text-xl text-foreground">
-            {inviteToken ? "Create account & join" : "Create account"}
+            {inviteToken ? t("titleJoin") : t("title")}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            {inviteToken
-              ? "Verify your email, then accept the invitation to join your team."
-              : "Get started with CRM Template for WhatsApp"}
+            {inviteToken ? t("descJoin") : t("desc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -157,12 +201,12 @@ function SignupPageInner() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="fullName" className="text-muted-foreground">
-                Full name
+                {t("fullNameLabel")}
               </Label>
               <Input
                 id="fullName"
                 type="text"
-                placeholder="John Doe"
+                placeholder={t("fullNamePlaceholder")}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -172,12 +216,12 @@ function SignupPageInner() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="email" className="text-muted-foreground">
-                Email
+                {t("emailLabel")}
               </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t("emailPlaceholder")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -187,12 +231,12 @@ function SignupPageInner() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="password" className="text-muted-foreground">
-                Password
+                {t("passwordLabel")}
               </Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="At least 6 characters"
+                placeholder={t("passwordPlaceholder")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -202,12 +246,12 @@ function SignupPageInner() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="confirmPassword" className="text-muted-foreground">
-                Confirm password
+                {t("confirmPasswordLabel")}
               </Label>
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="Repeat your password"
+                placeholder={t("confirmPasswordPlaceholder")}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
@@ -215,17 +259,48 @@ function SignupPageInner() {
               />
             </div>
 
+            <label className="flex items-start gap-2.5 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+              />
+              <span>
+                {t.rich("acceptTerms", {
+                  terms: (chunks) => (
+                    <Link
+                      href="/termos"
+                      target="_blank"
+                      className="text-primary hover:text-primary/80"
+                    >
+                      {chunks}
+                    </Link>
+                  ),
+                  privacy: (chunks) => (
+                    <Link
+                      href="/privacidade"
+                      target="_blank"
+                      className="text-primary hover:text-primary/80"
+                    >
+                      {chunks}
+                    </Link>
+                  ),
+                })}
+              </span>
+            </label>
+
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !acceptedTerms}
               className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              {loading ? "Creating account..." : "Create account"}
+              {loading ? t("creatingAccount") : t("createAccount")}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
+            {t("haveAccount")}{" "}
             <Link
               href={
                 inviteToken
@@ -234,7 +309,16 @@ function SignupPageInner() {
               }
               className="text-primary hover:text-primary/80"
             >
-              Sign in
+              {t("signIn")}
+            </Link>
+          </p>
+
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            <Link
+              href="/privacidade"
+              className="hover:text-foreground underline underline-offset-2"
+            >
+              {t("privacyPolicy")}
             </Link>
           </p>
         </CardContent>

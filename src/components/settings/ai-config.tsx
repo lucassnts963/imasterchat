@@ -29,6 +29,7 @@ import { AiKnowledgeCard } from './ai-knowledge';
 import { AI_PROVIDER_DEFAULT_MODEL } from '@/lib/ai/defaults';
 import { PROVIDERS, getPreset } from '@/lib/ai/providers/catalog';
 import { EMBEDDING_DIMENSIONS } from '@/lib/ai/embeddings';
+import { ModelPicker, isUnknownModel } from '@/components/ui/model-picker';
 import type { AiProvider } from '@/lib/ai/types';
 import type { AccountMember } from '@/types';
 import { fetchAccountMembers, memberLabel } from '@/lib/account/members';
@@ -70,9 +71,19 @@ export function AiConfig() {
   const [systemPrompt, setSystemPrompt] = useState('');
   const [isActive, setIsActive] = useState(false);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
+  // Nasce ligado, como a coluna: quem tem agendamento é quem mais sofre
+  // sem as marcas, e ninguém liga uma chave para um bug que não sabe
+  // que tem.
+  const [contextTimestamps, setContextTimestamps] = useState(true);
+  // Nasce desligado, como a coluna: ligar faz o bot enviar uma mensagem
+  // a mais ao cliente, e mensagem enviada não volta atrás.
+  const [handoffNotice, setHandoffNotice] = useState(false);
+  const [handoffNoticeText, setHandoffNoticeText] = useState('');
   const [maxPerConversation, setMaxPerConversation] = useState(3);
   // Empty string = leave unassigned (shared queue).
   const [handoffAgentId, setHandoffAgentId] = useState('');
+  // Free text so the admin can clear the field; '' = no budget (null).
+  const [monthlyBudget, setMonthlyBudget] = useState('');
   const [members, setMembers] = useState<AccountMember[]>([]);
 
   // Guard keyed on the account (not a bare boolean) so an in-place
@@ -100,8 +111,14 @@ export function AiConfig() {
         setSystemPrompt(data.system_prompt ?? '');
         setIsActive(data.is_active);
         setAutoReplyEnabled(data.auto_reply_enabled);
+        setContextTimestamps(data.context_timestamps !== false);
+        setHandoffNotice(data.handoff_notice_enabled === true);
+        setHandoffNoticeText(data.handoff_notice_text ?? '');
         setMaxPerConversation(data.auto_reply_max_per_conversation ?? 3);
         setHandoffAgentId(data.handoff_agent_id ?? '');
+        setMonthlyBudget(
+          data.monthly_budget_usd != null ? String(data.monthly_budget_usd) : '',
+        );
         setHasStoredKey(Boolean(data.has_key));
         setApiKey(data.has_key ? MASKED_KEY : '');
         setKeyEdited(false);
@@ -114,7 +131,7 @@ export function AiConfig() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!accountId || loadedAccountIdRef.current === accountId) return;
@@ -160,8 +177,14 @@ export function AiConfig() {
     system_prompt: systemPrompt.trim() || null,
     is_active: isActive,
     auto_reply_enabled: autoReplyEnabled,
+    context_timestamps: contextTimestamps,
+    handoff_notice_enabled: handoffNotice,
+    handoff_notice_text: handoffNoticeText.trim() || null,
     auto_reply_max_per_conversation: maxPerConversation,
     handoff_agent_id: handoffAgentId || null,
+    monthly_budget_usd: monthlyBudget.trim()
+      ? Number(monthlyBudget.replace(',', '.'))
+      : null,
   });
 
   const handleTest = async () => {
@@ -191,6 +214,13 @@ export function AiConfig() {
     if (!model.trim()) {
       toast.error(t('missingModel'));
       return;
+    }
+    if (monthlyBudget.trim()) {
+      const parsed = Number(monthlyBudget.replace(',', '.'));
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        toast.error(t('invalidBudget'));
+        return;
+      }
     }
     if (!configured && !keyEdited) {
       toast.error(t('missingApiKey'));
@@ -231,6 +261,7 @@ export function AiConfig() {
         setAutoReplyEnabled(false);
         setSystemPrompt('');
         setHandoffAgentId('');
+        setMonthlyBudget('');
       } else {
         const data = await res.json();
         toast.error(data.error ?? t('removeFailed'));
@@ -245,8 +276,7 @@ export function AiConfig() {
   if (loading || profileLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('loadFailed')} {/* Re-using label or a global one, wait, loading is better. Let's use useTranslations from overview or just hardcode Loading... actually I should add loading to aiConfig */}
-        {/* Wait, I didn't add loading to aiConfig. I'll just use loading. */}
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('loading')}
       </div>
     );
   }
@@ -286,7 +316,9 @@ export function AiConfig() {
                   disabled={disabled}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {(v) => getPreset(String(v ?? ''))?.label ?? String(v ?? '')}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {PROVIDERS.map((p) => (
@@ -305,13 +337,23 @@ export function AiConfig() {
 
               <div className="space-y-2">
                 <Label htmlFor="ai-model">{t('model')}</Label>
-                <Input
+                <ModelPicker
                   id="ai-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder={AI_PROVIDER_DEFAULT_MODEL[provider] ?? ''}
+                  provider={provider}
+                  value={model || AI_PROVIDER_DEFAULT_MODEL[provider]}
+                  onChange={setModel}
                   disabled={disabled}
+                  searchPlaceholder={t('modelSearch')}
+                  customLabel={(m) => t('modelCustom', { model: m })}
+                  priceLabel={(input, output) =>
+                    t('modelPrice', { input, output })
+                  }
                 />
+                {isUnknownModel(provider, model) && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('modelUnknown')}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -517,6 +559,59 @@ export function AiConfig() {
               />
             </div>
 
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t('handoffNotice')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('handoffNoticeDesc')}
+                  </p>
+                </div>
+                <Switch
+                  checked={handoffNotice}
+                  onCheckedChange={setHandoffNotice}
+                  disabled={disabled || !isActive}
+                />
+              </div>
+              {handoffNotice && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="ai-handoff-notice">
+                    {t('handoffNoticeTextLabel')}
+                  </Label>
+                  <Textarea
+                    id="ai-handoff-notice"
+                    value={handoffNoticeText}
+                    onChange={(e) => setHandoffNoticeText(e.target.value)}
+                    placeholder={t('handoffNoticePlaceholder')}
+                    maxLength={300}
+                    rows={2}
+                    disabled={disabled}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('handoffNoticeTextHint')}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {t('contextTimestamps')}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t('contextTimestampsDesc')}
+                </p>
+              </div>
+              <Switch
+                checked={contextTimestamps}
+                onCheckedChange={setContextTimestamps}
+                disabled={disabled || !isActive}
+              />
+            </div>
+
             <div className="flex items-center justify-between gap-4">
               <div>
                 <Label htmlFor="ai-max">{t('maxAutoReplies')}</Label>
@@ -553,7 +648,16 @@ export function AiConfig() {
                 disabled={disabled || !autoReplyEnabled}
               >
                 <SelectTrigger id="ai-handoff">
-                  <SelectValue />
+                  {/* Sem a função, aqui aparecia o UUID do atendente. */}
+                  <SelectValue>
+                    {(v) =>
+                      !v || v === HANDOFF_QUEUE
+                        ? t('handoffQueue')
+                        : (members.find((m) => m.user_id === v)
+                            ? memberLabel(members.find((m) => m.user_id === v)!)
+                            : t('handoffQueue'))
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={HANDOFF_QUEUE}>
@@ -566,6 +670,25 @@ export function AiConfig() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="ai-budget">{t('monthlyBudget')}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t('monthlyBudgetDesc')}
+                </p>
+              </div>
+              <Input
+                id="ai-budget"
+                type="text"
+                inputMode="decimal"
+                value={monthlyBudget}
+                onChange={(e) => setMonthlyBudget(e.target.value)}
+                placeholder={t('monthlyBudgetPlaceholder')}
+                disabled={disabled}
+                className="w-28"
+              />
             </div>
           </CardContent>
         </Card>

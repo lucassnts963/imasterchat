@@ -1,5 +1,6 @@
 {
   "LoginPage": {
+    "privacyPolicy": "Privacy Policy",
     "titleAccept": "Sign in to accept",
     "titleWelcome": "Welcome back",
     "descAccept": "Sign in and we'll take you to the invitation.",
@@ -15,7 +16,7 @@
     "createAccount": "Create account"
   },
   "Sidebar": {
-    "title": "CRM Template for WhatsApp",
+    "title": "iMasterChat",
     "dashboard": "Dashboard",
     "inbox": "Inbox",
     "notifications": "Notifications",
@@ -26,6 +27,7 @@
     "flows": "Flows",
     "aiAgents": "AI Agents",
     "settings": "Settings",
+    "platformAdmin": "Administration",
     "beta": "Beta",
     "unreadConversations": "{count} unread {count, plural, =1 {conversation} other {conversations}}",
     "unreadNotifications": "{count} unread {count, plural, =1 {notification} other {notifications}}",
@@ -38,7 +40,8 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
-    "menuSignOut": "Sign out"
+    "menuSignOut": "Sign out",
+    "agenda": "Agenda"
   },
   "Header": {
     "dashboard": "Dashboard",
@@ -55,7 +58,11 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
-    "menuSignOut": "Sign out"
+    "menuSignOut": "Sign out",
+    "agenda": "Agenda",
+    "platformAdmin": "Administration",
+    "flows": "Flows",
+    "aiAgents": "AI Agents"
   },
   "ModeToggle": {
     "switchMode": "Switch to {mode} mode"
@@ -72,6 +79,16 @@
       "vsYesterday": "vs yesterday",
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}"
+    },
+    "aiCost": {
+      "title": "AI cost (this month)",
+      "estimatedBadge": "estimate",
+      "ofBudget": "of {budget}",
+      "usedOfBudget": "{pct}% of the monthly budget used",
+      "nearBudget": "AI balance is running out — {pct}% of the monthly budget used",
+      "overBudget": "Monthly AI budget exceeded",
+      "noBudget": "No monthly budget set — define one in AI Agents → Set up to get a warning before the balance runs out.",
+      "manage": "Manage AI"
     },
     "quickActions": {
       "newContact": "New Contact",
@@ -142,7 +159,12 @@
       "clearAll": "Clear all",
       "noConversations": "No conversations found",
       "noMessagesYet": "No messages yet",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "filterMine": "Mine",
+      "queues": "Queue",
+      "allQueues": "All queues",
+      "filters": "Filters",
+      "clearFilters": "Clear filters"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -166,7 +188,9 @@
       "selectConversation": "Select a conversation",
       "selectConversationHint": "Choose a conversation from the left to start messaging",
       "today": "Today",
-      "yesterday": "Yesterday"
+      "yesterday": "Yesterday",
+      "loadOlder": "Load earlier messages",
+      "loadingOlder": "Loading…"
     },
     "sessionTimer": {
       "expired": "Expired",
@@ -202,7 +226,8 @@
       "send": "Send",
       "quickReplyNamePrompt": "Name this quick reply:",
       "quickReplySaved": "Saved as a quick reply.",
-      "quickReplySaveError": "Couldn't save the quick reply."
+      "quickReplySaveError": "Couldn't save the quick reply.",
+      "aiHoldingHint": "The assistant is handling this conversation. Click Take over, above, to reply yourself."
     },
     "bubble": {
       "photo": "Photo",
@@ -216,7 +241,8 @@
       "interactiveReply": "[Interactive reply]",
       "unsupported": "[Unsupported message type]",
       "aiBadge": "AI",
-      "aiBadgeTitle": "Sent automatically by the AI assistant"
+      "aiBadgeTitle": "Sent automatically by the AI assistant",
+      "transcript": "transcript"
     },
     "actions": {
       "reply": "Reply",
@@ -271,7 +297,11 @@
       "tookOver": "You’ve taken over this chat.",
       "resumed": "AI resumed.",
       "updateError": "Couldn’t update the AI assistant.",
-      "networkError": "Couldn’t reach the server."
+      "networkError": "Couldn’t reach the server.",
+      "youAreHandling": "You're handling this",
+      "someoneIsHandling": "A teammate is handling this",
+      "handlingHint": "The assistant stays quiet while the conversation has an owner.",
+      "giveBack": "Give back to AI"
     }
   },
   "Contacts": {
@@ -798,7 +828,8 @@
         "updateError": "Failed to update",
         "duplicateError": "Failed to duplicate",
         "deleteError": "Failed to delete"
-      }
+      },
+      "never": "never"
     },
     "edit": {
       "loading": "Loading...",
@@ -939,7 +970,7 @@
         "tagLabel": "Tag",
         "modeLabel": "Mode",
         "modes": {
-          "round_robin": "Round-robin",
+          "round_robin": "Any team member",
           "specific": "Specific agent"
         },
         "agentLabel": "Agent",
@@ -974,7 +1005,8 @@
         "matchContains": "Contains",
         "matchExact": "Exact",
         "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
-      }
+      },
+      "delete": "Delete"
     }
   },
   "Flows": {
@@ -1197,6 +1229,23 @@
       "modeRemove": "Remove",
       "tagPicked": "{mode} tag {tag}…",
       "tagNone": "{mode} tag (none picked)"
+    },
+    "header": {
+      "backToFlows": "Back to Flows",
+      "flowName": "Flow name",
+      "unsavedChanges": "Unsaved changes — hit Save to persist",
+      "edited": "Edited",
+      "runs": "Runs",
+      "delete": "Delete",
+      "pause": "Pause",
+      "fixIssues": "Fix the issues below before activating",
+      "activate": "Activate",
+      "save": "Save",
+      "descriptionPlaceholder": "Add a short description (internal — customers don't see this)",
+      "flowDescription": "Flow description",
+      "statusDraft": "Draft",
+      "statusActive": "Active",
+      "statusArchived": "Archived"
     }
   },
   "Settings": {
@@ -1276,7 +1325,8 @@
       "labelTooLong": "Label must be {max} characters or fewer",
       "copied": "Invite link copied",
       "clipboardBlocked": "Clipboard blocked — copy the link manually",
-      "whatsappMessage": "Join {accountName} on wacrm using this link (valid for {expiresInDays} days): {url}"
+      "whatsappMessage": "Join {accountName} on iMasterChat using this link (valid for {expiresInDays} days): {url}",
+      "accountFallback": "our account"
     },
     "tagsAndFields": {
       "title": "Fields & tags",
@@ -1311,7 +1361,9 @@
         "blue": "Blue",
         "violet": "Violet",
         "pink": "Pink"
-      }
+      },
+      "aiSelectableTitle": "Labels the agent may apply",
+      "aiSelectableHint": "Only tick the ones you want the assistant to use on its own. The rest stay manual — and a customer can't ask for a label by message text if it isn't here."
     },
     "templates": {
       "title": "Message templates",
@@ -1387,8 +1439,8 @@
       "saveResubmit": "Save & Resubmit",
       "submitApproval": "Submit for Approval",
       "deleteDialogTitle": "Delete template?",
-      "deleteMetaDesc": "\"{name}\" will be deleted from Meta and from wacrm. Active broadcasts using this template will start failing on their next send. This can't be undone.",
-      "deleteLocalDesc": "\"{name}\" will be deleted from wacrm. It was never submitted to Meta, so no remote cleanup is needed.",
+      "deleteMetaDesc": "\"{name}\" will be deleted from Meta and from iMasterChat. Active broadcasts using this template will start failing on their next send. This can't be undone.",
+      "deleteLocalDesc": "\"{name}\" will be deleted from iMasterChat. It was never submitted to Meta, so no remote cleanup is needed.",
       "deleting": "Deleting…",
       "delete": "Delete",
       "toastLoadFailed": "Failed to load templates",
@@ -1429,7 +1481,7 @@
       "notConnected": "Not Connected",
       "connectedDesc": "Your access token authenticates with Meta. See Registration status below for whether webhooks are actually wired.",
       "notConnectedDesc": "Configure your Meta API credentials below to connect your WhatsApp Business account.",
-      "registered": "Registered — Meta will deliver events to wacrm",
+      "registered": "Registered — Meta will deliver events to iMasterChat",
       "notRegistered": "Not registered — Meta will not deliver events",
       "verifyWithMeta": "Verify with Meta",
       "subscribedSince": "Subscribed since {date}. Click Verify with Meta if events stop arriving.",
@@ -1453,7 +1505,7 @@
       "twoStepPin": "Two-step verification PIN",
       "optional": "(optional)",
       "pinPlaceholder": "6-digit PIN from Meta WhatsApp Manager",
-      "pinHint": "Needed only to wire inbound messages for a production number. Set it in Meta Business Manager → WhatsApp Accounts → Phone Numbers → Two-step verification, then paste it here so wacrm can subscribe the number — otherwise Meta routes inbound events to whichever app last claimed it (the symptom that hits second numbers under a shared WABA). Meta test numbers have no PIN and are pre-registered — leave this blank for them. Leaving it blank also keeps an existing registration untouched.",
+      "pinHint": "Needed only to wire inbound messages for a production number. Set it in Meta Business Manager → WhatsApp Accounts → Phone Numbers → Two-step verification, then paste it here so iMasterChat can subscribe the number — otherwise Meta routes inbound events to whichever app last claimed it (the symptom that hits second numbers under a shared WABA). Meta test numbers have no PIN and are pre-registered — leave this blank for them. Leaving it blank also keeps an existing registration untouched.",
       "webhookTitle": "Webhook Configuration",
       "webhookDesc": "Use this URL as your webhook callback in the Meta App Dashboard.",
       "webhookUrl": "Webhook Callback URL",
@@ -1483,7 +1535,49 @@
       "step4_3": "Paste the <strong class=\"text-foreground\">Webhook Callback URL</strong> from above",
       "step4_4": "Enter the same <strong class=\"text-foreground\">Verify Token</strong> you set here",
       "step4_5": "Subscribe to \"messages\" webhook field",
-      "metaDocs": "Meta WhatsApp API Documentation"
+      "metaDocs": "Meta WhatsApp API Documentation",
+      "confirmReset": "This will delete the current WhatsApp config so you can re-enter it. Continue?",
+      "errors": {
+        "loadFailed": "Failed to load WhatsApp configuration",
+        "phoneNumberIdRequired": "Phone Number ID is required",
+        "accessTokenRequired": "Access Token is required for initial setup",
+        "reenterAccessToken": "Please re-enter the Access Token to save changes",
+        "saveFailed": "Failed to save configuration",
+        "savedButRegisterFailed": "Credentials saved, but inbound registration failed. See Registration status below.",
+        "connectionFailed": "API connection failed",
+        "connectionTestFailed": "Connection test failed. Check network and try again.",
+        "notFullyRegistered": "Number is not fully registered. See the checks below for which step failed.",
+        "verificationUnreachable": "Could not reach the verification endpoint.",
+        "resetFailed": "Failed to reset configuration"
+      },
+      "success": {
+        "registrationSkipped": "Credentials saved and verified. Inbound registration was skipped (no PIN) — see Registration status below.",
+        "liveWithName": "Live — {name} can now receive events.",
+        "connected": "WhatsApp connected. Events will start flowing within a minute.",
+        "connectedTo": "Connected to {name}",
+        "connectionOk": "API connection successful",
+        "numberWired": "Number is fully wired — Meta is delivering events.",
+        "configCleared": "Configuration cleared. You can now re-enter your credentials.",
+        "webhookCopied": "Webhook URL copied to clipboard"
+      },
+      "embeddedSignup": {
+        "cta": "Connect WhatsApp",
+        "connecting": "Connecting…",
+        "hint": "Opens a Facebook window — that is how Meta authorises the connection. Sign in with the account that manages your business. Your WhatsApp Business app keeps working on the phone, same number and same history.",
+        "connected": "WhatsApp connected.",
+        "connectedTo": "Connected to {name}.",
+        "connectedNoInbound": "Connected, but Meta has not confirmed inbound delivery yet. Check the registration status below.",
+        "errorGeneric": "Could not finish the connection. Try again.",
+        "errorNumberClaimed": "This phone number is already connected to another account.",
+        "errorAmbiguous": "Your WhatsApp account has more than one number. Pick one in the Facebook window, or use manual setup below.",
+        "errorNotConfigured": "This deployment is not set up as a Tech Provider yet.",
+        "manualTitle": "Or set it up manually",
+        "title": "Quick connection",
+        "errorFromMeta": "Meta refused the connection: {message}",
+        "errorCancelledAt": "The connection stopped at the \"{step}\" step in the Meta window. Check that your business portfolio is active and that you are an admin of it, then try again.",
+        "errorNoWaba": "Login was approved, but Meta shared no WhatsApp Business account with the app. Check that you reached the end of the flow and picked the account in Meta’s window; if the number was just created, give it a minute. If it keeps happening, use the manual setup below.",
+        "errorNoNumber": "The WhatsApp Business account was shared, but it has no usable phone number yet. Finish adding and verifying the number in Meta, then come back."
+      }
     },
     "sections": {
       "overview": "Overview",
@@ -1496,7 +1590,10 @@
       "fields": "Fields & tags",
       "deals": "Deals & currency",
       "members": "Team members",
-      "api": "API keys"
+      "api": "API keys",
+      "scheduling": "Scheduling",
+      "push": "Device alerts",
+      "queues": "Queues"
     },
     "groups": {
       "account": "Account",
@@ -1618,7 +1715,7 @@
     },
     "aiConfig": {
       "title": "Agent setup",
-      "description": "Bring your own OpenAI or Anthropic key. wacrm calls the provider directly with your key — no per-seat AI fees, and your data stays yours. This powers AI-drafted replies in the inbox, the auto-reply bot, and the Playground.",
+      "description": "Bring your own OpenAI or Anthropic key. iMasterChat calls the provider directly with your key — no per-seat AI fees, and your data stays yours. This powers AI-drafted replies in the inbox, the auto-reply bot, and the Playground.",
       "adminOnlyConfig": "Only admins and owners can change the AI configuration.",
       "loadFailed": "Failed to load AI configuration",
       "providerAndKey": "Provider & key",
@@ -1645,6 +1742,10 @@
       "handoffTo": "Hand off to",
       "handoffToDesc": "When the bot can’t help — or hits the reply cap — it pauses and routes the chat here, with a short note on what happened.",
       "handoffQueue": "Unassigned queue (any agent can pick it up)",
+      "monthlyBudget": "Monthly AI budget (US$)",
+      "monthlyBudgetDesc": "OpenAI/Anthropic bill your key in US dollars. The dashboard estimates month-to-date spend and warns when it nears this amount. Leave empty for no budget.",
+      "monthlyBudgetPlaceholder": "50.00",
+      "invalidBudget": "Enter a positive budget amount (or leave it empty).",
       "remove": "Remove",
       "save": "Save",
       "missingModel": "Enter a model name.",
@@ -1659,7 +1760,19 @@
       "embeddingsHintOtherProvider": "{provider} has no embeddings endpoint, so semantic search needs a key from a provider that does — OpenRouter serves baai/bge-m3. Leave blank to use keyword search instead.",
       "embeddingsEndpoint": "Embeddings endpoint",
       "embeddingsModel": "Embeddings model",
-      "embeddingsDimensionHint": "The model must return {dimensions}-dimensional vectors, which is what your knowledge base stores. This is checked when you save."
+      "embeddingsDimensionHint": "The model must return {dimensions}-dimensional vectors, which is what your knowledge base stores. This is checked when you save.",
+      "modelSearch": "Search models…",
+      "modelCustom": "Use “{model}”",
+      "modelPrice": "US$ {input} / {output} per 1M",
+      "modelUnknown": "Model not in our price table — the cost projection falls back to its class, so it will be rougher.",
+      "loading": "Loading the AI configuration…",
+      "contextTimestamps": "Timestamps in the conversation context",
+      "contextTimestampsDesc": "Marks each message with when it was said, so the agent can tell yesterday from today. Without it, a \"tomorrow\" said yesterday still reads as tomorrow. Costs ~100–160 tokens per reply — turn it off if you do not use scheduling.",
+      "handoffNotice": "Tell the customer when transferring",
+      "handoffNoticeDesc": "When a conversation is passed to a person, the bot sends a message before going quiet. Off, it simply stops replying — how it worked until now.",
+      "handoffNoticeTextLabel": "Notice message",
+      "handoffNoticePlaceholder": "I am passing your request to the responsible team. Someone will get back to you here shortly.",
+      "handoffNoticeTextHint": "Empty uses the text above. Avoid saying \"I will get a human\": the customer does not need to learn who they were talking to, and promising someone \"now\" sets an expectation the queue cannot keep."
     },
     "aiKnowledge": {
       "loadFailed": "Failed to load knowledge base",
@@ -1687,6 +1800,759 @@
       "reindex": "Reindex",
       "reindexTooltip": "Re-embed all documents (e.g. after adding an embeddings key)",
       "loading": "Loading…"
+    },
+    "quickReplies": {
+      "title": "Quick replies",
+      "description": "Reusable snippets — plain text or a saved interactive message — that agents can insert from the inbox composer.",
+      "newButton": "New quick reply",
+      "empty": "No quick replies yet. Create one to reuse it across conversations.",
+      "editTitle": "Edit quick reply",
+      "createTitle": "New quick reply",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Business hours",
+      "tabText": "Text",
+      "tabInteractive": "Interactive",
+      "textPlaceholder": "The message text to insert",
+      "deleteConfirm": "Delete this quick reply?",
+      "cancel": "Cancel",
+      "save": "Save",
+      "errors": {
+        "nameRequired": "Give the quick reply a name.",
+        "saveFailed": "Couldn't save the quick reply.",
+        "deleteFailed": "Couldn't delete the quick reply."
+      },
+      "success": {
+        "created": "Quick reply created.",
+        "updated": "Quick reply updated."
+      }
+    },
+    "scheduling": {
+      "title": "Scheduling",
+      "description": "Connect Google Calendar and set the rules the server enforces when the agent books.",
+      "loading": "Loading...",
+      "loadError": "Could not load the settings.",
+      "connectionTitle": "Google Calendar",
+      "connectionDesc": "Google Calendar is the source of truth for availability. Blocking a day there is enough — the bot respects it immediately.",
+      "notConfigured": "This deployment has no Google credentials. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and NEXT_PUBLIC_SITE_URL.",
+      "connect": "Connect Google Calendar",
+      "disconnect": "Disconnect",
+      "connectedUnknownAccount": "Google account connected",
+      "calendarLabel": "Calendar: {id}",
+      "connectSuccess": "Google Calendar connected.",
+      "connectFailed": "Could not connect ({code}).",
+      "disconnected": "Google Calendar disconnected.",
+      "disconnectError": "Could not disconnect.",
+      "rulesTitle": "Scheduling rules",
+      "rulesDesc": "The server checks every booking against these. The model picks the time; it does not pick whether the time is legal.",
+      "activeLabel": "Let the agent book on its own",
+      "activeHint": "Off, the scheduling tools do not even appear to the model.",
+      "activeWithoutCalendar": "Without Google Calendar connected, days the shop blocks directly in Google are invisible to the bot.",
+      "connectedButInactive": "Google Calendar is connected and the rules are saved, but the agent will not book anything: the switch above is off, and with it off the scheduling tools do not even appear to the model.",
+      "timezone": "Timezone",
+      "timezoneHint": "Sets the business clock: times offered, booked and displayed all follow this zone.",
+      "timezonePlaceholder": "Choose a timezone…",
+      "timezoneSearch": "Search city or zone…",
+      "timezoneEmpty": "No timezone found.",
+      "slotMinutes": "Duration (minutes)",
+      "leadTime": "Minimum notice (minutes)",
+      "leadTimeHint": "Nothing inside this window is offered.",
+      "maxAdvance": "Book up to this many days ahead",
+      "hours": "Opening hours",
+      "hoursHint": "Windows on the business clock. A day with no window is a closed day.",
+      "closed": "Closed",
+      "addWindow": "Add window",
+      "removeWindow": "Remove window",
+      "save": "Save",
+      "saved": "Rules saved.",
+      "saveError": "Could not save.",
+      "dayNames": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ],
+      "labelTitle": "What do you call this?",
+      "labelDesc": "The word the agent uses with the customer — and the one shown on screen. Leave empty for \"appointment\".",
+      "labelPlaceholder": "demo, site visit, consultation…",
+      "tokenRevoked": "Google rejected this access — the agent stopped scheduling. Click Reconnect. If it repeats every 7 days, publish the consent screen in Google Cloud: in testing mode the access expires on its own."
+    },
+    "push": {
+      "title": "Device alerts",
+      "description": "Alerts on your phone or computer while the app is closed. With the app open, messages already arrive on their own.",
+      "thisDevice": "This device",
+      "perDevice": "The choice applies to this device only. Your phone can alert on everything while your computer stays quiet.",
+      "loading": "Loading…",
+      "saving": "Saving…",
+      "saved": "Preference saved.",
+      "turnedOff": "Notifications off on this device.",
+      "saveError": "Could not save.",
+      "permissionDenied": "You need to allow notifications in the browser.",
+      "blocked": "The browser is blocking notifications for this site. Allow them in browser settings and come back.",
+      "unsupported": "This browser does not support push notifications.",
+      "notConfigured": "This deployment has no notification keys (VAPID) configured yet.",
+      "modeOff": "Off",
+      "modeOffHint": "No alerts on this device.",
+      "modeHuman": "Only what needs a person",
+      "modeHumanHint": "Alerts when the agent stops and calls a human — a complaint, a blocked subject, a booking that failed. Most people want this.",
+      "modeAll": "Every message",
+      "modeAllHint": "Alerts on every customer message. In a busy shop that is all day.",
+      "iosNote": "On iPhone the app must be installed to the home screen before notifications work (iOS 16.4 or newer)."
+    },
+    "queues": {
+      "title": "Attendance queues",
+      "description": "Every conversation is always in one queue, and the queue says who attends it: the assistant or a team.",
+      "loading": "Loading queues…",
+      "badgeDefault": "Default",
+      "descriptionLabel": "Description",
+      "descriptionHint": "This is the text the assistant reads to decide where to route. Use the words your customers use.",
+      "responsibleLabel": "Responsible",
+      "responsibleHint": "Who answers for this queue. One person can answer for several.",
+      "noResponsible": "Nobody (shared waiting room)",
+      "autoAssignLabel": "Assign to the responsible",
+      "autoAssignOn": "On",
+      "autoAssignOff": "Off",
+      "autoAssignHint": "When on, the conversation becomes theirs on arrival — and the assistant stops replying in it.",
+      "newTitle": "New queue",
+      "newNamePlaceholder": "Billing",
+      "newDescriptionPlaceholder": "Invoice, second copy, payment, installments",
+      "newHint": "Start with three or four. An unused queue confuses the assistant and costs tokens on every reply.",
+      "create": "Create queue",
+      "created": "Queue created",
+      "deleted": "Queue removed",
+      "delete": "Remove queue",
+      "confirmDelete": "Remove the \"{name}\" queue? Conversations in it are left without a queue; history is preserved.",
+      "errorDuplicate": "A queue with that name already exists.",
+      "slaLabel": "Alert after (minutes)",
+      "slaPlaceholder": "no alert",
+      "slaHint": "Empty = no alert. Filled in, someone is warned when a conversation waits here longer than this.",
+      "overflowLabel": "If nobody picks up, send to",
+      "noOverflow": "stays put",
+      "overflowHint": "After this long unattended, the conversation moves queue on its own. One hop only.",
+      "overflowAfterLabel": "Move after (minutes)",
+      "distributionLabel": "Who receives",
+      "rosterLabel": "Who's in the rotation",
+      "skipOfflineLabel": "Skip people who are offline",
+      "skipOfflineHint": "If nobody in the rotation is online, the conversation waits in the queue — instead of going to someone who left.",
+      "distribution": {
+        "responsible": "The responsible",
+        "round_robin": "Round-robin across the team",
+        "least_busy": "Whoever has fewest open conversations",
+        "none": "Nobody (waiting room)"
+      },
+      "distributionHint": {
+        "responsible": "Everything goes to the person chosen above.",
+        "round_robin": "Takes turns, in order. Predictable — everyone knows when it is their turn.",
+        "least_busy": "Looks fairer, but has a side effect: closing fast earns more work, and leaving everything open stops the flow.",
+        "none": "The conversation stays visible to the team and someone picks it up."
+      }
+    }
+  },
+  "SignupPage": {
+    "privacyPolicy": "Privacy Policy",
+    "emailAlreadyRegistered": "This email already has an account. Sign in with your password, or use “Forgot password”.",
+    "titleJoin": "Create account & join",
+    "title": "Create account",
+    "descJoin": "Verify your email, then accept the invitation to join your team.",
+    "desc": "Get started with CRM Template for WhatsApp",
+    "passwordsMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "checkEmailTitle": "Check your email",
+    "checkEmailDesc": "We've sent a confirmation link to <strong>{email}</strong>. Please check your inbox and click the link to verify your account.",
+    "backToSignIn": "Back to sign in",
+    "fullNameLabel": "Full name",
+    "fullNamePlaceholder": "John Doe",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "At least 6 characters",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat your password",
+    "creatingAccount": "Creating account...",
+    "createAccount": "Create account",
+    "haveAccount": "Already have an account?",
+    "signIn": "Sign in",
+    "acceptTerms": "I have read and agree to the <terms>Terms of Use</terms> and the <privacy>Privacy Policy</privacy>."
+  },
+  "ForgotPasswordPage": {
+    "title": "Reset password",
+    "desc": "Enter your email and we'll send you a reset link",
+    "checkEmailTitle": "Check your email",
+    "checkEmailDesc": "We've sent a password reset link to <strong>{email}</strong>. Please check your inbox.",
+    "backToSignIn": "Back to sign in",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "sending": "Sending...",
+    "sendResetLink": "Send reset link"
+  },
+  "JoinPage": {
+    "verifying": "Verifying invitation…",
+    "fail": {
+      "notFound": {
+        "title": "Invite not found",
+        "body": "This link doesn’t match a valid invitation. Double-check the URL or ask the person who invited you to send a new one."
+      },
+      "used": {
+        "title": "Invite already used",
+        "body": "This invitation has already been accepted. If that wasn’t you, ask the account admin to send a fresh link."
+      },
+      "expired": {
+        "title": "Invite expired",
+        "body": "This invitation has expired. Ask the account admin to send a new one — they take a few seconds to generate."
+      },
+      "serverError": {
+        "title": "Something went wrong",
+        "body": "We couldn’t verify this invitation right now. Try refreshing the page in a moment."
+      }
+    },
+    "tryAgain": "Try again",
+    "createNewAccountInstead": "Create a new account instead",
+    "signIn": "Sign in",
+    "invitedTitle": "You're invited to <account>{name}</account>",
+    "invitedDesc": "You'll join as <role>{roleName}</role>. Link valid until {date}.",
+    "roleAdmin": "Admin",
+    "roleAgent": "Agent",
+    "roleViewer": "Viewer",
+    "accepting": "Accepting…",
+    "acceptInvitation": "Accept invitation",
+    "acceptNote": "Accepting moves your login into <account>{name}</account>. Your empty personal account from signup will be cleaned up.",
+    "toastWelcome": "Welcome to the team",
+    "toastAcceptFailed": "Failed to accept invitation",
+    "toastServerUnreachable": "Could not reach the server",
+    "conflictFallback": "You are already in another account. Sign in with a different email to join this one.",
+    "toastSignOutFailed": "Could not sign out. Try refreshing the page.",
+    "conflictTitle": "Can't join {name} with this account",
+    "conflictHelp": "To join <account>{name}</account>, sign out and sign up again with a different email address. The invite link stays valid as long as it hasn't expired.",
+    "staySignedIn": "Stay signed in",
+    "signingOut": "Signing out…",
+    "signOutUseDifferentEmail": "Sign out & use a different email",
+    "createAccountJoin": "Create account & join",
+    "alreadyHaveAccount": "I already have an account"
+  },
+  "Shell": {
+    "loading": "Loading..."
+  },
+  "Agents": {
+    "page": {
+      "title": "AI Agents",
+      "description": "Your bring-your-own-key AI agent — set it up, then test it in the playground before it replies to customers in the inbox.",
+      "tabPlayground": "Playground",
+      "tabSetup": "Setup",
+      "tabUsage": "Usage",
+      "vaultTab": "Network",
+      "guardrailsTab": "Limits",
+      "tabContext": "Context",
+      "tabRules": "Rules"
+    },
+    "playground": {
+      "notConfiguredError": "No agent configured yet — finish Setup first.",
+      "noReplyError": "Couldn't get a reply.",
+      "unreachableError": "Couldn't reach the agent.",
+      "title": "Playground",
+      "subtitle": "— test replies as if you were a customer",
+      "reset": "Reset",
+      "emptyTitle": "Send a message to see how your agent would reply.",
+      "emptyHint": "It uses your knowledge base and behaves exactly like the auto-reply bot — including handoff.",
+      "goToSetup": "Not set up yet? Go to Setup",
+      "handoff": "Would hand off to a human here",
+      "thinking": "Thinking…",
+      "inputPlaceholder": "Type a customer message…"
+    },
+    "usage": {
+      "loadError": "Failed to load usage",
+      "title": "Token usage",
+      "description": "Tokens spent on your provider key by drafts and the auto-reply bot. Counts only — no message content is stored here.",
+      "lastDays": "Last {days} days",
+      "emptyTitle": "No AI usage in the last {days} days yet.",
+      "emptyHint": "This fills in as the assistant drafts and auto-replies.",
+      "statTotalTokens": "Total tokens",
+      "statLlmCalls": "LLM calls",
+      "statAutoReply": "Auto-reply",
+      "statDrafts": "Drafts",
+      "tokensPerDay": "Tokens per day",
+      "tokensCategory": "Tokens",
+      "byModel": "By model",
+      "modelStats": "{tokens} tok · {count, plural, =1 {# call} other {# calls}}",
+      "truncated": "Showing a partial window — usage is high enough that only the most recent records are summarized here.",
+      "costPerDay": "Cost per day",
+      "costCategory": "Cost",
+      "unitCost": "Money",
+      "unitTokens": "Tokens"
+    },
+    "vault": {
+      "loadError": "Could not load the vault.",
+      "actionError": "Could not complete the action.",
+      "approved": "Page approved — it counts in replies now.",
+      "rejected": "Page rejected.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "archive": "Archive",
+      "showDrafts": "Show drafts in the graph",
+      "noDrafts": "Nothing waiting for approval. The agent proposes pages when conversations end.",
+      "noPages": "No approved pages yet.",
+      "tabs": {
+        "graph": "Network",
+        "drafts": "Approval",
+        "pages": "Pages",
+        "health": "Health",
+        "keeper": "Keeper"
+      },
+      "graph": {
+        "hint": "Drag to move, scroll to zoom, hover to light up the connections. A hollow node is a draft — it does not count in replies yet.",
+        "empty": "The vault is empty. As the agent works, it proposes pages here — and the network grows.",
+        "connections": "{count, plural, =0 {no connections} =1 {1 connection} other {# connections}}",
+        "kind": {
+          "rule": "Rule",
+          "entity_customer": "Customer",
+          "entity_business": "Business",
+          "concept": "Concept",
+          "state": "Right now"
+        }
+      },
+      "healthy": "Nothing to fix. The wiki is consistent.",
+      "lint": {
+        "contradiction": "Contradiction",
+        "stale": "Stale",
+        "duplicate": "Duplicate",
+        "orphan": "Orphan",
+        "gap": "Gap"
+      },
+      "edit": "Edit",
+      "editTitle": "Page title",
+      "editHint": "Saving approves the page with your version — that is what the agent will use in replies.",
+      "cancelEdit": "Discard",
+      "saveEdit": "Save",
+      "saveAndApprove": "Save and approve",
+      "saved": "Page saved and approved.",
+      "keeper": {
+        "description": "The keeper reads conversations idle for over 90 minutes and proposes wiki pages. It runs on its own overnight; here you see what it decided — including when the decision was to keep nothing.",
+        "runNow": "Run now",
+        "running": "Running…",
+        "loading": "Loading…",
+        "empty": "The keeper has not run for this account yet.",
+        "runError": "Could not run the keeper.",
+        "runProposed": "{count} page(s) proposed — see the approval tab.",
+        "runNothingDurable": "Read {count} conversation(s) and found nothing durable to keep.",
+        "runTooRecent": "No conversation ready: {count} are still active. It only reads after 90 minutes of silence.",
+        "runAlreadyRead": "Nothing new — the {count} conversations in the window were already read.",
+        "runNoConversations": "No conversations in the last 7 days to read.",
+        "operation": {
+          "proposed": "Proposed a page",
+          "no_action": "Ran and called no tool",
+          "finished": "Decided to keep nothing"
+        }
+      },
+      "newPage": {
+        "button": "New page",
+        "title": "Write a page",
+        "description": "What the business knows that no conversation ever said. It goes in approved and starts affecting replies.",
+        "kind": "Kind",
+        "pageTitle": "Title",
+        "pageTitlePlaceholder": "Return policy",
+        "content": "Content",
+        "contentPlaceholder": "Returns within 30 days, with the receipt.",
+        "contentHint": "Short and correct. Rules go into EVERY reply — whatever is wrong here, the agent will repeat.",
+        "cancel": "Cancel",
+        "save": "Create page",
+        "created": "Page created and approved.",
+        "error": "Could not create the page.",
+        "kinds": {
+          "rule": "Rule",
+          "entity_customer": "About a customer",
+          "entity_business": "About the business",
+          "concept": "Concept",
+          "state": "Current state"
+        },
+        "kindHints": {
+          "rule": "True for everyone and stable over months. Goes into EVERY reply, so keep it short.",
+          "entity_customer": "A fact about one person: preference, constraint, what they bought.",
+          "entity_business": "What you sell, charge, will and will not do.",
+          "concept": "A term from your trade the agent must understand your way.",
+          "state": "True right now and will change: this month promo, short-staffed."
+        }
+      }
+    },
+    "guardrails": {
+      "title": "When to call a person",
+      "description": "Subjects the agent may not handle on its own. Everything else it keeps answering normally.",
+      "loading": "Loading…",
+      "loadError": "Could not load the rules.",
+      "saveError": "Could not save.",
+      "added": "Rule added.",
+      "remove": "Remove rule",
+      "builtin": "default",
+      "topicsTitle": "By subject",
+      "topicsDesc": "The agent reads it and decides whether the conversation went there. Catches the customer who negotiates without ever saying “discount” — and, resting on its judgement, can be wrong.",
+      "keywordsTitle": "By word",
+      "keywordsDesc": "Checked before the agent replies, spending no call. It cannot be talked out of it — and it misses anyone who phrased it differently.",
+      "noTopics": "No blocked subjects.",
+      "noKeywords": "No blocked words.",
+      "addTitle": "Add a rule",
+      "addDesc": "Use a subject for something a customer can phrase many ways; a word for an exact term that must never get through.",
+      "kindTopic": "Subject",
+      "kindKeyword": "Word",
+      "valueTopicLabel": "Subject that requires a person",
+      "valueTopicPlaceholder": "e.g. lens replacement outside warranty",
+      "valueKeywordLabel": "Word or phrase",
+      "valueKeywordPlaceholder": "e.g. complaint",
+      "noteLabel": "Note for the attendant (optional)",
+      "notePlaceholder": "e.g. check the invoice before replying",
+      "noteHint": "Shows in the note the attendant reads before opening the thread.",
+      "add": "Add"
+    },
+    "costProjection": {
+      "title": "Projected cost per message",
+      "description": "Assembled from the same pieces the agent actually loads — it moves on its own when the vault grows or a rule is added.",
+      "loading": "Calculating…",
+      "notConfigured": "Configure the agent to see the projection.",
+      "perReply": "Per reply",
+      "perMonth": "Per month",
+      "basedOn": "{count} inbound messages in 30 days",
+      "promptTokens": "Tokens sent",
+      "steps": "Calls per reply",
+      "stepsHint": "With tools, the prompt is re-sent on every step",
+      "breakdown": "Where the cost is",
+      "everyMessage": "All of this is re-sent on every message, in every conversation. That is why cutting what is always loaded is worth more than cutting what is retrieved.",
+      "estimateWarning": "Tokens start as a character estimate and are corrected by what the provider actually charged on this account.",
+      "noMeasurement": "No calls recorded yet to compare against. Once the agent answers customers, the measured figure appears here.",
+      "priceFallback": "This model is not in the price table — we used its class, so the figure is rougher still.",
+      "sections": {
+        "scaffold": "Fixed base",
+        "system_prompt": "Your prompt",
+        "environment": "Current context",
+        "vault": "Vault",
+        "guardrails": "Limits",
+        "knowledge": "Knowledge base",
+        "tools": "Tools",
+        "transcript": "Conversation history"
+      },
+      "calibrated": "Corrected using {calls} real calls: the character estimate said {raw} tokens and was {drift}% off the measured figure. The number above is already adjusted.",
+      "calibratedMatch": "Checked against {calls} real calls — the estimate matched.",
+      "fxNote": "BRL figures are approximate at R$ {rate} per dollar ({age}). The provider charges in dollars on the card, with tax and spread on top.",
+      "fxToday": "today's rate",
+      "fxDays": "rate from {days} days ago"
+    },
+    "tools": {
+      "title": "What the agent can do",
+      "description": "The tools it can use. A tool that is off does not become “unavailable” — it stops existing for the model, which never offers it.",
+      "loading": "Loading…",
+      "loadError": "Could not load the tools.",
+      "saveError": "Could not save.",
+      "alwaysOn": "Always on",
+      "alwaysOnWhy": "Cannot be switched off: it is the only way the agent can stop and call a person.",
+      "absentNote": "A tool that is off also leaves the prompt — it stops costing tokens on every message.",
+      "descriptions": {
+        "request_human": "Stops the conversation and hands it to a person, with a reason.",
+        "check_availability": "Looks up genuinely free slots, crossing Google Calendar with what is already booked here.",
+        "book_appointment": "Books the appointment at the time the customer chose.",
+        "reschedule_appointment": "Moves the customer's appointment to another free slot.",
+        "cancel_appointment": "Cancels the customer's appointment and frees the slot.",
+        "route_to_queue": "Sends the conversation to the right team and stops replying. It picks using the description you wrote for each queue.",
+        "add_tag": "Labels the contact with one of the labels you allowed. Only allowed ones are offered to it."
+      },
+      "requirements": {
+        "scheduling_off": "Unavailable: switch on “let the agent book on its own” in Settings → Scheduling.",
+        "google_disconnected": "Unavailable: connect Google Calendar in Settings → Scheduling.",
+        "calendar_unusable": "Unavailable: the Google Calendar connection must be reconnected.",
+        "no_human_queue": "Unavailable: create at least one people queue in Settings → Queues.",
+        "no_selectable_tag": "Unavailable: allow at least one label for the agent in Settings → Fields & tags."
+      },
+      "names": {
+        "request_human": "Call a person",
+        "check_availability": "Check free slots",
+        "book_appointment": "Book an appointment",
+        "reschedule_appointment": "Reschedule an appointment",
+        "cancel_appointment": "Cancel an appointment",
+        "route_to_queue": "Route to a queue",
+        "add_tag": "Label the contact"
+      }
+    },
+    "context": {
+      "loading": "Assembling the context…",
+      "notConfigured": "Set up the AI first — without a key and model there is no context to assemble.",
+      "description": "Exactly what the agent reads before writing, assembled with the same code as the live path. If something here is wrong, that is what the customer will hear.",
+      "totalTokens": "tokens per reply",
+      "sectionEmpty": "empty",
+      "emptyDetail": "Nothing in this section. If you expected something, what is missing is the configuration.",
+      "editAt": "Where to change this",
+      "knowledgeNote": "The knowledge base is not shown here because what it contributes depends on the question — up to 5 chunks picked at reply time. It adds to the total when present.",
+      "sections": {
+        "scaffold": "Fixed scaffold",
+        "environment": "Current situation",
+        "vault": "Vault (always-on pages)",
+        "business_prompt": "Your business instructions",
+        "guardrails": "Guardrails",
+        "tools": "Available tools",
+        "transcript": "The conversation"
+      },
+      "hints": {
+        "scaffold": "The rules that apply to every account. Not configurable.",
+        "environment": "Current date and time, timezone, opening hours, the customer and their booking.",
+        "vault": "Approved pages that go into every reply.",
+        "business_prompt": "The free text you wrote about the business.",
+        "guardrails": "Subjects the bot must not handle.",
+        "tools": "What it can do beyond replying.",
+        "transcript": "The last messages. Empty here because no conversation was picked."
+      }
+    },
+    "rules": {
+      "loading": "Loading…",
+      "save": "Save rules",
+      "saved": "Rules saved.",
+      "saveError": "Could not save. If scheduling is not set up yet, open Settings → Scheduling first.",
+      "description": "The numbers that govern how the agent talks. Each one is a trade-off — the amber line is what you pay by raising it.",
+      "sections": {
+        "conversation": "Conversation",
+        "scheduling": "Scheduling",
+        "audio": "Audio"
+      },
+      "fields": {
+        "new_session_hours": {
+          "label": "Hours of silence before it counts as a new conversation",
+          "hint": "When the customer comes back after this long, the agent treats it as a fresh contact: it stops assuming the earlier topic and stops handing off over an old unanswered question.",
+          "cost": "Too high and a next-day return reads as a continuation. Too low and it fires mid-conversation when the customer merely took a while to answer."
+        },
+        "offer_slots_max": {
+          "label": "Times offered per message",
+          "hint": "How many times the bot will name at once. It keeps the rest for the next question.",
+          "cost": "Above 3 the reply starts to read as a form. A high number here is what produced the message with 42 times."
+        },
+        "lookahead_days": {
+          "label": "Days ahead it searches",
+          "hint": "How far the agent looks when the customer does not give a date.",
+          "cost": "More days bring more slots and cost more tokens on every availability check."
+        },
+        "slot_fetch_limit": {
+          "label": "Slots fetched per check",
+          "hint": "How many slots the search returns to the model. It only offers the first few, but knows them all so it can answer \"what about Thursday?\" without checking again.",
+          "cost": "Every slot rides in the context and is paid in tokens. Lowering saves, but forces more round-trips during the conversation."
+        },
+        "context_message_limit": {
+          "label": "History messages sent to the model",
+          "hint": "How many earlier messages of the conversation the agent sees when replying. Fewer and it loses the thread; more rarely helps.",
+          "cost": "This is the context size, so it is the cost of EVERY reply. An optician gets by on 6; a consultancy may need 40. If conversations are long and the topic shifts, the vault serves better than a bigger history."
+        }
+      },
+      "audio": {
+        "policyLabel": "When the customer sends an audio",
+        "policies": {
+          "ignore": {
+            "label": "Do nothing",
+            "hint": "The audio is stored and shows in the conversation, but the agent does not reply. This was the previous behaviour — and it is silence from the customer's side."
+          },
+          "notice": {
+            "label": "Ask them to type",
+            "hint": "Replies asking for the request in writing. Cheap and ends the silence, but puts the effort on the customer."
+          },
+          "transcribe": {
+            "label": "Transcribe and reply",
+            "hint": "Transcribes and treats it as text. From there everything works: context, keywords, scheduling. If transcription fails, it falls back to asking them to type."
+          },
+          "handoff": {
+            "label": "Pass to a person",
+            "hint": "Transfers straight away without trying to understand. For those who would rather listen than risk it."
+          }
+        },
+        "noticeLabel": "Message when the audio cannot be understood",
+        "noticePlaceholder": "Got your audio! So I can help faster, could you type what you need?",
+        "noticeHint": "Empty uses the text above. Avoid confessing a technical limit — \"I cannot hear audio\" invites the customer to judge the tool instead of solving their problem.",
+        "providerLabel": "Who transcribes",
+        "providers": {
+          "local": {
+            "label": "Whisper on our VPS",
+            "hint": "No per-minute cost, and the customer audio never leaves here. Slower: about 11 seconds for 7 seconds of audio, and proportional to length."
+          },
+          "elevenlabs": {
+            "label": "ElevenLabs (API)",
+            "hint": "Faster and more accurate, especially with poor phone audio. Charges per minute and the audio leaves to a third party — weigh that if conversations are sensitive."
+          }
+        },
+        "keyLabel": "ElevenLabs key",
+        "keyPlaceholder": "sk_…",
+        "keySaved": "••• key saved — type another to replace",
+        "keyHint": "Stored encrypted. Leave blank to keep the current one.",
+        "vocabLabel": "Words from your trade",
+        "vocabPlaceholder": "frames, anti-reflective lens, prescription, progressive, Ray-Ban",
+        "vocabHint": "Product names, brands and jargon the transcriber tends to get wrong. Comma-separated. Scheduling verbs and weekdays are already included — no need to repeat them.",
+        "vocabCost": "Applies to the local Whisper only. Do not overdo it: this text competes for room with the audio itself, and a long list makes worse exactly what it came to fix. Add only what you saw come out wrong."
+      }
+    }
+  },
+  "Notifications": {
+    "markReadError": "Failed to mark notification as read",
+    "markAllReadError": "Failed to mark all as read",
+    "retry": "Retry",
+    "title": "Notifications",
+    "description": "Conversations other teammates assign to you show up here.",
+    "markAllRead": "Mark all as read",
+    "emptyTitle": "No notifications yet",
+    "emptyHint": "You'll see an alert here when someone assigns you a conversation.",
+    "unread": "Unread",
+    "someContact": "a contact",
+    "assigned": {
+      "title": "New conversation assigned",
+      "byPerson": "{actor} assigned you a conversation with {contact}",
+      "bySystem": "A conversation with {contact} was assigned to you"
+    }
+  },
+  "Billing": {
+    "pendingTitle": "Account awaiting approval",
+    "pendingDesc": "The account \"{accountName}\" has been created and is awaiting activation by our team. You will get access as soon as it is approved.",
+    "blockedTitle": "Account temporarily suspended",
+    "blockedDesc": "Access to \"{accountName}\" is suspended due to a pending payment. Settle the invoice to restore access — nothing is lost, and incoming WhatsApp messages keep being stored while access is suspended.",
+    "pixLabel": "PIX key for payment",
+    "pixQrAlt": "PIX QR code — scan to pay",
+    "contactCta": "Talk to support",
+    "signOut": "Sign out",
+    "pastDueBanner": "Your account has a pending invoice. Please settle it to avoid suspension.",
+    "admin": {
+      "title": "Platform admin",
+      "subtitle": "All accounts with their manual billing state. Changes apply immediately.",
+      "colAccount": "Account",
+      "colOwner": "Owner",
+      "colStatus": "Status",
+      "colPaidUntil": "Paid until",
+      "colMembers": "Members",
+      "colNotes": "Notes",
+      "statusPending": "Pending approval",
+      "statusActive": "Active",
+      "statusPastDue": "Past due",
+      "statusBlocked": "Blocked",
+      "notesPlaceholder": "Internal notes (contract, price, contact…)",
+      "saveNotes": "Save",
+      "loadError": "Could not load accounts",
+      "updateError": "Could not update the account",
+      "updatedToast": "Account updated",
+      "empty": "No accounts yet",
+      "forbidden": "You do not have access to this page.",
+      "refresh": "Refresh"
+    }
+  },
+  "Interactive": {
+    "replyButtons": "Reply buttons",
+    "list": "List",
+    "body": "Body",
+    "bodyPlaceholder": "What the customer reads above the options",
+    "headerOptional": "Header (optional)",
+    "footerOptional": "Footer (optional)",
+    "showReplyIds": "Show reply IDs (advanced)",
+    "preview": "Preview",
+    "buttonsCount": "Buttons ({count}/{max})",
+    "buttonLabelPlaceholder": "Button label",
+    "addButton": "Add button",
+    "listButtonLabel": "List button label",
+    "rowsCount": "Rows ({count}/{max})",
+    "sectionTitlePlaceholder": "Section title (optional)",
+    "rowTitlePlaceholder": "Row title",
+    "descriptionPlaceholder": "Description (optional)",
+    "addRow": "Add row",
+    "addSection": "Add section",
+    "previewBodyPlaceholder": "Message body…",
+    "previewButtonFallback": "Button",
+    "previewMenuFallback": "Menu"
+  },
+  "Agenda": {
+    "title": "Agenda",
+    "description": "Booked appointments — by the agent or by you. Availability comes from Google Calendar.",
+    "week": "Week",
+    "day": "Day",
+    "today": "Today",
+    "previous": "Previous period",
+    "next": "Next period",
+    "newButton": "New appointment",
+    "empty": "Nothing booked",
+    "loadError": "Could not load the agenda.",
+    "unknownContact": "Unnamed contact",
+    "viaAgent": "Booked by the agent",
+    "viaManual": "Booked by hand",
+    "notOnCalendar": "Not on Google Calendar",
+    "openConversation": "Open conversation",
+    "newDialog": {
+      "title": "New appointment",
+      "description": "Date and time in the business timezone ({timezone}).",
+      "contact": "Customer",
+      "contactSearch": "Search by name or phone...",
+      "noContacts": "No contacts found.",
+      "date": "Date",
+      "time": "Time",
+      "duration": "Duration (minutes)",
+      "subject": "Subject",
+      "subjectPlaceholder": "Demo, quote, site visit…",
+      "cancel": "Cancel",
+      "save": "Book",
+      "created": "Appointment created.",
+      "createdUnsynced": "Appointment created, but it did not reach Google Calendar. Check before confirming with the customer.",
+      "error": "Could not create the appointment."
+    },
+    "detail": {
+      "unknownContact": "Unnamed contact",
+      "viaAgent": "Booked by the agent",
+      "viaManual": "Booked by hand",
+      "status": {
+        "scheduled": "Confirmed",
+        "completed": "Showed up",
+        "no_show": "No-show",
+        "cancelled": "Cancelled"
+      },
+      "notOnCalendar": "This appointment never reached Google Calendar. The shop will not see it — sort it out before the time comes.",
+      "cancelledBecause": "Cancelled: {reason}",
+      "openConversation": "Open conversation",
+      "reschedule": "Reschedule",
+      "confirmReschedule": "Confirm new time",
+      "back": "Back",
+      "newDate": "New date",
+      "newTime": "New time",
+      "cancel": "Cancel appointment",
+      "cancelReason": "Cancellation reason",
+      "cancelReasonPlaceholder": "Optional",
+      "rescheduled": "Appointment moved.",
+      "cancelled": "Appointment cancelled.",
+      "unsyncedWarning": "Saved here, but Google Calendar was not updated.",
+      "error": "Could not update the appointment."
+    }
+  },
+  "Feedback": {
+    "open": "Feedback",
+    "close": "Close",
+    "title": "Something wrong?",
+    "subtitle": "Goes straight to whoever builds iMasterChat.",
+    "kind": {
+      "bug": "Problem",
+      "idea": "Idea",
+      "other": "Other"
+    },
+    "placeholder": {
+      "bug": "What you did, what you expected, what happened.",
+      "idea": "What would make your day here easier?",
+      "other": "Write freely."
+    },
+    "shotAdd": "Attach a picture of the screen",
+    "shotAttached": "Image attached",
+    "shotRemove": "Remove the image",
+    "shotUnsupported": "This device cannot capture the screen. Describe it in the text.",
+    "shotFailed": "Could not capture the screen.",
+    "shotWarning": "The image is optional. If you attach one, choose what to share — the screen may contain a customer's conversation.",
+    "shotWarningAttached": "Check that the image shows no customer data before sending.",
+    "back": "Back",
+    "send": "Send",
+    "sendError": "Could not send. Try again.",
+    "thanks": "Got it, thank you!",
+    "thanksHint": "If we need more detail, we'll reach you here.",
+    "sendAnother": "Send another"
+  },
+  "Pwa": {
+    "install": {
+      "title": "Install iMasterChat on your device",
+      "description": "It becomes an icon on your home screen, opens without browser chrome, and it is what lets you be notified of a message while the app is closed.",
+      "action": "Install",
+      "installing": "Opening…",
+      "stepsIos": "In Safari: Share → Add to Home Screen.",
+      "stepsAndroid": "In the browser menu (⋮): Install app.",
+      "stepsDesktop": "Click the install icon in your browser's address bar.",
+      "never": "Don't show this again",
+      "close": "Close"
     }
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import {
   CONVERSATION_SELECT,
   matchesContactFilters,
@@ -9,9 +10,10 @@ import {
 } from "@/lib/inbox/conversations";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
-import { Search, ChevronDown, X } from "lucide-react";
+import { Search, ChevronDown, X, SlidersHorizontal } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useTranslations } from "next-intl";
+import { dateFnsLocale } from "@/lib/time/format";
+import { useLocale, useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -21,6 +23,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ConversationListProps {
   activeConversationId: string | null;
@@ -44,7 +51,41 @@ const STATUS_COLORS: Record<ConversationStatus, string> = {
 
 
 
-type InboxFilter = ConversationStatus | "all" | "unread";
+type InboxFilter = ConversationStatus | "all" | "unread" | "mine";
+
+/** Uma opção dentro do popover de filtros. Marca de seleção à direita
+ *  para os rótulos longos (nome de empresa) alinharem à esquerda. */
+function FilterRow({
+  label,
+  active,
+  onClick,
+  dot,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  dot?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-muted",
+        active ? "text-primary" : "text-popover-foreground"
+      )}
+    >
+      {dot && (
+        <span
+          className="size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: dot }}
+        />
+      )}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {active && <span className="text-xs">✓</span>}
+    </button>
+  );
+}
 
 export function ConversationList({
   activeConversationId,
@@ -54,10 +95,16 @@ export function ConversationList({
   resyncToken = 0,
 }: ConversationListProps) {
   const t = useTranslations("Inbox.conversationList");
-  
+  const { user } = useAuth();
+
   const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
     { label: t("filterAll"), value: "all" },
     { label: t("filterUnread"), value: "unread" },
+    // "Minhas" logo depois de "Não lidas" de propósito: são as duas
+    // perguntas que um atendente faz ao abrir a tela, e até agora só uma
+    // delas tinha resposta. Sem este filtro, dar um responsável a uma
+    // fila seria dar uma responsabilidade que a pessoa não consegue ver.
+    { label: t("filterMine"), value: "mine" },
     { label: t("filterOpen"), value: "open" },
     { label: t("filterPending"), value: "pending" },
     { label: t("filterClosed"), value: "closed" },
@@ -71,6 +118,9 @@ export function ConversationList({
   // Broadcast audience filtering. Company is an exact match on the field.
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  /** Filtro por fila. `null` = todas. */
+  const [selectedQueueId, setSelectedQueueId] = useState<string | null>(null);
+  const [queues, setQueues] = useState<{ id: string; name: string }[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
 
   // Keep the latest callback in a ref so the fetch effect below can
@@ -158,13 +208,41 @@ export function ConversationList({
     return m;
   }, [tags]);
 
+  // As filas da conta, para o filtro e para o rótulo no item. A RLS já
+  // recorta por conta; uma consulta só, e as filas mudam raramente.
+  useEffect(() => {
+    const supabase = createClient();
+    void supabase
+      .from("queues")
+      .select("id, name")
+      .eq("active", true)
+      .order("position")
+      .then(({ data }) => setQueues(data ?? []));
+  }, []);
+
+  const queueNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const q of queues) m.set(q.id, q.name);
+    return m;
+  }, [queues]);
+
   const filtered = useMemo(() => {
     let result = conversations;
 
     if (filter === "unread") {
       result = result.filter((c) => c.unread_count > 0);
+    } else if (filter === "mine") {
+      // Sem usuário resolvido, lista vazia em vez da lista inteira: uma
+      // aba "Minhas" que mostra as de todo mundo é pior que uma vazia.
+      result = user?.id
+        ? result.filter((c) => c.assigned_agent_id === user.id)
+        : [];
     } else if (filter !== "all") {
       result = result.filter((c) => c.status === filter);
+    }
+
+    if (selectedQueueId) {
+      result = result.filter((c) => c.queue_id === selectedQueueId);
     }
 
     // Contact-based filters (tags via OR logic, exact company match).
@@ -188,7 +266,7 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, search, selectedTagIds, selectedCompany]);
+  }, [conversations, filter, search, selectedTagIds, selectedCompany, user?.id, selectedQueueId]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -202,6 +280,13 @@ export function ConversationList({
   }, []);
 
   const hasContactFilters = selectedTagIds.length > 0 || selectedCompany !== null;
+  /** Quantos filtros secundários estão agindo — o número no botão. Sem
+   *  ele, um filtro esquecido dentro do popover esconde conversas e
+   *  ninguém entende por quê. */
+  const secondaryCount =
+    (selectedQueueId ? 1 : 0) +
+    selectedTagIds.length +
+    (selectedCompany ? 1 : 0);
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,92 +348,118 @@ export function ConversationList({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {tags.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
+          {/* Filtros secundários num lugar só.
+              Eram três menus soltos ao lado do de status — fila,
+              etiquetas e empresa — e a linha virou uma fileira de
+              quatro botões que embrulhava no celular. O de status fica
+              fora porque é o que se usa o tempo todo; o resto entra
+              aqui, com um contador para não haver filtro escondido
+              agindo sem ninguém ver. */}
+          {(queues.length > 1 || tags.length > 0 || companies.length > 0) && (
+            <Popover>
+              <PopoverTrigger
                 className={cn(
-                  "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-muted",
-                  selectedTagIds.length > 0
+                  "inline-flex h-7 items-center justify-center gap-1 rounded-md px-2 text-xs hover:bg-muted",
+                  secondaryCount > 0
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {t("tags")}
-                {selectedTagIds.length > 0 && (
+                <SlidersHorizontal className="h-3 w-3" />
+                {t("filters")}
+                {secondaryCount > 0 && (
                   <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                    {selectedTagIds.length}
+                    {secondaryCount}
                   </span>
                 )}
                 <ChevronDown className="h-3 w-3" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
+              </PopoverTrigger>
+              <PopoverContent
                 align="start"
-                className="max-h-64 w-56 border-border bg-popover"
+                className="max-h-[70vh] w-64 overflow-y-auto border-border bg-popover p-3"
               >
-                {tags.map((t) => (
-                  <DropdownMenuCheckboxItem
-                    key={t.id}
-                    checked={selectedTagIds.includes(t.id)}
-                    onCheckedChange={() => toggleTag(t.id)}
-                    className="text-sm text-popover-foreground"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: t.color }}
+                <div className="space-y-4">
+                  {queues.length > 1 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("queues")}
+                      </p>
+                      <FilterRow
+                        label={t("allQueues")}
+                        active={selectedQueueId === null}
+                        onClick={() => setSelectedQueueId(null)}
                       />
-                      <span className="truncate">{t.name}</span>
-                    </span>
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {companies.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className={cn(
-                  "inline-flex max-w-40 items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-muted",
-                  selectedCompany
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <span className="truncate">{selectedCompany ?? t("company")}</span>
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="max-h-64 w-56 border-border bg-popover"
-              >
-                <DropdownMenuItem
-                  onClick={() => setSelectedCompany(null)}
-                  className={cn(
-                    "text-sm",
-                    selectedCompany === null
-                      ? "text-primary"
-                      : "text-popover-foreground"
+                      {queues.map((q) => (
+                        <FilterRow
+                          key={q.id}
+                          label={q.name}
+                          active={selectedQueueId === q.id}
+                          onClick={() => setSelectedQueueId(q.id)}
+                        />
+                      ))}
+                    </div>
                   )}
-                >
-                  {t("allCompanies")}
-                </DropdownMenuItem>
-                {companies.map((co) => (
-                  <DropdownMenuItem
-                    key={co}
-                    onClick={() => setSelectedCompany(co)}
-                    className={cn(
-                      "text-sm",
-                      selectedCompany === co
-                        ? "text-primary"
-                        : "text-popover-foreground"
-                    )}
-                  >
-                    <span className="truncate">{co}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+
+                  {tags.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("tags")}
+                      </p>
+                      {tags.map((tg) => (
+                        <FilterRow
+                          key={tg.id}
+                          label={tg.name}
+                          dot={tg.color}
+                          active={selectedTagIds.includes(tg.id)}
+                          onClick={() =>
+                            setSelectedTagIds((prev) =>
+                              prev.includes(tg.id)
+                                ? prev.filter((x) => x !== tg.id)
+                                : [...prev, tg.id]
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {companies.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("company")}
+                      </p>
+                      <FilterRow
+                        label={t("allCompanies")}
+                        active={selectedCompany === null}
+                        onClick={() => setSelectedCompany(null)}
+                      />
+                      {companies.map((co) => (
+                        <FilterRow
+                          key={co}
+                          label={co}
+                          active={selectedCompany === co}
+                          onClick={() => setSelectedCompany(co)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {secondaryCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedQueueId(null);
+                        setSelectedTagIds([]);
+                        setSelectedCompany(null);
+                      }}
+                      className="w-full rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+                    >
+                      {t("clearFilters")}
+                    </button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
 
@@ -436,6 +547,7 @@ function ConversationItem({
   onSelect,
   t,
 }: ConversationItemProps) {
+  const locale = useLocale();
   const contact = conversation.contact;
   const displayName = contact?.name || contact?.phone || t("unknown");
   const initials = displayName.charAt(0).toUpperCase();
@@ -444,9 +556,12 @@ function ConversationItem({
     onSelect(conversation);
   }, [onSelect, conversation]);
 
+  // Sem `locale`, o date-fns responde "about 2 hours" — em inglês, na
+  // lista que a atendente olha o dia inteiro.
   const timeAgo = conversation.last_message_at
     ? formatDistanceToNow(new Date(conversation.last_message_at), {
         addSuffix: false,
+        locale: dateFnsLocale(locale),
       })
     : "";
 

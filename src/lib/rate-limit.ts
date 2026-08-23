@@ -134,6 +134,12 @@ export const RATE_LIMITS = {
    *  successful redemption mutates two profiles and an invite row, so
    *  the abuse surface is "spam join attempts." */
   invitationRedeem: { limit: 10, windowMs: 60_000 },
+  /** Envio de feedback pelo widget. Um relato carrega até ~3 MB de
+   *  imagem, e o widget por natureza convida a clicar de novo — 5 por
+   *  minuto é folgado para quem está relatando um problema de verdade
+   *  e bloqueia tanto o clique nervoso quanto uma sessão comprometida
+   *  enchendo a tabela de eventos de megabytes. */
+  feedback: { limit: 5, windowMs: 60_000 },
   /** Admin-only account / member-management actions: create/revoke
    *  invitation, rename account, change member role, remove member,
    *  transfer ownership. 30/min per user is comfortably above any
