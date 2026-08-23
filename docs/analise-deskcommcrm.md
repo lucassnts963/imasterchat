@@ -12,6 +12,34 @@
 > juridicamente possível mantendo o aviso de copyright. Mas veja a §D antes de
 > pensar em copiar arquivo.
 
+> ## ⚠️ Revisão — o que a `main` já entregou desde esta análise
+>
+> Esta lista foi escrita contra a `main` em `d94bea2`. Ela avançou **110
+> commits** desde então e entregou, por conta própria, vários itens abaixo.
+> Verificado por inspeção do código na `main` em `df90f00`:
+>
+> | Item | Estado | Onde |
+> |---|---|---|
+> | `I-3` Guardrails antes de enviar | **feito** | `src/lib/ai/guardrails.ts` |
+> | `I-5` Tools no turno do agente | **feito** | `src/lib/ai/agent.ts`, `src/lib/ai/tools/` |
+> | `I-6` Transcrição de áudio | **feito** | `src/lib/audio/`, `transcript-stamp.ts` |
+> | `I-9` Memória da organização | **feito** | `src/lib/ai/vault/` |
+> | `M-6` Custo em dinheiro | **feito** | `pricing.ts`, `cost-projection.ts` |
+> | `M-7` Orçamento mensal | **feito** | migration 069, `monthly_budget_usd` |
+> | `V-6` Distribuição entre atendentes | **feito** | `src/lib/queues/`, migrations 065–072 |
+> | `V-7` Escalação / transbordo | **feito** | migration 071 |
+> | `P-13` Português brasileiro | **feito** | `messages/pt-BR.json` |
+> | `M-1` `M-2` `M-4` Provedores abertos | **feito nesta branch** | `providers/catalog.ts`, migration 073 |
+> | Embeddings em qualquer provedor | **feito nesta branch** | migration 074 |
+>
+> **Continuam pendentes e valendo:** `I-1`/`I-2` (múltiplos agentes e seletor
+> de turno), `I-8` (skills), `C-1` (WhatsApp por QR/WAHA), `M-3`, `M-5`, `M-9`,
+> e a maior parte do bloco `P-*` de plataforma. Confirmei a ausência dos três
+> primeiros no código da `main`.
+>
+> `I-5` estar pronto muda o recorte de `I-8`: a metade "pacote instalável"
+> daquele item dependia justamente de tool-calling, que agora existe.
+
 ---
 
 ## A. Estado da branch

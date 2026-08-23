@@ -4,6 +4,11 @@
 > [`analise-deskcommcrm.md`](./analise-deskcommcrm.md), feito lendo o código do
 > DeskcommCRM (`@ c9f368d`), não a documentação deles.
 
+> **Revisão:** a `main` entregou `I-5` (tools no turno do agente) desde que este
+> documento foi escrito — veja `src/lib/ai/agent.ts` e `src/lib/ai/tools/`. Isso
+> destrava `I-8b` (pacotes de skill e references), que dependia dele. `I-1`,
+> `I-2` e `I-8` seguem inexistentes na `main`, confirmado por inspeção.
+
 ---
 
 ## 0. A primeira coisa: são três eixos, não dois
