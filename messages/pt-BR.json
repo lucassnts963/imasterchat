@@ -1574,7 +1574,9 @@
         "manualTitle": "Ou configure manualmente",
         "title": "Conexão rápida",
         "errorFromMeta": "A Meta recusou a conexão: {message}",
-        "errorCancelledAt": "A conexão parou no passo \"{step}\" na janela da Meta. Confira se o seu portfólio empresarial está ativo e se você é administrador dele, e tente de novo."
+        "errorCancelledAt": "A conexão parou no passo \"{step}\" na janela da Meta. Confira se o seu portfólio empresarial está ativo e se você é administrador dele, e tente de novo.",
+        "errorNoWaba": "O login foi aprovado, mas a Meta não compartilhou nenhuma conta do WhatsApp Business com o app. Confira se você chegou até o fim do fluxo e escolheu a conta na janela da Meta; se o número acabou de ser criado, espere um minuto. Persistindo, use a configuração manual abaixo.",
+        "errorNoNumber": "A conta do WhatsApp Business foi compartilhada, mas ainda não tem um número utilizável. Termine de cadastrar e verificar o número na Meta e volte aqui."
       }
     },
     "sections": {

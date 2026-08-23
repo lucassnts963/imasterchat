@@ -135,6 +135,13 @@ export function EmbeddedSignupButton({
             toast.error(t('errorAmbiguous'));
           } else if (reason === 'server_not_configured') {
             toast.error(t('errorNotConfigured'));
+          } else if (reason === 'no_waba_shared') {
+            // Both of these used to fall through to "try again", which is
+            // the one thing that does not help: nothing about repeating
+            // the flow changes what the token was granted.
+            toast.error(t('errorNoWaba'));
+          } else if (reason === 'no_phone_number') {
+            toast.error(t('errorNoNumber'));
           } else {
             toast.error(data?.message || t('errorGeneric'));
           }

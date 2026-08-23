@@ -1574,7 +1574,9 @@
         "manualTitle": "또는 수동으로 설정",
         "title": "빠른 연결",
         "errorFromMeta": "Meta가 연결을 거부했습니다: {message}",
-        "errorCancelledAt": "Meta 창의 \"{step}\" 단계에서 연결이 중단되었습니다. 비즈니스 포트폴리오가 활성 상태이고 본인이 관리자인지 확인한 뒤 다시 시도하세요."
+        "errorCancelledAt": "Meta 창의 \"{step}\" 단계에서 연결이 중단되었습니다. 비즈니스 포트폴리오가 활성 상태이고 본인이 관리자인지 확인한 뒤 다시 시도하세요.",
+        "errorNoWaba": "로그인은 승인되었지만 Meta가 앱에 WhatsApp Business 계정을 공유하지 않았습니다. Meta 창에서 흐름을 끝까지 진행하고 계정을 선택했는지 확인하세요. 번호를 방금 만들었다면 잠시 기다리세요. 계속되면 아래 수동 설정을 사용하세요.",
+        "errorNoNumber": "WhatsApp Business 계정은 공유되었지만 아직 사용할 수 있는 번호가 없습니다. Meta에서 번호 등록과 인증을 마친 뒤 다시 시도하세요."
       }
     },
     "sections": {

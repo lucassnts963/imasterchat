@@ -1574,7 +1574,9 @@
         "manualTitle": "Or set it up manually",
         "title": "Quick connection",
         "errorFromMeta": "Meta refused the connection: {message}",
-        "errorCancelledAt": "The connection stopped at the \"{step}\" step in the Meta window. Check that your business portfolio is active and that you are an admin of it, then try again."
+        "errorCancelledAt": "The connection stopped at the \"{step}\" step in the Meta window. Check that your business portfolio is active and that you are an admin of it, then try again.",
+        "errorNoWaba": "Login was approved, but Meta shared no WhatsApp Business account with the app. Check that you reached the end of the flow and picked the account in Meta’s window; if the number was just created, give it a minute. If it keeps happening, use the manual setup below.",
+        "errorNoNumber": "The WhatsApp Business account was shared, but it has no usable phone number yet. Finish adding and verifying the number in Meta, then come back."
       }
     },
     "sections": {
