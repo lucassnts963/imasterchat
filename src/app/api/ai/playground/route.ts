@@ -3,6 +3,7 @@ import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { loadAiConfig } from '@/lib/ai/config'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
+import { resolveEmbeddingsTarget } from '@/lib/ai/providers/catalog'
 import { runAgent } from '@/lib/ai/agent'
 import { buildEnvironment } from '@/lib/ai/environment'
 import {
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     const knowledge = await retrieveKnowledge(
       supabase,
       accountId,
-      config,
+      resolveEmbeddingsTarget(config),
       latestUserMessage(messages),
     )
     const scheduling = await resolveSchedulingContext(supabase, accountId)

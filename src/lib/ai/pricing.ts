@@ -16,6 +16,8 @@
  * price, update the table; nothing else needs to change.
  */
 
+import type { AiProvider } from './types'
+
 export interface ModelPrice {
   /** USD per 1M prompt (input) tokens. */
   input: number
@@ -70,12 +72,20 @@ const FALLBACK_STANDARD: ModelPrice = { input: 3, output: 15 }
  * of.
  */
 export function knownModels(
-  provider: 'openai' | 'anthropic',
+  provider: AiProvider,
   overrides?: PriceOverrides,
 ): {
   id: string
   price: ModelPrice
 }[] {
+  // The table only covers these two. For DeepSeek, OpenRouter or a
+  // self-hosted endpoint we return nothing rather than the OpenAI list:
+  // the whole point of showing suggestions is showing their price, and
+  // offering a model the account cannot reach — at a price that is not
+  // its price — is worse than offering nothing. The picker still lets
+  // the operator type any id.
+  if (provider !== 'openai' && provider !== 'anthropic') return []
+
   const isAnthropic = (id: string) => id.startsWith('claude')
   return Object.entries(overrides ? { ...PRICES, ...overrides } : PRICES)
     .filter(([id]) => (provider === 'anthropic') === isAnthropic(id))

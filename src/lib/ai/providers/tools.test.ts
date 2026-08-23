@@ -24,6 +24,8 @@ function args(overrides: Partial<ProviderArgs> = {}): ProviderArgs {
   return {
     apiKey: 'k',
     model: 'm',
+  baseUrl: 'https://api.example.com/v1',
+  providerLabel: 'Example',
     systemPrompt: 'sys',
     messages: [{ role: 'user', content: 'Hi' }],
     timeoutMs: 1000,

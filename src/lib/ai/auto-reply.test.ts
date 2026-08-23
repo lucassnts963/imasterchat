@@ -116,12 +116,15 @@ function aiConfig(overrides: Partial<AiConfig> = {}): AiConfig {
     provider: 'openai',
     model: 'gpt-test',
     apiKey: 'sk-test',
+    baseUrl: null,
     systemPrompt: null,
     isActive: true,
     autoReplyEnabled: true,
     autoReplyMaxPerConversation: 3,
     handoffAgentId: null,
     embeddingsApiKey: null,
+    embeddingsBaseUrl: null,
+    embeddingsModel: null,
     ...overrides,
   }
 }

@@ -6,7 +6,15 @@
 // whether the account is on OpenAI or Anthropic.
 // ============================================================
 
-export type AiProvider = 'openai' | 'anthropic'
+/**
+ * A provider id from `providers/catalog.ts`. Deliberately `string` and
+ * not a union: the database column carries no CHECK either (migration
+ * 037), because pinning the set in two places meant every new provider
+ * needed a migration — and the two copies drifted. The catalog is the
+ * single list; unknown ids fail with a typed `AiError`, not a constraint
+ * violation the operator would read as a product bug.
+ */
+export type AiProvider = string
 
 /**
  * Account AI setup, decrypted and ready to use. Produced by
@@ -17,6 +25,9 @@ export interface AiConfig {
   provider: AiProvider
   model: string
   apiKey: string
+  /** Overrides the preset origin — a gateway, or a self-hosted model.
+   *  Null means "use the catalog's base URL for this provider". */
+  baseUrl: string | null
   systemPrompt: string | null
   isActive: boolean
   autoReplyEnabled: boolean
@@ -25,10 +36,16 @@ export interface AiConfig {
    *  agent's `auth.users.id`, or null to leave it unassigned (drop into
    *  the shared queue). */
   handoffAgentId: string | null
-  /** Optional OpenAI-compatible key for embeddings. When set, the
-   *  knowledge base is embedded and semantic retrieval turns on; when
-   *  null, retrieval falls back to lexical full-text search. */
+  /** Optional key for an OpenAI-compatible embeddings endpoint. When
+   *  set, the knowledge base is embedded and semantic retrieval turns
+   *  on; when null, retrieval falls back to lexical full-text search.
+   *  Independent of the chat provider — DeepSeek and Anthropic have no
+   *  embeddings endpoint, so those accounts point this at someone else. */
   embeddingsApiKey: string | null
+  /** Origin + model for embeddings. Null falls back to the chat
+   *  provider's embeddings preset, when it has one. */
+  embeddingsBaseUrl: string | null
+  embeddingsModel: string | null
   /** How many provider round-trips one reply may take when the account
    *  has tools. Optional on purpose: it is a tuning knob, not part of
    *  what makes a config valid, so callers that build one by hand (the

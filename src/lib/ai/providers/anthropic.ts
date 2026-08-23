@@ -13,7 +13,6 @@ import {
   type ProviderArgs,
 } from './shared'
 
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
 
 interface AnthropicBlock {
@@ -122,12 +121,21 @@ function toAnthropicMessages(messages: ChatMessage[]): AnthropicMessage[] {
  * in `generateReply`).
  */
 export async function generateAnthropic(args: ProviderArgs): Promise<ProviderResult> {
-  const { apiKey, model, systemPrompt, messages, timeoutMs, tools, toolChoice } =
-    args
+  const {
+    apiKey,
+    model,
+    baseUrl,
+    providerLabel,
+    systemPrompt,
+    messages,
+    timeoutMs,
+    tools,
+    toolChoice,
+  } = args
 
   let res: Response
   try {
-    res = await fetch(ANTHROPIC_URL, {
+    res = await fetch(`${baseUrl}/messages`, {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,
@@ -162,7 +170,7 @@ export async function generateAnthropic(args: ProviderArgs): Promise<ProviderRes
   }
 
   if (!res.ok) {
-    throw await providerHttpError('Anthropic', res)
+    throw await providerHttpError(providerLabel, res)
   }
 
   const data = (await res.json().catch(() => null)) as AnthropicResponse | null
@@ -193,7 +201,7 @@ export async function generateAnthropic(args: ProviderArgs): Promise<ProviderRes
   // Empty is only a failure when the model neither spoke nor acted —
   // answering purely with a tool call is a normal, complete turn.
   if (!text && toolCalls.length === 0) {
-    throw new AiError('Anthropic returned an empty response.', {
+    throw new AiError(`${providerLabel} returned an empty response.`, {
       code: 'empty_response',
     })
   }

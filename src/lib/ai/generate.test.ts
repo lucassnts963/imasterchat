@@ -7,12 +7,15 @@ function config(overrides: Partial<AiConfig> = {}): AiConfig {
     provider: 'openai',
     model: 'gpt-test',
     apiKey: 'sk-test',
+    baseUrl: null,
     systemPrompt: null,
     isActive: true,
     autoReplyEnabled: false,
     autoReplyMaxPerConversation: 3,
     handoffAgentId: null,
     embeddingsApiKey: null,
+    embeddingsBaseUrl: null,
+    embeddingsModel: null,
     ...overrides,
   }
 }
@@ -125,6 +128,88 @@ describe('generateReply — OpenAI', () => {
         messages: [{ role: 'user', content: 'Hi' }],
       }),
     ).rejects.toBeInstanceOf(AiError)
+  })
+})
+
+describe('generateReply — OpenAI-compatible providers', () => {
+  function replyOnce() {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okResponse({ choices: [{ message: { content: 'ok' } }] }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  // The whole point of the catalog: these reuse the OpenAI adapter and
+  // differ only by origin. If someone reintroduces a per-provider branch,
+  // these are what catch it.
+  it.each([
+    ['deepseek', 'https://api.deepseek.com/v1/chat/completions'],
+    ['openrouter', 'https://openrouter.ai/api/v1/chat/completions'],
+  ])('routes %s to its own endpoint', async (provider, expectedUrl) => {
+    const fetchMock = replyOnce()
+
+    await generateReply({
+      config: config({ provider }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })
+
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe(expectedUrl)
+    // Same wire format as OpenAI — bearer auth, system as a message.
+    expect(opts.headers.Authorization).toBe('Bearer sk-test')
+    expect(JSON.parse(opts.body).messages[0]).toEqual({
+      role: 'system',
+      content: 'sys',
+    })
+  })
+
+  it('honours an account base URL override for a self-hosted model', async () => {
+    const fetchMock = replyOnce()
+
+    await generateReply({
+      config: config({ provider: 'custom', baseUrl: 'http://10.0.0.4:8000/v1' }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://10.0.0.4:8000/v1/chat/completions')
+  })
+
+  it('names the provider that actually failed, not "OpenAI"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(errResponse(401, { error: { message: 'bad key' } })),
+    )
+
+    await expect(
+      generateReply({
+        config: config({ provider: 'deepseek' }),
+        systemPrompt: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_key', message: expect.stringContaining('DeepSeek') })
+  })
+
+  it('refuses a provider that is not in the catalog', async () => {
+    await expect(
+      generateReply({
+        config: config({ provider: 'mistral' }),
+        systemPrompt: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    ).rejects.toMatchObject({ code: 'unsupported_provider' })
+  })
+
+  it('refuses a custom provider with no endpoint configured', async () => {
+    await expect(
+      generateReply({
+        config: config({ provider: 'custom', baseUrl: null }),
+        systemPrompt: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    ).rejects.toMatchObject({ code: 'missing_base_url' })
   })
 })
 

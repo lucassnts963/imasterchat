@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AiConfig } from './types'
 import { chunkText } from './chunk'
-import { embedTexts, toVectorLiteral } from './embeddings'
+import { embedTexts, toVectorLiteral, type EmbeddingsTarget } from './embeddings'
 
 // ============================================================
 // Knowledge base: ingest (chunk + optionally embed) and hybrid
@@ -41,7 +40,8 @@ function ownerColumn(owner: ChunkOwner): { column: string; id: string } {
 export async function ingestDocument(
   db: SupabaseClient,
   accountId: string,
-  config: Pick<AiConfig, 'embeddingsApiKey'>,
+  /** null = no embeddings configured; store chunks for lexical search. */
+  embeddings: EmbeddingsTarget | null,
   owner: ChunkOwner,
   content: string,
 ): Promise<void> {
@@ -63,11 +63,11 @@ export async function ingestDocument(
   // AFTER inserting (embedding-less) rows, so the route can warn
   // "semantic indexing failed" — which is now truthful, because lexical
   // search really does still work.
-  let embeddings: number[][] | null = null
+  let vectors: number[][] | null = null
   let embedError: unknown = null
-  if (config.embeddingsApiKey) {
+  if (embeddings) {
     try {
-      embeddings = await embedTexts(config.embeddingsApiKey, chunks)
+      vectors = await embedTexts(embeddings, chunks)
     } catch (err) {
       embedError = err
     }
@@ -78,7 +78,7 @@ export async function ingestDocument(
     account_id: accountId,
     chunk_index: i,
     content,
-    embedding: embeddings ? toVectorLiteral(embeddings[i]) : null,
+    embedding: vectors ? toVectorLiteral(vectors[i]) : null,
   }))
 
   const { error: insErr } = await db.from('ai_knowledge_chunks').insert(rows)
@@ -99,7 +99,8 @@ export async function ingestDocument(
 export async function retrieveKnowledge(
   db: SupabaseClient,
   accountId: string,
-  config: Pick<AiConfig, 'embeddingsApiKey'>,
+  /** null = lexical-only retrieval. */
+  embeddings: EmbeddingsTarget | null,
   queryText: string,
   k = 5,
 ): Promise<string[]> {
@@ -123,9 +124,9 @@ export async function retrieveKnowledge(
   const picked = new Map<string, string>() // id → content, preserves order
 
   // Semantic path.
-  if (config.embeddingsApiKey) {
+  if (embeddings) {
     try {
-      const [queryEmbedding] = await embedTexts(config.embeddingsApiKey, [query])
+      const [queryEmbedding] = await embedTexts(embeddings, [query])
       if (queryEmbedding) {
         const { data, error } = await db.rpc('match_ai_knowledge_semantic', {
           p_account_id: accountId,

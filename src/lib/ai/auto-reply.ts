@@ -2,6 +2,7 @@ import { supabaseAdmin } from './admin-client'
 import { loadAiConfig } from './config'
 import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
+import { resolveEmbeddingsTarget } from './providers/catalog'
 import { runAgent } from './agent'
 import { buildEnvironment } from './environment'
 import {
@@ -280,7 +281,7 @@ export async function dispatchInboundToAiReply(
     const knowledge = await retrieveKnowledge(
       db,
       accountId,
-      config,
+      resolveEmbeddingsTarget(config),
       latestUserMessage(messages),
     )
 

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { knownModels } from '@/lib/ai/pricing';
+import type { AiProvider } from '@/lib/ai/types';
 
 // ============================================================
 // Model picker.
@@ -37,7 +38,7 @@ export function ModelPicker({
   customLabel,
   priceLabel,
 }: {
-  provider: 'openai' | 'anthropic';
+  provider: AiProvider;
   value: string;
   onChange: (model: string) => void;
   disabled?: boolean;
@@ -160,7 +161,7 @@ export function ModelPicker({
  *  settings form uses it to warn that the cost figures will be a
  *  class-based guess. */
 export function isUnknownModel(
-  provider: 'openai' | 'anthropic',
+  provider: AiProvider,
   model: string,
 ): boolean {
   return !knownModels(provider).some((m) => m.id === model.trim());

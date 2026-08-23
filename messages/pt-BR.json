@@ -1729,8 +1729,6 @@
       "testNetworkError": "Não foi possível conectar ao provedor.",
       "embeddingsKey": "Chave de embeddings",
       "optionalSemanticSearch": "(opcional — habilita a busca semântica na base de conhecimento)",
-      "embeddingsHint": "Uma chave da OpenAI usada apenas para gerar embeddings da sua base de conhecimento (text-embedding-3-small){sameKeyText}. Deixe em branco para usar busca por palavras-chave. Apague-a para desativar a busca semântica.",
-      "sameKeyText": " — pode ser a mesma chave acima",
       "behaviour": "Comportamento",
       "behaviourDesc": "Conte ao assistente sobre o seu negócio — produtos, tom, o que ele pode ou não prometer. Esse contexto alimenta tanto os rascunhos quanto as respostas automáticas.",
       "businessContext": "Contexto do negócio e instruções",
@@ -1767,7 +1765,14 @@
       "handoffNoticeDesc": "Quando a conversa for passada para uma pessoa, o bot manda uma mensagem antes de silenciar. Desligado, ele apenas para de responder — que é como funcionava até agora.",
       "handoffNoticeTextLabel": "Mensagem do aviso",
       "handoffNoticePlaceholder": "Vou encaminhar seu atendimento para o setor responsável. Em breve alguém entra em contato por aqui.",
-      "handoffNoticeTextHint": "Vazio usa o texto acima. Evite dizer \"vou chamar um humano\": o cliente não precisa saber com quem falava, e prometer alguém \"agora\" cria uma expectativa que a fila não sustenta."
+      "handoffNoticeTextHint": "Vazio usa o texto acima. Evite dizer \"vou chamar um humano\": o cliente não precisa saber com quem falava, e prometer alguém \"agora\" cria uma expectativa que a fila não sustenta.",
+      "endpointUrl": "URL do endpoint",
+      "endpointHint": "A URL base de um servidor compatível com a API da OpenAI, terminando em /v1. O caminho do chat é acrescentado automaticamente.",
+      "embeddingsHintSameProvider": "Uma chave usada só para indexar a sua base de conhecimento. A {provider} também serve embeddings, então pode ser a mesma chave acima — o padrão é {model}. Deixe em branco para usar busca por palavra-chave.",
+      "embeddingsHintOtherProvider": "A {provider} não tem endpoint de embeddings, então a busca semântica precisa de uma chave de um provedor que tenha — a OpenRouter serve baai/bge-m3. Deixe em branco para usar busca por palavra-chave.",
+      "embeddingsEndpoint": "Endpoint de embeddings",
+      "embeddingsModel": "Modelo de embeddings",
+      "embeddingsDimensionHint": "O modelo precisa devolver vetores de {dimensions} dimensões, que é o que a sua base de conhecimento guarda. Isso é conferido ao salvar."
     },
     "aiKnowledge": {
       "loadFailed": "Falha ao carregar a base de conhecimento",

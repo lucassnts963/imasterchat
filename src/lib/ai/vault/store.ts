@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ingestDocument } from '../knowledge'
-import { loadEmbeddingsKey } from '../config'
+import { loadEmbeddingsTarget } from '../config'
 import { slugify, type VaultPageKind, type VaultPageStatus } from './schema'
 
 // ============================================================
@@ -334,11 +334,11 @@ async function indexPage(
   }
 
   try {
-    const { key } = await loadEmbeddingsKey(db, accountId)
+    const { target } = await loadEmbeddingsTarget(db, accountId)
     await ingestDocument(
       db,
       accountId,
-      { embeddingsApiKey: key },
+      target,
       { vaultPageId: page.id },
       `${page.title}\n\n${page.content}`,
     )

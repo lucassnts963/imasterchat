@@ -1,4 +1,5 @@
 import type { AiProvider } from './types'
+import { PROVIDERS } from './providers/catalog'
 
 // ============================================================
 // Tunables + prompt scaffold for the AI reply assistant.
@@ -6,14 +7,17 @@ import type { AiProvider } from './types'
 
 /**
  * Sensible default model per provider, pre-filled in the settings form.
- * Kept as editable free text in the UI — model IDs churn fast and a
- * BYO-key forker may want a cheaper/newer one — so these are only the
- * starting point, never a hard allow-list.
+ * Kept as editable free text in the UI — model IDs churn fast (DeepSeek
+ * retired its `deepseek-chat` alias outright in July 2026) and a BYO-key
+ * forker may want a cheaper/newer one — so these are only the starting
+ * point, never a hard allow-list.
+ *
+ * Derived from the catalog rather than repeated: when this was its own
+ * literal, a provider added to one and not the other left the form
+ * pre-filling an empty model.
  */
-export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> = {
-  openai: 'gpt-5.4-mini',
-  anthropic: 'claude-haiku-4-5-20251001',
-}
+export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> =
+  Object.fromEntries(PROVIDERS.map((p) => [p.id, p.defaultModel]))
 
 /**
  * Sentinel the model is instructed to emit (in auto-reply mode) when it

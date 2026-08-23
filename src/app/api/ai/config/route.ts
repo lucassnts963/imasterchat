@@ -8,8 +8,12 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
 import { isAudioPolicy } from '@/lib/audio/policy'
 import { validateAiCredentials } from '@/lib/ai/validate'
-import { embedTexts } from '@/lib/ai/embeddings'
-import { AiError, type AiProvider } from '@/lib/ai/types'
+import { validateEmbeddingsTarget } from '@/lib/ai/embeddings'
+import { AiError } from '@/lib/ai/types'
+import {
+  resolveEmbeddingsTarget,
+  validateProviderSelection,
+} from '@/lib/ai/providers/catalog'
 
 function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 })
@@ -39,7 +43,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, audio_notice_text, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
+        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, embeddings_base_url, embeddings_model, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, audio_notice_text, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -87,10 +91,11 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null)
     if (!body || typeof body !== 'object') return bad('Invalid request body')
 
-    const provider = body.provider as AiProvider
-    if (provider !== 'openai' && provider !== 'anthropic') {
-      return bad('provider must be "openai" or "anthropic"')
-    }
+    const provider = String(body.provider ?? '')
+    const selection = validateProviderSelection(provider, body.base_url)
+    if (!selection.ok) return bad(selection.error)
+    const baseUrl = selection.baseUrl
+
     const model = typeof body.model === 'string' ? body.model.trim() : ''
     if (!model) return bad('model is required')
 
@@ -165,10 +170,21 @@ export async function POST(request: Request) {
         : ''
     const clearEmbeddingsKey = body.embeddings_api_key === null
 
+    // Where the embeddings key points. Independent of the chat provider
+    // because Anthropic and DeepSeek have no embeddings endpoint at all.
+    const embeddingsBaseUrl =
+      typeof body.embeddings_base_url === 'string' && body.embeddings_base_url.trim()
+        ? body.embeddings_base_url.trim().replace(/\/+$/, '')
+        : null
+    const embeddingsModel =
+      typeof body.embeddings_model === 'string' && body.embeddings_model.trim()
+        ? body.embeddings_model.trim()
+        : null
+
     // Reuse the stored key when the form didn't send a fresh one.
     const { data: existing } = await supabase
       .from('ai_configs')
-      .select('id, provider, model, api_key')
+      .select('id, provider, model, api_key, base_url')
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -193,7 +209,8 @@ export async function POST(request: Request) {
       !existing ||
       rawKey !== '' ||
       provider !== existing.provider ||
-      model !== existing.model
+      model !== existing.model ||
+      baseUrl !== (existing.base_url ?? null)
 
     if (credentialsChanged) {
       try {
@@ -201,12 +218,15 @@ export async function POST(request: Request) {
           provider,
           model,
           apiKey: apiKeyPlain,
+          baseUrl,
           systemPrompt,
           isActive,
           autoReplyEnabled,
           autoReplyMaxPerConversation: maxPer,
           handoffAgentId: null,
           embeddingsApiKey: null,
+          embeddingsBaseUrl: null,
+          embeddingsModel: null,
         })
       } catch (err) {
         if (err instanceof AiError) {
@@ -222,13 +242,28 @@ export async function POST(request: Request) {
 
     // Validate a new embeddings key before storing (a cheap 1-input
     // embed), same "verify before save" discipline as the chat key.
+    // This also asserts the model's output width matches the knowledge
+    // base — a mismatch caught here names both numbers, where the same
+    // mismatch caught later surfaces as a Postgres type error midway
+    // through a reindex.
     if (rawEmbeddingsKey) {
+      const target = resolveEmbeddingsTarget({
+        provider,
+        embeddingsApiKey: rawEmbeddingsKey,
+        embeddingsBaseUrl,
+        embeddingsModel,
+      })
+      if (!target) {
+        return bad(
+          `${selection.preset.label} has no embeddings endpoint, so an embeddings key needs somewhere to go. Set the embeddings endpoint and model, or clear the key to use keyword search.`,
+        )
+      }
       try {
-        await embedTexts(rawEmbeddingsKey, ['ping'])
+        await validateEmbeddingsTarget(target)
       } catch (err) {
         if (err instanceof AiError) {
           return NextResponse.json(
-            { error: `Embeddings key: ${err.message}`, code: err.code },
+            { error: `Embeddings: ${err.message}`, code: err.code },
             { status: 400 },
           )
         }
@@ -241,6 +276,7 @@ export async function POST(request: Request) {
     const shared: Record<string, unknown> = {
       provider,
       model,
+      base_url: baseUrl,
       system_prompt: systemPrompt,
       is_active: isActive,
       auto_reply_enabled: autoReplyEnabled,
@@ -256,8 +292,12 @@ export async function POST(request: Request) {
     if (budgetProvided) shared.monthly_budget_usd = monthlyBudgetUsd
     if (rawEmbeddingsKey) {
       shared.embeddings_api_key = encrypt(rawEmbeddingsKey)
+      shared.embeddings_base_url = embeddingsBaseUrl
+      shared.embeddings_model = embeddingsModel
     } else if (clearEmbeddingsKey) {
       shared.embeddings_api_key = null
+      shared.embeddings_base_url = null
+      shared.embeddings_model = null
     }
 
     if (existing) {

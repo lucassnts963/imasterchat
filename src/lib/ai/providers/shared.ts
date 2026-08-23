@@ -7,6 +7,13 @@ import { AiError, type AiUsage, type ChatMessage, type ToolSpec } from '../types
 export interface ProviderArgs {
   apiKey: string
   model: string
+  /** Origin the adapter appends its own path to, already normalized by
+   *  `resolveChatBaseUrl` (no trailing slash). This is what lets one
+   *  adapter serve every OpenAI-compatible host. */
+  baseUrl: string
+  /** Display name for error messages — "DeepSeek rejected the API key"
+   *  reads better than "OpenAI ..." when the call went to DeepSeek. */
+  providerLabel: string
   systemPrompt: string
   messages: ChatMessage[]
   timeoutMs: number

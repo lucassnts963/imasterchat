@@ -27,6 +27,8 @@ import {
 import { SettingsPanelHead } from './settings-panel-head';
 import { AiKnowledgeCard } from './ai-knowledge';
 import { AI_PROVIDER_DEFAULT_MODEL } from '@/lib/ai/defaults';
+import { PROVIDERS, getPreset } from '@/lib/ai/providers/catalog';
+import { EMBEDDING_DIMENSIONS } from '@/lib/ai/embeddings';
 import { ModelPicker, isUnknownModel } from '@/components/ui/model-picker';
 import type { AiProvider } from '@/lib/ai/types';
 import type { AccountMember } from '@/types';
@@ -39,15 +41,9 @@ const MASKED_KEY = '••••••••••••••••';
 // unassigned" choice gets a sentinel that maps to null in the payload.
 const HANDOFF_QUEUE = '__queue__';
 
-const PROVIDER_LABEL: Record<AiProvider, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic (Claude)',
-};
-
-const KEY_PLACEHOLDER: Record<AiProvider, string> = {
-  openai: 'sk-...',
-  anthropic: 'sk-ant-...',
-};
+/** Every default model the catalog ships, used to tell "the operator
+ *  typed their own model" from "this is still the preset". */
+const PRESET_MODELS = new Set(PROVIDERS.map((p) => p.defaultModel));
 
 export function AiConfig() {
   const { accountId, accountRole, profileLoading } = useAuth();
@@ -66,9 +62,12 @@ export function AiConfig() {
   const [keyEdited, setKeyEdited] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [hasStoredKey, setHasStoredKey] = useState(false);
+  const [baseUrl, setBaseUrl] = useState('');
   const [embeddingsKey, setEmbeddingsKey] = useState('');
   const [embeddingsKeyEdited, setEmbeddingsKeyEdited] = useState(false);
   const [hasStoredEmbeddingsKey, setHasStoredEmbeddingsKey] = useState(false);
+  const [embeddingsBaseUrl, setEmbeddingsBaseUrl] = useState('');
+  const [embeddingsModel, setEmbeddingsModel] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [isActive, setIsActive] = useState(false);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
@@ -106,6 +105,9 @@ export function AiConfig() {
         setConfigured(true);
         setProvider(data.provider);
         setModel(data.model);
+        setBaseUrl(data.base_url ?? '');
+        setEmbeddingsBaseUrl(data.embeddings_base_url ?? '');
+        setEmbeddingsModel(data.embeddings_model ?? '');
         setSystemPrompt(data.system_prompt ?? '');
         setIsActive(data.is_active);
         setAutoReplyEnabled(data.auto_reply_enabled);
@@ -142,15 +144,21 @@ export function AiConfig() {
   }, [accountId, fetchConfig]);
 
   // Swap the model default when the provider changes, unless the user
-  // typed a custom model.
+  // typed a custom model. Comparing against every preset (not a hard-coded
+  // pair) keeps a hand-typed model safe as providers are added.
   const handleProviderChange = (next: AiProvider) => {
     setProvider(next);
-    const isDefaultModel =
-      model === AI_PROVIDER_DEFAULT_MODEL.openai ||
-      model === AI_PROVIDER_DEFAULT_MODEL.anthropic ||
-      model.trim() === '';
-    if (isDefaultModel) setModel(AI_PROVIDER_DEFAULT_MODEL[next]);
+    if (PRESET_MODELS.has(model) || model.trim() === '') {
+      setModel(AI_PROVIDER_DEFAULT_MODEL[next] ?? '');
+    }
+    // The endpoint belongs to the provider that was selected, so a
+    // leftover URL from the previous one would silently misroute. Only
+    // `custom` keeps it, since there it is the operator's own input.
+    if (next !== 'custom') setBaseUrl('');
   };
+
+  const preset = getPreset(provider);
+  const embeddingsPreset = preset?.embeddings ?? null;
 
   const keyPayload = () => (keyEdited ? apiKey.trim() : undefined);
 
@@ -161,8 +169,11 @@ export function AiConfig() {
   const buildBody = () => ({
     provider,
     model: model.trim(),
+    base_url: baseUrl.trim() || null,
     api_key: keyPayload(),
     embeddings_api_key: embeddingsKeyPayload(),
+    embeddings_base_url: embeddingsBaseUrl.trim() || null,
+    embeddings_model: embeddingsModel.trim() || null,
     system_prompt: systemPrompt.trim() || null,
     is_active: isActive,
     auto_reply_enabled: autoReplyEnabled,
@@ -185,6 +196,7 @@ export function AiConfig() {
         body: JSON.stringify({
           provider,
           model: model.trim(),
+          base_url: baseUrl.trim() || null,
           api_key: keyPayload(),
         }),
       });
@@ -305,16 +317,22 @@ export function AiConfig() {
                 >
                   <SelectTrigger>
                     <SelectValue>
-                      {(v) => PROVIDER_LABEL[v as AiProvider] ?? String(v ?? '')}
+                      {(v) => getPreset(String(v ?? ''))?.label ?? String(v ?? '')}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="openai">{PROVIDER_LABEL.openai}</SelectItem>
-                    <SelectItem value="anthropic">
-                      {PROVIDER_LABEL.anthropic}
-                    </SelectItem>
+                    {PROVIDERS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {preset && (
+                  <p className="text-xs text-muted-foreground">
+                    {preset.whenToUse}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -339,6 +357,24 @@ export function AiConfig() {
               </div>
             </div>
 
+            {/* Only the custom provider needs this: for the presets the
+                catalog already knows the origin, and showing an empty
+                URL box next to a working provider invites breaking it. */}
+            {preset?.requiresBaseUrl && (
+              <div className="space-y-2">
+                <Label htmlFor="ai-base-url">{t('endpointUrl')}</Label>
+                <Input
+                  id="ai-base-url"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder="https://my-model.example.com/v1"
+                  disabled={disabled}
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">{t('endpointHint')}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="ai-key">{t('apiKey')}</Label>
               <div className="flex gap-2">
@@ -357,7 +393,7 @@ export function AiConfig() {
                         setKeyEdited(true);
                       }
                     }}
-                    placeholder={KEY_PLACEHOLDER[provider]}
+                    placeholder={preset?.keyPlaceholder ?? 'sk-...'}
                     disabled={disabled}
                     autoComplete="off"
                   />
@@ -410,16 +446,64 @@ export function AiConfig() {
                     setEmbeddingsKeyEdited(true);
                   }
                 }}
-                placeholder="sk-... (OpenAI)"
+                placeholder="sk-..."
                 disabled={disabled}
                 autoComplete="off"
               />
               <p className="text-xs text-muted-foreground">
-                {t('embeddingsHint', {
-                  sameKeyText: provider === 'openai' ? t('sameKeyText') : '',
-                })}
+                {embeddingsPreset
+                  ? t('embeddingsHintSameProvider', {
+                      provider: preset?.label ?? provider,
+                      model: embeddingsPreset.defaultModel,
+                    })
+                  : t('embeddingsHintOtherProvider', {
+                      provider: preset?.label ?? provider,
+                    })}
               </p>
             </div>
+
+            {/* Shown whenever a key is present, because the endpoint is
+                only optional when the chat provider happens to serve
+                embeddings too — on Anthropic or DeepSeek it is required,
+                and the save is rejected without it. */}
+            {(embeddingsKey.trim() !== '' || hasStoredEmbeddingsKey) && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="ai-embeddings-url">
+                    {t('embeddingsEndpoint')}
+                    {!embeddingsPreset && (
+                      <span className="ml-1 text-destructive">*</span>
+                    )}
+                  </Label>
+                  <Input
+                    id="ai-embeddings-url"
+                    value={embeddingsBaseUrl}
+                    onChange={(e) => setEmbeddingsBaseUrl(e.target.value)}
+                    placeholder={
+                      embeddingsPreset?.baseUrl ?? 'https://openrouter.ai/api/v1'
+                    }
+                    disabled={disabled}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ai-embeddings-model">
+                    {t('embeddingsModel')}
+                  </Label>
+                  <Input
+                    id="ai-embeddings-model"
+                    value={embeddingsModel}
+                    onChange={(e) => setEmbeddingsModel(e.target.value)}
+                    placeholder={embeddingsPreset?.defaultModel ?? 'baai/bge-m3'}
+                    disabled={disabled}
+                    autoComplete="off"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground sm:col-span-2">
+                  {t('embeddingsDimensionHint', { dimensions: EMBEDDING_DIMENSIONS })}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
