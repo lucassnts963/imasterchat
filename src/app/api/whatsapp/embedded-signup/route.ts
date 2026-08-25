@@ -183,8 +183,10 @@ export async function POST(request: Request) {
     // screen's registration check will surface the gap), but the client
     // must be told inbound isn't live yet.
     let subscribed = true
+    let subscribedAppsAt: string | null = null
     try {
       await subscribeWabaToApp({ wabaId, accessToken: businessToken })
+      subscribedAppsAt = new Date().toISOString()
     } catch (err) {
       subscribed = false
       console.error('[embedded-signup] waba subscribe failed:', err)
@@ -195,14 +197,18 @@ export async function POST(request: Request) {
     // usually have none, so a failure here is expected and reported
     // rather than fatal.
     let registered = true
+    let registeredAt: string | null = null
+    let registrationError: string | null = null
     try {
       await registerPhoneNumber({
         phoneNumberId,
         accessToken: businessToken,
         pin: typeof body.pin === 'string' ? body.pin : '',
       })
+      registeredAt = new Date().toISOString()
     } catch (err) {
       registered = false
+      registrationError = err instanceof Error ? err.message : 'Unknown Meta API error'
       console.error('[embedded-signup] phone register failed:', err)
     }
 
@@ -222,6 +228,9 @@ export async function POST(request: Request) {
           meta_business_id: businessId,
           waba_name: wabaName,
           onboarded_at: new Date().toISOString(),
+          registered_at: registeredAt,
+          subscribed_apps_at: subscribedAppsAt,
+          last_registration_error: registrationError,
         },
         // whatsapp_config carries UNIQUE constraints on BOTH account_id
         // (017: one number per account) and phone_number_id (013: one
