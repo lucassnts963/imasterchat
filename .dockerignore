@@ -5,6 +5,12 @@ node_modules
 docs
 mcp-server
 supabase
+# The self-hosted Supabase stack (deploy/README.md step 1) lives inside
+# the repo working tree at deploy time, but it's Deno/Elixir/SQL config
+# for other containers — never app source. Besides the size, its
+# volumes/functions/*.ts import Deno-only modules Next's tsconfig would
+# try (and fail) to type-check if this reached the build context.
+supabase-stack
 # ...menos as migrações. O `next.config.ts` lê este diretório em tempo
 # de build para gravar `EXPECTED_MIGRATION`, que é o que a verificação
 # de saúde compara com `applied_migrations`. Fora do contexto de build
