@@ -160,6 +160,7 @@ GRANT EXECUTE ON FUNCTION public._bcast_bump(uuid, text, integer)               
 -- ------------------------------------------------------------
 
 DROP POLICY IF EXISTS "Chat media is publicly readable" ON storage.objects;
+DROP POLICY IF EXISTS "Chat media readable by account members" ON storage.objects;
 CREATE POLICY "Chat media readable by account members"
   ON storage.objects FOR SELECT
   USING (
@@ -172,6 +173,7 @@ CREATE POLICY "Chat media readable by account members"
   );
 
 DROP POLICY IF EXISTS "Flow media is publicly readable" ON storage.objects;
+DROP POLICY IF EXISTS "Flow media readable by account members" ON storage.objects;
 CREATE POLICY "Flow media readable by account members"
   ON storage.objects FOR SELECT
   USING (
@@ -188,6 +190,7 @@ CREATE POLICY "Flow media readable by account members"
 -- mata a enumeração anônima, que é o achado; e membros da mesma conta
 -- continuam podendo listar, o que o roster de Membros usa.
 DROP POLICY IF EXISTS "Avatars are publicly readable" ON storage.objects;
+DROP POLICY IF EXISTS "Avatars readable by signed-in users" ON storage.objects;
 CREATE POLICY "Avatars readable by signed-in users"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'avatars' AND auth.uid() IS NOT NULL);
