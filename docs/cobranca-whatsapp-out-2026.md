@@ -99,12 +99,60 @@ Em ordem de urgência, considerando as 5 semanas:
 5. **Aproveitar a janela de 72h dos anúncios** — se o CRM souber que a conversa
    entrou por Click-to-WhatsApp, dá para tratar diferente.
 
+## 6. Respondido: a Meta **manda** a categoria cobrada
+
+A pergunta que estava em aberto na §5 tem resposta, e é a melhor possível.
+
+O webhook de status já traz um objeto `pricing` junto de cada `statuses[]`:
+
+```json
+"pricing": {
+  "billable": false,
+  "pricing_model": "PMP",
+  "type": "free_customer_service",
+  "category": "utility"
+}
+```
+
+| Campo | O que é |
+|---|---|
+| `billable` | a decisão da **própria Meta** sobre cobrar ou não |
+| `category` | `marketing` · `utility` · `service` · `authentication` |
+| `type` | `regular` (cobrada) · `free_customer_service` · `free_entry_point` |
+| `pricing_model` | `PMP` — per-message pricing |
+
+Três consequências:
+
+**1. O contador pode ser exato, não estimado.** Não precisamos inferir categoria
+nem aplicar tabela de preço para saber *o que foi cobrado* — a Meta diz. A tabela
+de preço serve só para converter em dinheiro.
+
+**2. Já estamos recebendo isso e jogando fora.** O tipo em
+`src/app/api/whatsapp/webhook/route.ts:93` declara quatro campos
+(`id`, `status`, `timestamp`, `recipient_id`) e `handleStatusUpdate` lê os mesmos
+quatro. O `pricing` chega e é descartado.
+
+**3. Dá para começar a medir hoje, e isso muda o valor do trabalho.** Toda
+mensagem que hoje chega como `type: "free_customer_service"` é exatamente uma
+mensagem que **passa a custar** em 1º de outubro. Capturando agora, o operador
+chega em outubro com um número real do que vai pagar, em vez de descobrir na
+fatura. E quando a virada acontecer, ela aparece nos nossos próprios dados: as
+mesmas mensagens deixam de vir `free_customer_service` e passam a vir `regular`
+com `category: service`.
+
+O `type: "free_entry_point"` é o que identifica a janela de 72h por anúncio — a
+alavanca da §4, item 5, também sai de graça daqui.
+
+> **Ressalva:** confirmado em duas fontes secundárias que concordam no formato,
+> porque `developers.facebook.com` está bloqueado neste ambiente. O formato é
+> fácil de verificar em produção: basta registrar um payload de status bruto uma
+> vez e olhar.
+
 ## 5. O que ainda não sei
 
 - **A tarifa exata de serviço** — a Meta publica até 1º/09/2026. Usei a de
   utilidade porque as fontes dizem que serão iguais.
-- **Se a Meta expõe a categoria cobrada por mensagem no webhook de status.** Se
-  expuser, o contador do item 1 fica exato em vez de estimado. É a primeira coisa
-  a verificar na documentação oficial, porque muda o desenho.
+- ~~Se a Meta expõe a categoria cobrada por mensagem no webhook de status.~~
+  **Respondido na §6: expõe.** O contador pode ser exato.
 - **Markup do BSP.** Quem usa a Cloud API direto paga a tarifa da Meta; quem passa
   por BSP paga mais. Isso é por instalação, não nosso.
