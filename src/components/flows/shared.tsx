@@ -20,6 +20,10 @@ import {
   Flag,
   GitFork,
   Inbox,
+  CalendarSearch,
+  CalendarPlus,
+  CalendarClock,
+  CalendarX,
   ListChecks,
   ListPlus,
   MessageCircle,
@@ -49,6 +53,10 @@ export type NodeType =
   | 'collect_input'
   | 'condition'
   | 'set_tag'
+  | 'offer_slots'
+  | 'book_appointment'
+  | 'reschedule_appointment'
+  | 'cancel_appointment'
   | 'handoff'
   | 'end';
 
@@ -152,6 +160,34 @@ export const NODE_META: Record<
     blurb: 'Adds or removes a contact tag',
     category: 'logic',
   },
+  offer_slots: {
+    label: 'Offer times',
+    icon: CalendarSearch,
+    color: 'text-emerald-400',
+    blurb: 'Lists free slots and waits for the pick',
+    category: 'logic',
+  },
+  book_appointment: {
+    label: 'Book',
+    icon: CalendarPlus,
+    color: 'text-emerald-400',
+    blurb: 'Books the time the customer picked',
+    category: 'logic',
+  },
+  reschedule_appointment: {
+    label: 'Reschedule',
+    icon: CalendarClock,
+    color: 'text-emerald-400',
+    blurb: 'Moves the existing appointment',
+    category: 'logic',
+  },
+  cancel_appointment: {
+    label: 'Cancel appointment',
+    icon: CalendarX,
+    color: 'text-emerald-400',
+    blurb: 'Cancels and frees the slot',
+    category: 'logic',
+  },
   handoff: {
     label: 'Handoff to agent',
     icon: UserPlus,
@@ -205,6 +241,12 @@ const NODE_HUE: Record<NodeType, { l: number; c: number; h: number }> = {
   collect_input: { l: 0.65, c: 0.1, h: 185 }, // teal — capture
   condition: { l: 0.72, c: 0.15, h: 65 }, // amber — a fork in the road
   set_tag: { l: 0.65, c: 0.15, h: 350 }, // pink
+  // Os quatro de agendamento dividem o verde: na tela eles são um
+  // assunto só, e o operador acha o bloco pela cor antes de ler o nome.
+  offer_slots: { l: 0.68, c: 0.13, h: 150 },
+  book_appointment: { l: 0.62, c: 0.14, h: 150 },
+  reschedule_appointment: { l: 0.62, c: 0.14, h: 150 },
+  cancel_appointment: { l: 0.62, c: 0.14, h: 150 },
   handoff: { l: 0.65, c: 0.17, h: 16 }, // rose — hands off
   end: { l: 0.55, c: 0.01, h: 260 }, // neutral grey — terminal
 };
@@ -314,6 +356,23 @@ export function summarizeNode(
     case 'start':
     case 'end':
       return null;
+    case 'offer_slots': {
+      const max = typeof cfg.max_options === 'number' ? cfg.max_options : 5;
+      const text = typeof cfg.text === 'string' ? cfg.text : '';
+      return text
+        ? `${truncate(text, 40)} · até ${max} horários`
+        : `até ${max} horários`;
+    }
+    case 'book_appointment': {
+      const title = typeof cfg.title === 'string' ? cfg.title : '';
+      return title ? truncate(title, 50) : 'Marca o horário escolhido';
+    }
+    case 'reschedule_appointment':
+      return 'Move o agendamento do cliente';
+    case 'cancel_appointment': {
+      const reason = typeof cfg.reason === 'string' ? cfg.reason : '';
+      return reason ? truncate(reason, 50) : 'Cancela e libera o horário';
+    }
     case 'send_message': {
       const text = typeof cfg.text === 'string' ? cfg.text : '';
       return text.length > 0 ? truncate(text) : null;

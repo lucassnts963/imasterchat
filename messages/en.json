@@ -868,7 +868,10 @@
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
         "close_conversation": "Close Conversation",
-        "start_flow": "Start Flow"
+        "start_flow": "Start Flow",
+        "book_appointment": "Book Appointment",
+        "reschedule_appointment": "Reschedule Appointment",
+        "cancel_appointment": "Cancel Appointment"
       },
       "triggers": {
         "new_message_received": {
@@ -1010,7 +1013,12 @@
         "flowSelect": "Select a flow…",
         "flowPlaceholder": "Flow ID",
         "flowUnknown": "Unavailable flow ({id})",
-        "startFlowHint": "Hands the customer over to a flow, which can wait for an answer — an automation cannot. Only one flow runs per contact at a time; if the customer is already in one, this step is skipped and says so in the log."
+        "startFlowHint": "Hands the customer over to a flow, which can wait for an answer — an automation cannot. Only one flow runs per contact at a time; if the customer is already in one, this step is skipped and says so in the log.",
+        "startsAtLabel": "Start (ISO 8601)",
+        "endsAtLabel": "End (ISO 8601)",
+        "cancelReasonLabel": "Reason (optional)",
+        "appointmentTimeHint": "An automation never asks anything, so the time has to come from somewhere else — usually a variable a flow collected and handed over. Business hours, minimum notice and collisions are still checked before anything is written.",
+        "cancelAppointmentHint": "Cancels the customer’s single live appointment and frees the slot. If they have none, the step says so and the automation carries on."
       },
       "delete": "Delete"
     }
@@ -1156,7 +1164,21 @@
         "filenamePlaceholder": "invoice.pdf",
         "advanceAfterSending": "After sending, advance to",
         "pickNextNode": "Pick a next node…",
-        "none": "— None —"
+        "none": "— None —",
+        "listButtonLabel": "Button that opens the list",
+        "maxOptions": "How many times to offer",
+        "lookaheadDays": "Days ahead",
+        "lookaheadDaysPlaceholder": "account default",
+        "appointmentTitle": "What the appointment is for",
+        "cancelReason": "Reason recorded on the appointment",
+        "onSlotChosen": "Customer picked a time →",
+        "onNoSlots": "No free times →",
+        "onCalendarError": "Calendar could not be read →",
+        "onBooked": "Booked →",
+        "onMoved": "Moved →",
+        "onCancelled": "Cancelled →",
+        "onSlotTaken": "Time taken meanwhile →",
+        "onNothingBooked": "Nothing booked →"
       },
       "categories": {
         "messaging": "Messaging",
@@ -1195,6 +1217,22 @@
         "set_tag": {
           "label": "Tag contact",
           "blurb": "Adds or removes a contact tag"
+        },
+        "offer_slots": {
+          "label": "Offer times",
+          "blurb": "Lists free slots and waits for the pick"
+        },
+        "book_appointment": {
+          "label": "Book",
+          "blurb": "Books the time the customer picked"
+        },
+        "reschedule_appointment": {
+          "label": "Reschedule",
+          "blurb": "Moves the existing appointment"
+        },
+        "cancel_appointment": {
+          "label": "Cancel appointment",
+          "blurb": "Cancels and frees the slot"
         },
         "handoff": {
           "label": "Handoff to agent",

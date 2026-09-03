@@ -166,6 +166,81 @@ export interface ConditionNodeConfig {
   false_next: string;
 }
 
+// ============================================================
+// Agendamento no fluxo — fase 1, R-4.
+//
+// Existem porque o cliente que recusa o custo do modelo também precisa
+// marcar horário. Toda a regra — expediente, antecedência, horizonte,
+// colisão — vem de `src/lib/actions/scheduling.ts`, a mesma que o agente
+// de IA usa; estes nós são o invólucro de menu por cima dela.
+//
+// Repare que os quatro têm arestas de erro SEPARADAS de "não deu certo".
+// Uma agenda que não conseguimos ler não é uma agenda vazia: mandar o
+// cliente pelo caminho de "não tenho horário" quando o Google caiu é
+// perder a venda e mentir. Por isso `on_error_next` existe em todos.
+// ============================================================
+
+/**
+ * Consulta os horários livres e oferece como lista, esperando a escolha.
+ *
+ * É o único nó cujas opções não estão na configuração: elas são
+ * calculadas na hora e guardadas em `flow_runs.vars._offered_slots`, na
+ * mesma ordem dos `reply_id`. O runner casa a resposta por índice.
+ */
+export interface OfferSlotsNodeConfig {
+  /** Texto acima da lista. */
+  text: string;
+  /** Rótulo do botão que abre a lista. */
+  button_label: string;
+  header_text?: string;
+  footer_text?: string;
+  /** Quantos horários oferecer, no máximo. Meta limita a 10 linhas. */
+  max_options?: number;
+  /** Quantos dias à frente olhar. Sem isto, `lookahead_days` da conta. */
+  lookahead_days?: number;
+  /** O cliente escolheu um horário → aqui. */
+  next_node_key: string;
+  /** Não há horário livre no período. */
+  no_slots_next: string;
+  /** A agenda não pôde ser lida. NUNCA é o mesmo que "sem horário". */
+  on_error_next: string;
+}
+
+/**
+ * Marca o horário escolhido no nó `offer_slots` anterior.
+ *
+ * Separado dele de propósito: entre a oferta e a escolha o cliente leva
+ * tempo, e o horário pode ter ido embora. Um nó só não teria onde
+ * desviar quando isso acontece.
+ */
+export interface BookAppointmentNodeConfig {
+  /** Descrição do compromisso; interpola `{{vars.X}}`. */
+  title?: string;
+  /** Marcado. */
+  next_node_key: string;
+  /** O horário caiu entre a oferta e a confirmação. */
+  on_unavailable_next: string;
+  /** Nenhum horário escolhido, agenda ilegível, ou a escrita falhou. */
+  on_error_next: string;
+}
+
+export interface RescheduleAppointmentNodeConfig {
+  next_node_key: string;
+  on_unavailable_next: string;
+  /** O cliente não tem agendamento para mover. */
+  on_no_appointment_next: string;
+  on_error_next: string;
+}
+
+export interface CancelAppointmentNodeConfig {
+  /** Motivo registrado no agendamento; interpola `{{vars.X}}`. */
+  reason?: string;
+  next_node_key: string;
+  /** O cliente não tem agendamento para cancelar. */
+  on_no_appointment_next: string;
+  on_error_next: string;
+}
+
 export interface SetTagNodeConfig {
   mode: "add" | "remove";
   /** Tag UUID. The builder picks from the user's existing tags. */
@@ -193,6 +268,13 @@ export type FlowNodeConfig =
   | { node_type: "collect_input"; config: CollectInputNodeConfig }
   | { node_type: "condition"; config: ConditionNodeConfig }
   | { node_type: "set_tag"; config: SetTagNodeConfig }
+  | { node_type: "offer_slots"; config: OfferSlotsNodeConfig }
+  | { node_type: "book_appointment"; config: BookAppointmentNodeConfig }
+  | {
+      node_type: "reschedule_appointment";
+      config: RescheduleAppointmentNodeConfig;
+    }
+  | { node_type: "cancel_appointment"; config: CancelAppointmentNodeConfig }
   | { node_type: "handoff"; config: HandoffNodeConfig }
   | { node_type: "end"; config: EndNodeConfig };
 

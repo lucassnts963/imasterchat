@@ -599,6 +599,10 @@ function AddNodeButton({ onAdd, t }: { onAdd: (type: NodeType) => void; t: Retur
     'collect_input',
     'condition',
     'set_tag',
+    'offer_slots',
+    'book_appointment',
+    'reschedule_appointment',
+    'cancel_appointment',
     'handoff',
     'end',
   ];

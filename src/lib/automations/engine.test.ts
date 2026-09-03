@@ -15,6 +15,10 @@ const h = vi.hoisted(() => ({
     logUpdates: [] as Record<string, unknown>[],
   },
   startFlowRun: vi.fn(),
+  resolveSchedulingContext: vi.fn(),
+  bookForContact: vi.fn(),
+  rescheduleForContact: vi.fn(),
+  cancelForContact: vi.fn(),
 }));
 
 vi.mock("./admin-client", () => {
@@ -111,6 +115,13 @@ vi.mock("@/lib/flows/engine", async () => {
   };
 });
 
+vi.mock("@/lib/actions/scheduling", () => ({
+  resolveSchedulingContext: h.resolveSchedulingContext,
+  bookForContact: h.bookForContact,
+  rescheduleForContact: h.rescheduleForContact,
+  cancelForContact: h.cancelForContact,
+}));
+
 vi.mock("./meta-send", () => ({
   engineSendText: vi.fn(async () => ({ whatsapp_message_id: "m1" })),
   engineSendTemplate: vi.fn(async () => ({ whatsapp_message_id: "m1" })),
@@ -132,6 +143,20 @@ beforeEach(() => {
   h.state.upsertCalls = [];
   h.state.logInserts = [];
   h.state.logUpdates = [];
+  for (const fn of [
+    h.resolveSchedulingContext,
+    h.bookForContact,
+    h.rescheduleForContact,
+    h.cancelForContact,
+  ]) {
+    fn.mockReset();
+  }
+  h.resolveSchedulingContext.mockResolvedValue({
+    settings: { timezone: "America/Sao_Paulo" },
+    connection: null,
+  });
+  h.bookForContact.mockResolvedValue({ ok: true, data: {} });
+  h.cancelForContact.mockResolvedValue({ ok: true, data: {} });
   h.startFlowRun.mockReset();
   h.startFlowRun.mockResolvedValue({
     started: true,
@@ -567,5 +592,115 @@ describe("start_flow step", () => {
       .filter(Boolean)
       .flat() as { detail?: string }[];
     expect(JSON.stringify(steps)).toContain("already in a flow");
+  });
+});
+
+// ------------------------------------------------------------
+// Agendamento na automação — fase 1, R-5.
+// ------------------------------------------------------------
+
+async function runSchedulingStep(
+  stepType: string,
+  stepConfig: Record<string, unknown>,
+  context: Record<string, unknown> = {},
+) {
+  h.state.owned = { id: "c1" };
+  h.state.automations = [
+    {
+      id: "a1",
+      account_id: ACCOUNT,
+      user_id: "u1",
+      trigger_type: "tag_added",
+      trigger_config: { tag_id: "tag-x" },
+      is_active: true,
+    },
+  ];
+  h.state.steps = [
+    {
+      id: "s1",
+      automation_id: "a1",
+      step_type: stepType,
+      position: 0,
+      parent_step_id: null,
+      step_config: stepConfig,
+    },
+  ];
+  await runAutomationsForTrigger({
+    accountId: ACCOUNT,
+    triggerType: "tag_added",
+    contactId: "c1",
+    context: { tag_id: "tag-x", conversation_id: "conv-1", ...context },
+  });
+}
+
+describe("scheduling steps", () => {
+  it("books the time it was given", async () => {
+    await runSchedulingStep("book_appointment", {
+      starts_at: "2026-09-10T13:00:00.000Z",
+      ends_at: "2026-09-10T14:00:00.000Z",
+      title: "Corte",
+    });
+
+    expect(h.bookForContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contactId: "c1",
+        startsAt: "2026-09-10T13:00:00.000Z",
+        endsAt: "2026-09-10T14:00:00.000Z",
+        title: "Corte",
+      }),
+    );
+  });
+
+  // Uma automação não pergunta nada, então o horário vem de fora —
+  // normalmente de uma variável que um fluxo coletou e entregou.
+  it("interpolates the time out of the context", async () => {
+    await runSchedulingStep(
+      "book_appointment",
+      { starts_at: "{{ vars.inicio }}", ends_at: "{{ vars.fim }}" },
+      { vars: { inicio: "2026-09-10T13:00:00.000Z", fim: "2026-09-10T14:00:00.000Z" } },
+    );
+
+    expect(h.bookForContact.mock.calls[0][0].startsAt).toBe(
+      "2026-09-10T13:00:00.000Z",
+    );
+  });
+
+  it("cancels the contact's live appointment", async () => {
+    await runSchedulingStep("cancel_appointment", { reason: "pediu" });
+    expect(h.cancelForContact).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: "c1", reason: "pediu" }),
+    );
+  });
+
+  // Conta com agendamento desligado não é automação quebrada. Lançar
+  // marcaria a execução como falha e mataria os passos seguintes.
+  it("does not fail the run when the account has no scheduling", async () => {
+    h.resolveSchedulingContext.mockResolvedValue(null);
+    await runSchedulingStep("cancel_appointment", {});
+
+    expect(h.cancelForContact).not.toHaveBeenCalled();
+    expect(h.state.logUpdates).toContainEqual(
+      expect.objectContaining({ status: "success" }),
+    );
+  });
+
+  // Idem para uma recusa da própria ação: o motivo vai para o log do
+  // passo, e a automação segue.
+  it("records a refusal without failing the run", async () => {
+    h.cancelForContact.mockResolvedValue({
+      ok: false,
+      reason: "no_appointment",
+      message: "This customer has no appointment booked.",
+    });
+    await runSchedulingStep("cancel_appointment", {});
+
+    const steps = h.state.logUpdates
+      .map((u) => u.steps_executed)
+      .filter(Boolean)
+      .flat() as unknown[];
+    expect(JSON.stringify(steps)).toContain("no appointment booked");
+    expect(h.state.logUpdates).toContainEqual(
+      expect.objectContaining({ status: "success" }),
+    );
   });
 });

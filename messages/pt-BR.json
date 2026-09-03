@@ -940,7 +940,21 @@
         "filenamePlaceholder": "fatura.pdf",
         "advanceAfterSending": "Depois de enviar, avançar para",
         "pickNextNode": "Escolha um próximo nó…",
-        "none": "— Nenhum —"
+        "none": "— Nenhum —",
+        "listButtonLabel": "Botão que abre a lista",
+        "maxOptions": "Quantos horários oferecer",
+        "lookaheadDays": "Dias à frente",
+        "lookaheadDaysPlaceholder": "padrão da conta",
+        "appointmentTitle": "Para que é o agendamento",
+        "cancelReason": "Motivo registrado no agendamento",
+        "onSlotChosen": "Cliente escolheu um horário →",
+        "onNoSlots": "Sem horário livre →",
+        "onCalendarError": "Não deu para ler a agenda →",
+        "onBooked": "Agendado →",
+        "onMoved": "Remarcado →",
+        "onCancelled": "Cancelado →",
+        "onSlotTaken": "Horário tomado nesse meio →",
+        "onNothingBooked": "Não tem agendamento →"
       },
       "categories": {
         "messaging": "Mensagens",
@@ -979,6 +993,22 @@
         "set_tag": {
           "label": "Etiquetar contato",
           "blurb": "Adiciona ou remove uma etiqueta do contato"
+        },
+        "offer_slots": {
+          "label": "Oferecer horários",
+          "blurb": "Lista os horários livres e espera a escolha"
+        },
+        "book_appointment": {
+          "label": "Agendar",
+          "blurb": "Marca o horário que o cliente escolheu"
+        },
+        "reschedule_appointment": {
+          "label": "Remarcar",
+          "blurb": "Move o agendamento existente"
+        },
+        "cancel_appointment": {
+          "label": "Cancelar agendamento",
+          "blurb": "Cancela e libera o horário"
         },
         "handoff": {
           "label": "Transferir para agente",
@@ -1107,7 +1137,10 @@
         "condition": "Condição (Se/Senão)",
         "send_webhook": "Enviar webhook",
         "close_conversation": "Fechar conversa",
-        "start_flow": "Iniciar fluxo"
+        "start_flow": "Iniciar fluxo",
+        "book_appointment": "Agendar",
+        "reschedule_appointment": "Remarcar",
+        "cancel_appointment": "Cancelar agendamento"
       },
       "triggers": {
         "new_message_received": {
@@ -1249,7 +1282,12 @@
         "flowSelect": "Escolha um fluxo…",
         "flowPlaceholder": "ID do fluxo",
         "flowUnknown": "Fluxo indisponível ({id})",
-        "startFlowHint": "Entrega o cliente a um fluxo, que sabe esperar uma resposta — a automação não sabe. Só um fluxo roda por contato de cada vez; se o cliente já estiver em um, este passo é recusado e o motivo fica no histórico."
+        "startFlowHint": "Entrega o cliente a um fluxo, que sabe esperar uma resposta — a automação não sabe. Só um fluxo roda por contato de cada vez; se o cliente já estiver em um, este passo é recusado e o motivo fica no histórico.",
+        "startsAtLabel": "Início (ISO 8601)",
+        "endsAtLabel": "Fim (ISO 8601)",
+        "cancelReasonLabel": "Motivo (opcional)",
+        "appointmentTimeHint": "A automação não pergunta nada, então o horário precisa vir de fora — normalmente de uma variável que um fluxo coletou e entregou. Expediente, antecedência mínima e colisão continuam sendo conferidos antes de gravar.",
+        "cancelAppointmentHint": "Cancela o único agendamento vivo do cliente e libera o horário. Se ele não tiver nenhum, o passo registra isso e a automação segue."
       },
       "delete": "Excluir"
     }

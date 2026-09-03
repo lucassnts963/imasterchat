@@ -34,6 +34,9 @@ import {
   MousePointerClick,
   List,
   Workflow,
+  CalendarPlus,
+  CalendarClock,
+  CalendarX,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -113,6 +116,9 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   send_webhook: { label: "send_webhook", icon: Webhook, border: "border-l-primary" },
   close_conversation: { label: "close_conversation", icon: CircleSlash, border: "border-l-primary" },
   start_flow: { label: "start_flow", icon: Workflow, border: "border-l-sky-500" },
+  book_appointment: { label: "book_appointment", icon: CalendarPlus, border: "border-l-emerald-500" },
+  reschedule_appointment: { label: "reschedule_appointment", icon: CalendarClock, border: "border-l-emerald-500" },
+  cancel_appointment: { label: "cancel_appointment", icon: CalendarX, border: "border-l-emerald-500" },
 }
 
 const ADDABLE_STEPS: AutomationStepType[] = [
@@ -130,6 +136,9 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "send_webhook",
   "close_conversation",
   "start_flow",
+  "book_appointment",
+  "reschedule_appointment",
+  "cancel_appointment",
 ]
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType }[] = [
@@ -1505,6 +1514,55 @@ function StepEditor({
               className="min-h-20 bg-muted font-mono text-xs text-foreground"
             />
           </FieldBlock>
+        </>
+      )
+    case "book_appointment":
+    case "reschedule_appointment":
+      return (
+        <>
+          <FieldBlock label={t("config.startsAtLabel")}>
+            <Input
+              value={(cfg.starts_at as string) ?? ""}
+              onChange={(e) => set({ starts_at: e.target.value })}
+              placeholder="{{ vars.slot_start }}"
+              className="bg-muted font-mono text-xs text-foreground"
+            />
+          </FieldBlock>
+          <FieldBlock label={t("config.endsAtLabel")}>
+            <Input
+              value={(cfg.ends_at as string) ?? ""}
+              onChange={(e) => set({ ends_at: e.target.value })}
+              placeholder="{{ vars.slot_end }}"
+              className="bg-muted font-mono text-xs text-foreground"
+            />
+          </FieldBlock>
+          {step.step_type === "book_appointment" && (
+            <FieldBlock label={t("config.titleLabel")}>
+              <Input
+                value={(cfg.title as string) ?? ""}
+                onChange={(e) => set({ title: e.target.value })}
+                className="bg-muted text-foreground"
+              />
+            </FieldBlock>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {t("config.appointmentTimeHint")}
+          </p>
+        </>
+      )
+    case "cancel_appointment":
+      return (
+        <>
+          <FieldBlock label={t("config.cancelReasonLabel")}>
+            <Input
+              value={(cfg.reason as string) ?? ""}
+              onChange={(e) => set({ reason: e.target.value })}
+              className="bg-muted text-foreground"
+            />
+          </FieldBlock>
+          <p className="text-xs text-muted-foreground">
+            {t("config.cancelAppointmentHint")}
+          </p>
         </>
       )
     case "start_flow":

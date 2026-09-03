@@ -1,17 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { GoogleConnection } from '@/lib/google/connection'
-import { loadGoogleConnection } from '@/lib/google/connection'
-import {
-  loadSchedulingSettings,
-  type SchedulingSettings,
-} from '@/lib/scheduling/settings'
+import type { SchedulingContext } from '@/lib/actions/scheduling'
+import { resolveSchedulingContext } from '@/lib/actions/scheduling'
 import { requestHumanTool } from './handoff'
 import { buildSchedulingTools } from './scheduling'
 import { buildQueueTools, type QueueOption } from './queues'
 import { buildTagTools, type TagOption } from './tags'
 import { buildStartFlowTools, type StartableFlow } from './start-flow'
 import type { AgentTool } from './types'
-import { recordEvent } from '@/lib/observability/events'
 
 // ============================================================
 // What tools an account's agent actually gets.
@@ -27,57 +22,15 @@ import { recordEvent } from '@/lib/observability/events'
 // it costs no prompt tokens.
 // ============================================================
 
-/** Everything scheduling needs, resolved once per run. */
-export interface SchedulingContext {
-  settings: SchedulingSettings
-  /** Null when no calendar is connected — bookings still record, they
-   *  just live only in the CRM. */
-  connection: GoogleConnection | null
-}
-
-/**
- * Is autonomous scheduling live for this account, and with what?
- *
- * Returns null when it is switched off, or on but unusable. Resolved
- * once by the caller and handed to both the tool catalog and the
- * environment block, so a single inbound message does not load the same
- * settings twice.
- */
-export async function resolveSchedulingContext(
-  db: SupabaseClient,
-  accountId: string,
-): Promise<SchedulingContext | null> {
-  const settings = await loadSchedulingSettings(db, accountId)
-  if (!settings?.isActive) return null
-
-  // A connection is not required: without one, bookings still land in
-  // `appointments` and availability comes from our own rows. Worse
-  // product — the optician's hand-blocked day is invisible — but a
-  // coherent one, and it keeps the feature demoable before OAuth is set
-  // up.
-  try {
-    return { settings, connection: await loadGoogleConnection(db, accountId) }
-  } catch (err) {
-    // Credentials exist but are unusable; the operator must reconnect.
-    // Offering the tools anyway would have the bot promising times it
-    // cannot verify.
-    // A tela de status responde "conectado" olhando se EXISTE linha,
-    // não se o token vale. Então o operador vê "conectado", o cliente
-    // acha que o bot está agendando, e as ferramentas simplesmente não
-    // entram no catálogo — o bot nem sabe que podia agendar.
-    void recordEvent({
-      accountId,
-      source: 'google',
-      code: err instanceof Error && 'code' in err ? String((err as { code: unknown }).code) : 'calendar_unusable',
-      severity: 'error',
-      message: `Agenda do Google inutilizável — as ferramentas de agendamento saíram do catálogo do agente: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      context: { hint: 'reconectar o Google em Configurações → Agendamento' },
-    })
-    return null
-  }
-}
+// `SchedulingContext` e `resolveSchedulingContext` mudaram para
+// `src/lib/actions/scheduling.ts` na fase 1 (R-3): quem precisa saber se
+// a conta agenda deixou de ser só o agente. Reexportados aqui porque
+// meia dúzia de rotas e a projeção de custo importam deste módulo, e
+// mover o import de todas elas seria ruído num diff que já é grande.
+export {
+  resolveSchedulingContext,
+  type SchedulingContext,
+} from '@/lib/actions/scheduling'
 
 /**
  * The one tool that cannot be switched off.

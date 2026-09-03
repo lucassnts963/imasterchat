@@ -18,6 +18,9 @@ import type {
   CreateDealStepConfig,
   AssignConversationStepConfig,
   StartFlowStepConfig,
+  BookAppointmentStepConfig,
+  RescheduleAppointmentStepConfig,
+  CancelAppointmentStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
 import { addContactTagIfAbsent } from '@/lib/contacts/tag-write'
@@ -26,6 +29,12 @@ import { engineSendText, engineSendTemplate, engineSendInteractive } from './met
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
 import { describeStartFlowRefusal, startFlowRun } from '@/lib/flows/engine'
+import {
+  bookForContact,
+  cancelForContact,
+  rescheduleForContact,
+  resolveSchedulingContext,
+} from '@/lib/actions/scheduling'
 import { getFlowChainDepth } from '@/lib/flows/chain'
 
 // ------------------------------------------------------------
@@ -654,6 +663,75 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
         return `flow not started: ${describeStartFlowRefusal(result.reason)}`
       }
       return `flow started (run ${result.flowRunId})`
+    }
+
+    // Agendamento — fase 1, R-5. Toda a regra vem de
+    // `@/lib/actions/scheduling`, a mesma que o agente e o fluxo usam.
+    // Aqui só existe a tradução para o vocabulário da automação: um
+    // resultado da ação vira uma linha no log do passo.
+    //
+    // `consultar_horarios` NÃO existe como passo, e a ausência é
+    // deliberada: apresentar horários exige esperar a escolha, e esperar
+    // uma pessoa é fluxo. A automação que precisa disso usa `start_flow`.
+    case 'book_appointment':
+    case 'reschedule_appointment':
+    case 'cancel_appointment': {
+      if (!args.contactId) throw new Error(`${step.step_type} needs a contact`)
+      const scheduling = await resolveSchedulingContext(db, args.automation.account_id)
+      if (!scheduling) {
+        // Não lança: uma conta com o agendamento desligado não é uma
+        // automação quebrada, e derrubar a execução mataria os passos
+        // seguintes.
+        return 'scheduling is not set up for this account'
+      }
+
+      if (step.step_type === 'cancel_appointment') {
+        const cfg = step.step_config as CancelAppointmentStepConfig
+        const result = await cancelForContact({
+          db,
+          accountId: args.automation.account_id,
+          contactId: args.contactId,
+          settings: scheduling.settings,
+          connection: scheduling.connection,
+          reason: cfg.reason ? interpolate(cfg.reason, args) : null,
+        })
+        return result.ok ? 'appointment cancelled' : `not cancelled: ${result.message}`
+      }
+
+      const cfg = step.step_config as
+        | BookAppointmentStepConfig
+        | RescheduleAppointmentStepConfig
+      const startsAt = interpolate(cfg.starts_at, args)
+      const endsAt = interpolate(cfg.ends_at, args)
+
+      if (step.step_type === 'reschedule_appointment') {
+        const result = await rescheduleForContact({
+          db,
+          accountId: args.automation.account_id,
+          contactId: args.contactId,
+          settings: scheduling.settings,
+          connection: scheduling.connection,
+          startsAt,
+          endsAt,
+        })
+        return result.ok ? 'appointment moved' : `not moved: ${result.message}`
+      }
+
+      const result = await bookForContact({
+        db,
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        conversationId: args.context.conversation_id ?? null,
+        settings: scheduling.settings,
+        connection: scheduling.connection,
+        startsAt,
+        endsAt,
+        title: (cfg as BookAppointmentStepConfig).title
+          ? interpolate((cfg as BookAppointmentStepConfig).title!, args)
+          : null,
+        createdVia: 'native',
+      })
+      return result.ok ? 'appointment booked' : `not booked: ${result.message}`
     }
 
     case 'close_conversation': {

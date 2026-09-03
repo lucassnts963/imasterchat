@@ -484,7 +484,13 @@ export type AutomationStepType =
   /** Hand the customer over to a flow — the bridge. An automation has
    *  no memory, so anything that needs to WAIT for an answer belongs on
    *  the other side of this step. */
-  | 'start_flow';
+  | 'start_flow'
+  /** Agendamento sem conversa: a automação reage a um estado e mexe na
+   *  agenda. Consultar horários NÃO é um passo — apresentar opções exige
+   *  esperar a escolha, que é fluxo. */
+  | 'book_appointment'
+  | 'reschedule_appointment'
+  | 'cancel_appointment';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
 
@@ -589,6 +595,31 @@ export interface SendWebhookStepConfig {
   body_template?: string;
 }
 
+/**
+ * Marca um horário para o contato.
+ *
+ * O instante vem de fora — normalmente de uma variável que um fluxo
+ * coletou e entregou pela ponte. Uma automação não pergunta nada, então
+ * ela não tem como descobrir um horário sozinha; o que ela sabe fazer é
+ * agir sobre um que já foi decidido.
+ */
+export interface BookAppointmentStepConfig {
+  /** ISO 8601; interpola `{{ vars.X }}`. */
+  starts_at: string;
+  ends_at: string;
+  title?: string;
+}
+
+export interface RescheduleAppointmentStepConfig {
+  starts_at: string;
+  ends_at: string;
+}
+
+export interface CancelAppointmentStepConfig {
+  /** Motivo registrado no agendamento; interpola `{{ vars.X }}`. */
+  reason?: string;
+}
+
 export interface StartFlowStepConfig {
   /** Which flow to start. Must be active and in the same account. */
   flow_id: string;
@@ -613,6 +644,9 @@ export type AutomationStepConfig =
   | ConditionStepConfig
   | SendWebhookStepConfig
   | StartFlowStepConfig
+  | BookAppointmentStepConfig
+  | RescheduleAppointmentStepConfig
+  | CancelAppointmentStepConfig
   | Record<string, never>
   | Record<string, unknown>;
 

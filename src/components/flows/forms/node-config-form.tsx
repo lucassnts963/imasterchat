@@ -209,6 +209,80 @@ export function NodeConfigForm({
         />
       );
 
+    case "offer_slots":
+      return (
+        <OfferSlotsForm
+          cfg={cfg as OfferSlotsCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      );
+
+    case "book_appointment":
+      return (
+        <>
+          <TextRow
+            label={t("appointmentTitle")}
+            value={(cfg as { title?: string }).title ?? ""}
+            onChange={(v) => onUpdateConfig({ title: v })}
+          />
+          <SchedulingEdges
+            cfg={cfg as Record<string, string | undefined>}
+            keys={[
+              ["next_node_key", "onBooked"],
+              ["on_unavailable_next", "onSlotTaken"],
+              ["on_error_next", "onCalendarError"],
+            ]}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onUpdateConfig={onUpdateConfig}
+            t={t}
+          />
+        </>
+      );
+
+    case "reschedule_appointment":
+      return (
+        <SchedulingEdges
+          cfg={cfg as Record<string, string | undefined>}
+          keys={[
+            ["next_node_key", "onMoved"],
+            ["on_unavailable_next", "onSlotTaken"],
+            ["on_no_appointment_next", "onNothingBooked"],
+            ["on_error_next", "onCalendarError"],
+          ]}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      );
+
+    case "cancel_appointment":
+      return (
+        <>
+          <TextRow
+            label={t("cancelReason")}
+            value={(cfg as { reason?: string }).reason ?? ""}
+            onChange={(v) => onUpdateConfig({ reason: v })}
+          />
+          <SchedulingEdges
+            cfg={cfg as Record<string, string | undefined>}
+            keys={[
+              ["next_node_key", "onCancelled"],
+              ["on_no_appointment_next", "onNothingBooked"],
+              ["on_error_next", "onCalendarError"],
+            ]}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onUpdateConfig={onUpdateConfig}
+            t={t}
+          />
+        </>
+      );
+
     case "handoff":
       return (
         <TextRow
@@ -1094,6 +1168,142 @@ function SendMediaForm({
         onChange={(v) => onUpdateConfig({ next_node_key: v })}
         label={t("advanceAfterSending")}
       />
+    </>
+  );
+}
+
+// ============================================================
+// Agendamento — fase 1, R-4
+//
+// Os quatro nós têm a mesma forma: um ou dois campos próprios e um
+// punhado de saídas nomeadas. As saídas ganham um componente só, porque
+// a parte que o operador precisa entender não é o campo — é que
+// "calendário com erro" e "sem horário livre" NÃO são o mesmo caminho.
+// ============================================================
+
+interface OfferSlotsCfg {
+  text?: string;
+  button_label?: string;
+  max_options?: number;
+  lookahead_days?: number;
+  next_node_key?: string;
+  no_slots_next?: string;
+  on_error_next?: string;
+}
+
+function OfferSlotsForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: OfferSlotsCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <>
+      <TextRow
+        label={t("textToCustomer")}
+        value={cfg.text ?? ""}
+        onChange={(v) => onUpdateConfig({ text: v })}
+        rows={2}
+      />
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">
+          {t("listButtonLabel")}
+        </label>
+        <Input
+          value={cfg.button_label ?? ""}
+          onChange={(e) => onUpdateConfig({ button_label: e.target.value })}
+          className="bg-muted text-xs"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">
+            {t("maxOptions")}
+          </label>
+          <Input
+            type="number"
+            min={1}
+            max={10}
+            value={cfg.max_options ?? 5}
+            onChange={(e) =>
+              onUpdateConfig({
+                max_options: Math.min(10, Math.max(1, Number(e.target.value))),
+              })
+            }
+            className="bg-muted text-xs"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">
+            {t("lookaheadDays")}
+          </label>
+          <Input
+            type="number"
+            min={1}
+            value={cfg.lookahead_days ?? ""}
+            placeholder={t("lookaheadDaysPlaceholder")}
+            onChange={(e) =>
+              onUpdateConfig({
+                lookahead_days: e.target.value
+                  ? Math.max(1, Number(e.target.value))
+                  : undefined,
+              })
+            }
+            className="bg-muted text-xs"
+          />
+        </div>
+      </div>
+      <SchedulingEdges
+        cfg={cfg as Record<string, string | undefined>}
+        keys={[
+          ["next_node_key", "onSlotChosen"],
+          ["no_slots_next", "onNoSlots"],
+          ["on_error_next", "onCalendarError"],
+        ]}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onUpdateConfig={onUpdateConfig}
+        t={t}
+      />
+    </>
+  );
+}
+
+function SchedulingEdges({
+  cfg,
+  keys,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: Record<string, string | undefined>;
+  /** `[chave da config, chave de tradução do rótulo]`, na ordem da tela. */
+  keys: Array<[string, string]>;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <>
+      {keys.map(([key, labelKey]) => (
+        <NextNodeRow
+          key={key}
+          value={cfg[key] ?? ""}
+          allNodes={allNodes}
+          currentKey={currentKey}
+          onChange={(v) => onUpdateConfig({ [key]: v })}
+          label={t(labelKey)}
+        />
+      ))}
     </>
   );
 }

@@ -143,6 +143,19 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
         issues.push({ path: `${path}.url`, message: 'webhook URL is not a valid URL' })
       }
       break
+    case 'book_appointment':
+    case 'reschedule_appointment':
+      if (!nonEmpty(c.starts_at)) {
+        issues.push({ path: `${path}.starts_at`, message: 'start time is required' })
+      }
+      if (!nonEmpty(c.ends_at)) {
+        issues.push({ path: `${path}.ends_at`, message: 'end time is required' })
+      }
+      break
+    case 'cancel_appointment':
+      // Nada obrigatório: cancelar age sobre o único agendamento vivo do
+      // contato, e o motivo é opcional.
+      break
     case 'start_flow':
       if (!nonEmpty(c.flow_id)) {
         issues.push({ path: `${path}.flow_id`, message: 'flow is required' })

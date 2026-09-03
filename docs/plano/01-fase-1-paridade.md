@@ -46,8 +46,8 @@ Duas consequências que justificam a fase sozinha:
 | **Rotear para fila** | ✅ | ❌ | ❌ |
 | Webhook de saída | ❌ | ❌ | ✅ |
 | Esperar (relógio) | ❌ | ❌ | ✅ |
-| **Consultar disponibilidade** | ✅ | ❌ | ❌ |
-| **Agendar / remarcar / cancelar** | ✅ | ❌ | ❌ |
+| **Consultar disponibilidade** | ✅ | ✅ | ➖ |
+| **Agendar / remarcar / cancelar** | ✅ | ✅ | ✅ |
 | **Iniciar fluxo** | ✅ | ❌ | ✅ |
 | Disparar automação | ✅ (via tag) | ✅ (via tag) | ✅ (via tag) |
 
@@ -60,6 +60,9 @@ Duas consequências que justificam a fase sozinha:
 >   fluxo continua `❌` de propósito: um fluxo que inicia outro fluxo esbarraria
 >   no índice de um run ativo por contato, e a composição certa ali é a aresta
 >   entre nós, não um segundo run.
+> - **Consultar disponibilidade** é `➖` na automação, não `❌`: apresentar
+>   horários exige esperar a escolha, e esperar uma pessoa é fluxo (R-5 E2). A
+>   automação que precisa disso usa a ponte.
 > - **Disparar automação** já era `✅` nos três. Eu havia registrado que o
 >   `add_tag` da automação não despachava `tag_added`; ele despacha, com o mesmo
 >   teto de profundidade. O que R-2 encontrou não foi comportamento faltando, e
@@ -171,14 +174,14 @@ produção para ganhar limpeza, não comportamento.
 
 ### Bloco B — Agendamento nos três motores
 
-#### R-3 · Agendamento como ação de domínio — `P`
+#### R-3 · Agendamento como ação de domínio — `P` — **feito**
 - **C1** Extrair de `tools/scheduling.ts` a lógica que não é da IA, para
   `src/lib/actions/scheduling.ts`: consultar disponibilidade, agendar, remarcar,
   cancelar.
 - **C2** As ferramentas da IA passam a chamar a ação. **Comportamento idêntico**
   — os testes atuais devem passar sem alteração.
 
-#### R-4 · Nós de agendamento no fluxo — `M`
+#### R-4 · Nós de agendamento no fluxo — `M` — **feito**
 - **D1** Nó `consultar_horarios`: consulta e apresenta as opções como lista.
 - **D2** Nó `agendar`: marca o horário escolhido.
 - **D3** Nós `remarcar` e `cancelar`.
@@ -187,11 +190,42 @@ produção para ganhar limpeza, não comportamento.
 - **D5** Fuso e horário de funcionamento vêm de `ai_scheduling_settings`, a mesma
   fonte da IA. Sem segunda configuração.
 
-#### R-5 · Agendamento na automação — `M`
+#### R-5 · Agendamento na automação — `M` — **feito**
 - **E1** Passos `agendar`, `remarcar`, `cancelar`.
 - **E2** `consultar_horarios` **não** vira passo de automação: apresentar
   horários exige esperar a escolha, que é fluxo. A automação que precisa disso
   usa `iniciar_fluxo`.
+
+**Como ficou o bloco B.**
+
+`src/lib/actions/scheduling.ts` é a implementação única. Ela não fala com o
+cliente, não sabe o que é ferramenta, nó ou passo, e devolve **fato
+estruturado**: `ok`, ou uma recusa de um vocabulário fechado —
+`slot_unavailable`, `no_appointment`, `calendar_unreadable`,
+`calendar_not_synced`, `write_failed`, `no_contact`, `bad_slot`. Cada motor
+traduz esse mesmo resultado para o próprio idioma:
+
+| Motor | Traduz a recusa em |
+|---|---|
+| Agente | uma frase para o modelo, mais a decisão de **parar e chamar gente** quando a agenda está ilegível |
+| Fluxo | uma **aresta** — o cliente segue por um caminho e nunca lê um erro nosso |
+| Automação | uma linha no detalhe do passo, com a execução seguindo em frente |
+
+Duas escolhas que valem registrar:
+
+- **`no_slots` e `on_error` são arestas separadas no `offer_slots`.** A tentação
+  é juntar. Uma agenda que não conseguimos ler não é uma agenda cheia: mandar o
+  cliente por "não tenho horário" quando o Google caiu perde a venda e mente.
+- **O `reply_id` da lista carrega um ÍNDICE, não o instante.** O horário sai de
+  `flow_runs.vars._offered_slots`, que é o registro do que realmente foi
+  oferecido. Com a data no id, um cliente curioso responderia com outra — e o
+  fluxo tentaria marcar um horário que ninguém ofereceu.
+
+**Defeito encontrado e corrigido de passagem.** O Playground só retinha a
+escrita de `book_appointment`. Ensaiar **remarcar** movia de verdade o
+agendamento de um cliente real, e ensaiar **cancelar** cancelava. Os três agora
+rodam todas as verificações e não escrevem nada — que é o que o Playground
+sempre prometeu.
 
 ### Bloco C — Encher a matriz
 

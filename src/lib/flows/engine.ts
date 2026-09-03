@@ -42,6 +42,22 @@ import {
 import { decideFallback, resolveFallbackPolicy } from "./fallback";
 import { MAX_FLOW_CHAIN_DEPTH } from "./chain";
 import { addContactTagAndDispatch } from "@/lib/contacts/tag-events";
+import {
+  bookForContact,
+  cancelForContact,
+  listAvailability,
+  rescheduleForContact,
+  resolveSchedulingContext,
+  type SchedulingContext,
+  type SchedulingFailure,
+} from "@/lib/actions/scheduling";
+import {
+  parseSlotReplyId,
+  readOfferedSlots,
+  slotOptionDescription,
+  slotOptionTitle,
+  slotReplyId,
+} from "@/lib/scheduling/slot-option";
 import { removeContactTag } from "@/lib/contacts/tag-write";
 import {
   type CollectInputNodeConfig,
@@ -57,6 +73,10 @@ import {
   type SendMediaNodeConfig,
   type SendMessageNodeConfig,
   type SetTagNodeConfig,
+  type OfferSlotsNodeConfig,
+  type BookAppointmentNodeConfig,
+  type RescheduleAppointmentNodeConfig,
+  type CancelAppointmentNodeConfig,
   type StartNodeConfig,
   type KeywordTriggerConfig,
 } from "./types";
@@ -119,7 +139,10 @@ export function isAutoAdvancing(node_type: string): boolean {
     node_type === "send_message" ||
     node_type === "send_media" ||
     node_type === "condition" ||
-    node_type === "set_tag"
+    node_type === "set_tag" ||
+    node_type === "book_appointment" ||
+    node_type === "reschedule_appointment" ||
+    node_type === "cancel_appointment"
   );
 }
 
@@ -128,7 +151,8 @@ export function isSuspending(node_type: string): boolean {
   return (
     node_type === "send_buttons" ||
     node_type === "send_list" ||
-    node_type === "collect_input"
+    node_type === "collect_input" ||
+    node_type === "offer_slots"
   );
 }
 
@@ -556,6 +580,183 @@ async function endRun(
 }
 
 // ============================================================
+// Agendamento dentro do fluxo — fase 1, R-4.
+//
+// Toda a regra vem de `src/lib/actions/scheduling.ts`, a mesma que o
+// agente de IA usa. O que existe aqui é a tradução para o vocabulário do
+// fluxo: um resultado da ação vira uma ARESTA, e o cliente segue por ela
+// sem nunca ler uma mensagem de erro nossa.
+//
+// A configuração da conta é carregada uma vez por percurso do laço, e só
+// quando um nó de agendamento aparece: um fluxo que nunca agenda não
+// paga uma consulta por isso.
+// ============================================================
+
+interface SchedulingCache {
+  loaded: boolean;
+  value: SchedulingContext | null;
+}
+
+async function schedulingFor(
+  db: AdminClient,
+  accountId: string,
+  cache: SchedulingCache,
+): Promise<SchedulingContext | null> {
+  if (!cache.loaded) {
+    cache.value = await resolveSchedulingContext(db, accountId);
+    cache.loaded = true;
+  }
+  return cache.value;
+}
+
+/**
+ * Consulta os horários e oferece como lista.
+ *
+ * Três saídas, e a diferença entre duas delas é a razão de o nó existir:
+ * "não há horário" manda o cliente por um caminho ("me avisa quando
+ * abrir vaga"), "não consegui ler a agenda" manda por outro. Tratar as
+ * duas como a mesma coisa faz o fluxo dizer que a agenda está cheia
+ * quando na verdade o Google caiu.
+ */
+async function offerSlots(
+  db: AdminClient,
+  run: FlowRunRow,
+  node: FlowNodeRow,
+  scheduling: SchedulingContext | null,
+): Promise<{ kind: "suspended" } | { kind: "advance"; to: string }> {
+  const cfg = node.config as unknown as OfferSlotsNodeConfig;
+
+  if (!scheduling) {
+    await logEvent(db, run.id, "error", node.node_key, {
+      reason: "scheduling_not_configured",
+    });
+    return { kind: "advance", to: cfg.on_error_next };
+  }
+
+  const { settings, connection } = scheduling;
+  const now = new Date();
+  const days = cfg.lookahead_days ?? settings.lookaheadDays ?? 7;
+  const result = await listAvailability({
+    db,
+    accountId: run.account_id,
+    settings,
+    connection,
+    from: now,
+    to: new Date(now.getTime() + days * 86_400_000),
+    now,
+  });
+
+  if (!result.ok) {
+    await logEvent(db, run.id, "error", node.node_key, {
+      reason: result.reason,
+      detail: result.message,
+    });
+    return { kind: "advance", to: cfg.on_error_next };
+  }
+
+  // Meta aceita no máximo 10 linhas numa lista; o padrão de 5 é o que
+  // cabe numa tela sem virar formulário.
+  const max = Math.min(Math.max(cfg.max_options ?? 5, 1), 10);
+  const slots = result.data.slice(0, max);
+  if (slots.length === 0) {
+    await logEvent(db, run.id, "node_entered", node.node_key, {
+      node_type: "offer_slots",
+      offered: 0,
+    });
+    return { kind: "advance", to: cfg.no_slots_next };
+  }
+
+  // Guardar ANTES de mandar. Se a Meta falhar depois disto sobra uma
+  // oferta registrada que ninguém viu, o que é inofensivo; na ordem
+  // inversa sobraria uma lista na mão do cliente cujos índices não
+  // apontam para nada.
+  const offered = slots.map((slot) => ({
+    starts_at: slot.startsAt.toISOString(),
+    ends_at: slot.endsAt.toISOString(),
+  }));
+  const newVars = { ...run.vars, _offered_slots: offered };
+  const { error: varsErr } = await db
+    .from("flow_runs")
+    .update({ vars: newVars })
+    .eq("id", run.id);
+  if (varsErr) {
+    await logEvent(db, run.id, "error", node.node_key, {
+      reason: "offer_slots_vars_write_failed",
+      detail: varsErr.message,
+    });
+    return { kind: "advance", to: cfg.on_error_next };
+  }
+  run.vars = newVars;
+
+  const { whatsapp_message_id } = await engineSendInteractiveList({
+    accountId: run.account_id,
+    userId: run.user_id,
+    conversationId: run.conversation_id!,
+    contactId: run.contact_id!,
+    bodyText: interpolateVars(cfg.text, run.vars),
+    buttonLabel: cfg.button_label,
+    headerText: cfg.header_text,
+    footerText: cfg.footer_text,
+    sections: [
+      {
+        rows: slots.map((slot, index) => ({
+          id: slotReplyId(index),
+          title: slotOptionTitle(slot, settings.timezone),
+          description: slotOptionDescription(slot, settings.timezone),
+        })),
+      },
+    ],
+  });
+
+  await logEvent(db, run.id, "message_sent", node.node_key, {
+    node_type: "offer_slots",
+    offered: slots.length,
+    whatsapp_message_id,
+  });
+
+  const { data: msg } = await db
+    .from("messages")
+    .select("id")
+    .eq("message_id", whatsapp_message_id)
+    .maybeSingle();
+  await db
+    .from("flow_runs")
+    .update({
+      last_prompt_message_id: (msg as { id: string } | null)?.id ?? null,
+    })
+    .eq("id", run.id);
+
+  return { kind: "suspended" };
+}
+
+/**
+ * Qual aresta uma recusa da ação toma.
+ *
+ * `slot_unavailable` é a única que tem caminho próprio, e é a que
+ * acontece de verdade: entre oferecer e confirmar, o cliente demora, e o
+ * horário vai embora. Tudo o mais — agenda ilegível, escrita falhada,
+ * gravado sem sincronizar — é `on_error_next`, porque para o cliente
+ * são a mesma coisa: não deu, e continuar como se tivesse dado é o
+ * único desfecho de fato ruim.
+ */
+function schedulingEdgeFor(
+  failure: SchedulingFailure,
+  cfg: {
+    on_unavailable_next?: string;
+    on_no_appointment_next?: string;
+    on_error_next: string;
+  },
+): string {
+  if (failure.reason === "slot_unavailable" && cfg.on_unavailable_next) {
+    return cfg.on_unavailable_next;
+  }
+  if (failure.reason === "no_appointment" && cfg.on_no_appointment_next) {
+    return cfg.on_no_appointment_next;
+  }
+  return cfg.on_error_next;
+}
+
+// ============================================================
 // The synchronous advance loop. Walks through auto-advance nodes
 // until it hits one that suspends (send_buttons/send_list) or
 // terminates (handoff/end). Each suspending node persists the
@@ -569,6 +770,9 @@ async function advanceFromNodeKey(
   nodes: Map<string, FlowNodeRow>,
 ): Promise<{ outcome: "advanced" | "completed" | "handed_off" }> {
   let currentKey: string | null = startNodeKey;
+  // Configuração de agendamento, carregada sob demanda e no máximo uma
+  // vez por percurso — um fluxo que nunca agenda não paga por ela.
+  const scheduling: SchedulingCache = { loaded: false, value: null };
   // Defensive cap — if a flow has a cycle (which the validator
   // SHOULD catch but doesn't yet in v1), we bail rather than loop.
   for (let safety = 0; safety < 64; safety += 1) {
@@ -752,6 +956,124 @@ async function advanceFromNodeKey(
         });
       }
       currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "offer_slots") {
+      const outcome = await offerSlots(
+        db,
+        run,
+        node,
+        await schedulingFor(db, run.account_id, scheduling),
+      );
+      if (outcome.kind === "advance") {
+        currentKey = outcome.to;
+        continue;
+      }
+      // Suspenso à espera da escolha. Mesmo protocolo dos outros nós que
+      // esperam: grava o ponteiro por UPDATE otimista e sai.
+      const advanced = await advanceCurrentNodeKey(
+        db,
+        run.id,
+        run.current_node_key,
+        node.node_key,
+      );
+      if (!advanced) return { outcome: "advanced" };
+      run.current_node_key = node.node_key;
+      return { outcome: "advanced" };
+    }
+    if (node.node_type === "book_appointment") {
+      const cfg = node.config as unknown as BookAppointmentNodeConfig;
+      const ctx = await schedulingFor(db, run.account_id, scheduling);
+      const chosen = readOfferedSlots(run.vars)[
+        typeof run.vars._chosen_slot === "number" ? run.vars._chosen_slot : -1
+      ];
+      if (!ctx || !chosen) {
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: ctx ? "no_slot_chosen" : "scheduling_not_configured",
+        });
+        currentKey = cfg.on_error_next;
+        continue;
+      }
+      const result = await bookForContact({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id,
+        conversationId: run.conversation_id,
+        settings: ctx.settings,
+        connection: ctx.connection,
+        startsAt: chosen.starts_at,
+        endsAt: chosen.ends_at,
+        title: cfg.title ? interpolateVars(cfg.title, run.vars) : null,
+        createdVia: "native",
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "book_appointment",
+        booked: result.ok,
+        reason: result.ok ? null : result.reason,
+      });
+      currentKey = result.ok
+        ? cfg.next_node_key
+        : schedulingEdgeFor(result, cfg);
+      continue;
+    }
+    if (node.node_type === "reschedule_appointment") {
+      const cfg = node.config as unknown as RescheduleAppointmentNodeConfig;
+      const ctx = await schedulingFor(db, run.account_id, scheduling);
+      const chosen = readOfferedSlots(run.vars)[
+        typeof run.vars._chosen_slot === "number" ? run.vars._chosen_slot : -1
+      ];
+      if (!ctx || !chosen) {
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: ctx ? "no_slot_chosen" : "scheduling_not_configured",
+        });
+        currentKey = cfg.on_error_next;
+        continue;
+      }
+      const result = await rescheduleForContact({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id,
+        settings: ctx.settings,
+        connection: ctx.connection,
+        startsAt: chosen.starts_at,
+        endsAt: chosen.ends_at,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "reschedule_appointment",
+        moved: result.ok,
+        reason: result.ok ? null : result.reason,
+      });
+      currentKey = result.ok
+        ? cfg.next_node_key
+        : schedulingEdgeFor(result, cfg);
+      continue;
+    }
+    if (node.node_type === "cancel_appointment") {
+      const cfg = node.config as unknown as CancelAppointmentNodeConfig;
+      const ctx = await schedulingFor(db, run.account_id, scheduling);
+      if (!ctx) {
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: "scheduling_not_configured",
+        });
+        currentKey = cfg.on_error_next;
+        continue;
+      }
+      const result = await cancelForContact({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id,
+        settings: ctx.settings,
+        connection: ctx.connection,
+        reason: cfg.reason ? interpolateVars(cfg.reason, run.vars) : null,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "cancel_appointment",
+        cancelled: result.ok,
+        reason: result.ok ? null : result.reason,
+      });
+      currentKey = result.ok
+        ? cfg.next_node_key
+        : schedulingEdgeFor(result, cfg);
       continue;
     }
     if (node.node_type === "send_buttons") {
@@ -952,6 +1274,33 @@ async function handleReplyForActiveRun(
       currentNode.node_type === "send_list")
   ) {
     matched = matchReplyId(currentNode, message.reply_id);
+  } else if (
+    message.kind === "interactive_reply" &&
+    currentNode.node_type === "offer_slots"
+  ) {
+    // A escolha volta como índice, e o horário sai de
+    // `vars._offered_slots` — o registro do que REALMENTE foi oferecido.
+    // Um índice fora da oferta cai no fallback como qualquer resposta
+    // que não casa, em vez de virar um agendamento inventado.
+    const cfg = currentNode.config as unknown as OfferSlotsNodeConfig;
+    const index = parseSlotReplyId(message.reply_id);
+    const offered = readOfferedSlots(run.vars);
+    if (index !== null && index < offered.length) {
+      const newVars = { ...run.vars, _chosen_slot: index };
+      const { error: chooseErr } = await db
+        .from("flow_runs")
+        .update({ vars: newVars, reprompt_count: 0 })
+        .eq("id", run.id);
+      if (!chooseErr) {
+        run.vars = newVars;
+        run.reprompt_count = 0;
+        await logEvent(db, run.id, "node_entered", currentNode.node_key, {
+          chosen_slot: index,
+          starts_at: offered[index].starts_at,
+        });
+        matched = cfg.next_node_key;
+      }
+    }
   } else if (
     message.kind === "text" &&
     currentNode.node_type === "collect_input"

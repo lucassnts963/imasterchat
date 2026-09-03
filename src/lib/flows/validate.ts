@@ -701,6 +701,56 @@ function validateNode(
       break;
     }
 
+    case "offer_slots": {
+      const cfg = node.config as {
+        text?: string;
+        button_label?: string;
+        max_options?: number;
+      };
+      if (!cfg.text?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "text",
+          message: "Offer-slots needs a message to send above the times.",
+        });
+      }
+      if (!cfg.button_label?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "button_label",
+          message: "Offer-slots needs a label for the button that opens the list.",
+        });
+      }
+      // A Meta corta em 10 linhas. Autorizar 12 na tela e ver 10 chegar
+      // é o tipo de diferença que ninguém liga ao que configurou.
+      if (
+        cfg.max_options !== undefined &&
+        (!Number.isInteger(cfg.max_options) ||
+          cfg.max_options < 1 ||
+          cfg.max_options > 10)
+      ) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "max_options",
+          message: "WhatsApp shows at most 10 options in a list.",
+        });
+      }
+      validateSchedulingEdges(node, knownKeys, issues);
+      break;
+    }
+
+    case "book_appointment":
+    case "reschedule_appointment":
+    case "cancel_appointment":
+      validateSchedulingEdges(node, knownKeys, issues);
+      break;
+
     case "handoff":
     case "end":
       // Terminal nodes have no outgoing edges; nothing to validate
@@ -785,9 +835,80 @@ function outgoingEdges(node: NodeInput): string[] {
       }
       return out;
     }
+    case "offer_slots":
+    case "book_appointment":
+    case "reschedule_appointment":
+    case "cancel_appointment":
+      return schedulingEdgeKeys(node.node_type)
+        .map((key) => (node.config as Record<string, unknown>)[key])
+        .filter((k): k is string => typeof k === "string" && k.length > 0);
     case "handoff":
     case "end":
     default:
       return [];
+  }
+}
+
+// ============================================================
+// Arestas dos nós de agendamento — fase 1, R-4.
+//
+// Todas obrigatórias, e é de propósito. A tentação é deixar
+// `on_error_next` opcional "porque quase nunca acontece": quando
+// acontece, o run morre no meio e o cliente fica falando sozinho. Um
+// fluxo que agenda tem de dizer o que faz quando a agenda não responde,
+// nem que seja mandar para um humano.
+// ============================================================
+
+const SCHEDULING_EDGE_KEYS: Record<string, string[]> = {
+  offer_slots: ["next_node_key", "no_slots_next", "on_error_next"],
+  book_appointment: [
+    "next_node_key",
+    "on_unavailable_next",
+    "on_error_next",
+  ],
+  reschedule_appointment: [
+    "next_node_key",
+    "on_unavailable_next",
+    "on_no_appointment_next",
+    "on_error_next",
+  ],
+  cancel_appointment: [
+    "next_node_key",
+    "on_no_appointment_next",
+    "on_error_next",
+  ],
+};
+
+function schedulingEdgeKeys(nodeType: string): string[] {
+  return SCHEDULING_EDGE_KEYS[nodeType] ?? [];
+}
+
+function validateSchedulingEdges(
+  node: NodeInput,
+  knownKeys: Set<string>,
+  issues: ValidationIssue[],
+): void {
+  const cfg = node.config as Record<string, unknown>;
+  for (const key of schedulingEdgeKeys(node.node_type)) {
+    const target = cfg[key];
+    if (typeof target !== "string" || target.length === 0) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        node_key: node.node_key,
+        field: key,
+        message: `Scheduling nodes must say where to go on "${key.replace(/_next$|_node_key$/, "").replace(/^on_/, "")}".`,
+      });
+      continue;
+    }
+    if (!knownKeys.has(target)) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        node_key: node.node_key,
+        field: key,
+        message: `Points to non-existent node "${target}".`,
+      });
+    }
   }
 }

@@ -183,6 +183,36 @@ export function defaultConfigFor(type: NodeType): Record<string, unknown> {
       };
     case "set_tag":
       return { mode: "add", tag_id: "", next_node_key: "" };
+    case "offer_slots":
+      return {
+        text: "Estes são os horários livres:",
+        button_label: "Ver horários",
+        max_options: 5,
+        next_node_key: "",
+        no_slots_next: "",
+        on_error_next: "",
+      };
+    case "book_appointment":
+      return {
+        title: "",
+        next_node_key: "",
+        on_unavailable_next: "",
+        on_error_next: "",
+      };
+    case "reschedule_appointment":
+      return {
+        next_node_key: "",
+        on_unavailable_next: "",
+        on_no_appointment_next: "",
+        on_error_next: "",
+      };
+    case "cancel_appointment":
+      return {
+        reason: "",
+        next_node_key: "",
+        on_no_appointment_next: "",
+        on_error_next: "",
+      };
     case "handoff":
       return { note: "" };
     case "end":
