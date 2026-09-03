@@ -9,6 +9,7 @@ import { requestHumanTool } from './handoff'
 import { buildSchedulingTools } from './scheduling'
 import { buildQueueTools, type QueueOption } from './queues'
 import { buildTagTools, type TagOption } from './tags'
+import { buildStartFlowTools, type StartableFlow } from './start-flow'
 import type { AgentTool } from './types'
 import { recordEvent } from '@/lib/observability/events'
 
@@ -199,6 +200,39 @@ async function loadSelectableTags(
 }
 
 /**
+ * Os fluxos que o agente pode iniciar.
+ *
+ * Só `manual`, e só `active`. Um fluxo com gatilho de palavra-chave já
+ * tem quem o inicie — o cliente que digita a palavra — e deixar o modelo
+ * iniciá-lo também significaria que uma frase do cliente, interpretada,
+ * dispara o mesmo roteiro por um caminho que ninguém configurou. Fluxo
+ * `manual` é o que a conta marcou como "alguém de fora começa este".
+ *
+ * Lista vazia → a ferramenta não entra no catálogo, como todas as
+ * outras aqui: ausência é a permissão mais forte que existe.
+ */
+async function loadStartableFlows(
+  db: SupabaseClient,
+  accountId: string,
+): Promise<StartableFlow[]> {
+  try {
+    const { data } = await db
+      .from('flows')
+      .select('id, name, description')
+      .eq('account_id', accountId)
+      .eq('status', 'active')
+      .eq('trigger_type', 'manual')
+      .order('name')
+    // Mesmo cuidado das filas e das etiquetas: quem consome faz `.map`,
+    // e isso acontece fora deste try.
+    return Array.isArray(data) ? (data as StartableFlow[]) : []
+  } catch (err) {
+    console.error('[ai tools] fluxos indisponíveis:', err)
+    return []
+  }
+}
+
+/**
  * Resolve the tools available to this account right now.
  *
  * `request_human` is unconditional: any agent that can talk to a
@@ -220,14 +254,16 @@ export async function buildToolCatalog(
     tools.push(...buildSchedulingTools(scheduling))
   }
 
-  // Filas humanas e etiquetas liberadas, em paralelo: são duas consultas
-  // independentes e ambas entram em toda montagem do catálogo.
-  const [queues, tags] = await Promise.all([
+  // Filas humanas, etiquetas liberadas e fluxos manuais, em paralelo:
+  // consultas independentes, todas em toda montagem do catálogo.
+  const [queues, tags, flows] = await Promise.all([
     loadRoutableQueues(args.db, args.accountId),
     loadSelectableTags(args.db, args.accountId),
+    loadStartableFlows(args.db, args.accountId),
   ])
   tools.push(...buildQueueTools(queues))
   tools.push(...buildTagTools(tags))
+  tools.push(...buildStartFlowTools(flows))
 
   const disabled =
     args.disabled ?? (await loadDisabledTools(args.db, args.accountId))

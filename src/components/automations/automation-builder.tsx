@@ -33,6 +33,7 @@ import {
   ArrowUp,
   MousePointerClick,
   List,
+  Workflow,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -111,6 +112,7 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   condition: { label: "condition", icon: GitBranch, border: "border-l-amber-500" },
   send_webhook: { label: "send_webhook", icon: Webhook, border: "border-l-primary" },
   close_conversation: { label: "close_conversation", icon: CircleSlash, border: "border-l-primary" },
+  start_flow: { label: "start_flow", icon: Workflow, border: "border-l-sky-500" },
 }
 
 const ADDABLE_STEPS: AutomationStepType[] = [
@@ -127,6 +129,7 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "condition",
   "send_webhook",
   "close_conversation",
+  "start_flow",
 ]
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType }[] = [
@@ -210,9 +213,18 @@ interface AutomationResources {
   customFields: CustomField[]
   pipelines: PipelineOption[]
   stages: PipelineStageOption[]
+  /** Only ACTIVE flows: `start_flow` refuses anything else at run time,
+   *  so offering a draft here would build an automation that always
+   *  reports a refusal. */
+  flows: FlowOption[]
 }
 
 interface PipelineOption {
+  id: string
+  name: string
+}
+
+interface FlowOption {
   id: string
   name: string
 }
@@ -231,6 +243,7 @@ const ResourcesContext = createContext<AutomationResources>({
   customFields: [],
   pipelines: [],
   stages: [],
+  flows: [],
 })
 
 function useResources(): AutomationResources {
@@ -244,6 +257,7 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [pipelines, setPipelines] = useState<PipelineOption[]>([])
   const [stages, setStages] = useState<PipelineStageOption[]>([])
+  const [flows, setFlows] = useState<FlowOption[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -254,7 +268,14 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
     // actually be sent (anything else 400s at send time), matching the
     // broadcast picker.
     void (async () => {
-      const [tagsRes, templatesRes, customFieldsRes, pipelinesRes, stagesRes] =
+      const [
+        tagsRes,
+        templatesRes,
+        customFieldsRes,
+        pipelinesRes,
+        stagesRes,
+        flowsRes,
+      ] =
         await Promise.all([
           supabase.from("tags").select("*").order("name"),
           supabase
@@ -268,6 +289,11 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
             .from("pipeline_stages")
             .select("id, name, pipeline_id, position")
             .order("position"),
+          supabase
+            .from("flows")
+            .select("id, name")
+            .eq("status", "active")
+            .order("name"),
         ])
       if (cancelled) return
       setTags((tagsRes.data as TagRecord[] | null) ?? [])
@@ -275,6 +301,7 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
       setCustomFields((customFieldsRes.data as CustomField[] | null) ?? [])
       setPipelines((pipelinesRes.data as PipelineOption[] | null) ?? [])
       setStages((stagesRes.data as PipelineStageOption[] | null) ?? [])
+      setFlows((flowsRes.data as FlowOption[] | null) ?? [])
     })()
 
     // Members go through the API so we inherit its email-visibility
@@ -298,7 +325,7 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
 
   return (
     <ResourcesContext.Provider
-      value={{ tags, members, templates, customFields, pipelines, stages }}
+      value={{ tags, members, templates, customFields, pipelines, stages, flows }}
     >
       {children}
     </ResourcesContext.Provider>
@@ -1480,6 +1507,21 @@ function StepEditor({
           </FieldBlock>
         </>
       )
+    case "start_flow":
+      return (
+        <>
+          <FieldBlock label={t("config.flowLabel")}>
+            <FlowSelect
+              value={(cfg.flow_id as string) ?? ""}
+              onChange={(v) => set({ flow_id: v })}
+              t={t}
+            />
+          </FieldBlock>
+          <p className="text-xs text-muted-foreground">
+            {t("config.startFlowHint")}
+          </p>
+        </>
+      )
     case "close_conversation":
       return (
         <p className="text-xs text-muted-foreground">
@@ -1489,6 +1531,56 @@ function StepEditor({
     default:
       return null
   }
+}
+
+/**
+ * Which flow the automation hands over to.
+ *
+ * Falls back to a raw id input when the account has no active flow, for
+ * the same reason every other picker here does: an automation must stay
+ * authorable on a fresh account. The hint below the field is the part
+ * that matters — an operator who does not know that only one flow runs
+ * per contact will build a bridge that quietly refuses.
+ */
+function FlowSelect({
+  value,
+  onChange,
+  t,
+}: {
+  value: string
+  onChange: (v: string) => void
+  t: ReturnType<typeof useTranslations>
+}) {
+  const { flows } = useResources()
+  if (flows.length === 0) {
+    return (
+      <Input
+        placeholder={t("config.flowPlaceholder")}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-muted text-foreground"
+      />
+    )
+  }
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={SELECT_CLASS}
+    >
+      <option value="">{t("config.flowSelect")}</option>
+      {flows.map((f) => (
+        <option key={f.id} value={f.id}>
+          {f.name}
+        </option>
+      ))}
+      {/* Keep a saved flow that has since been archived or deleted, so
+          editing an old automation does not silently blank the target. */}
+      {value && !flows.some((f) => f.id === value) && (
+        <option value={value}>{t("config.flowUnknown", { id: value })}</option>
+      )}
+    </select>
+  )
 }
 
 function FieldBlock({

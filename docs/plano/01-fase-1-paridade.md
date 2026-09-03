@@ -48,10 +48,22 @@ Duas consequências que justificam a fase sozinha:
 | Esperar (relógio) | ❌ | ❌ | ✅ |
 | **Consultar disponibilidade** | ✅ | ❌ | ❌ |
 | **Agendar / remarcar / cancelar** | ✅ | ❌ | ❌ |
-| **Iniciar fluxo** | ❌ | ❌ | ❌ |
-| Disparar automação | ❌ | ✅ (via tag) | ❌ |
+| **Iniciar fluxo** | ✅ | ❌ | ✅ |
+| Disparar automação | ✅ (via tag) | ✅ (via tag) | ✅ (via tag) |
 
 **Vinte e uma capacidades, e apenas quatro existem nos três motores.**
+
+> **Revisão de 03/09/2026, com R-1 e R-2 implementados.** Duas linhas mudaram, e
+> uma delas por correção e não por trabalho:
+>
+> - **Iniciar fluxo** passou a existir no agente de IA e na automação (R-1). No
+>   fluxo continua `❌` de propósito: um fluxo que inicia outro fluxo esbarraria
+>   no índice de um run ativo por contato, e a composição certa ali é a aresta
+>   entre nós, não um segundo run.
+> - **Disparar automação** já era `✅` nos três. Eu havia registrado que o
+>   `add_tag` da automação não despachava `tag_added`; ele despacha, com o mesmo
+>   teto de profundidade. O que R-2 encontrou não foi comportamento faltando, e
+>   sim a mesma lógica escrita duas vezes — ver o requisito.
 
 ---
 
@@ -99,7 +111,7 @@ Ordenados por dependência. `P` = 1–2 dias · `M` = 3–7 dias.
 
 ### Bloco A — A ponte
 
-#### R-1 · Iniciar fluxo a partir de automação e de IA — `P`
+#### R-1 · Iniciar fluxo a partir de automação e de IA — `P` — **feito**
 - **A1** Passo `iniciar_fluxo` na automação, com o fluxo alvo como parâmetro.
 - **A2** Ferramenta equivalente para o agente de IA.
 - **A3** Se já houver run ativo para o contato, **não** cria outro — o índice
@@ -112,11 +124,50 @@ Ordenados por dependência. `P` = 1–2 dias · `M` = 3–7 dias.
 > **Maior alavancagem da fase.** A automação já tem `contact_id` e
 > `conversation_id` — que é tudo que o runner precisa.
 
-#### R-2 · Simetria no disparo de tag — `P`
-- **B1** `add_tag` da automação passa a poder despachar `tag_added`, com a
-  proteção de profundidade que já existe.
-- **B2** Comportamento atual (não despachar) permanece o **padrão**, para não
-  mudar automações em produção. Despachar vira opção do passo.
+**Como ficou.** `startFlowRun` em `src/lib/flows/engine.ts` é a segunda entrada
+pública do motor, ao lado de `dispatchInboundToFlows`, e os dois motores são
+adaptadores finos por cima dela — traduzem a própria forma para
+`StartFlowRunInput` e traduzem a resposta de volta. Três decisões que valem
+registrar:
+
+- **Nunca lança.** Os dois chamadores são caminhos de fire-and-forget onde uma
+  exceção derrubaria uma execução de automação ou um turno do agente. Toda
+  falha volta como recusa **nomeada** — e `describeStartFlowRefusal` dá a
+  mesma frase para o log da automação e para o resultado da ferramenta, para
+  os dois não divergirem.
+- **Recusa não é falha de passo.** "O cliente já está em um fluxo" é o
+  resultado correto de uma automação bem construída cujo cliente está no meio
+  de um menu. Lançar marcaria a execução inteira como falha e mataria todos os
+  passos seguintes.
+- **A ferramenta do agente encerra o turno** (`yieldTurn`, novo em
+  `ToolOutcome`). O fluxo já mandou o primeiro nó; qualquer frase do agente por
+  cima vira uma segunda mensagem e o cliente responde a errada. É deliberadamente
+  distinto de `handoff`, que chama gente: aqui ninguém é chamado, e sem essa
+  distinção a resposta automática abriria uma transferência a cada fluxo
+  iniciado.
+- **A lista é a permissão.** O agente só enxerga fluxos **ativos com gatilho
+  `manual`** — mesma defesa da ferramenta de etiquetas. Fluxo com gatilho de
+  palavra-chave já tem quem o inicie, e deixá-lo na lista significaria que uma
+  frase do cliente, interpretada, dispara um roteiro por um caminho que ninguém
+  configurou.
+
+#### R-2 · Simetria no disparo de tag — **já existia**
+
+Verificado em `src/lib/automations/engine.ts`: o `add_tag` da automação chama
+`addContactTagIfAbsent` e **despacha `tag_added`** logo em seguida, com
+`MAX_TAG_CHAIN_DEPTH`. A assimetria que este requisito ia corrigir não existe
+mais — a `main` a fechou antes.
+
+**O que sobra é duplicação, não comportamento.** O motor de automações
+reimplementa `addContactTagAndDispatch` em vez de chamá-la, e as duas cópias
+concordam hoje por coincidência de manutenção. A causa é um ciclo de imports
+(`tag-events` → `automations/engine`), e desfazê-lo é mexer em caminho quente de
+produção para ganhar limpeza, não comportamento.
+
+- **B1** ~~passar a despachar~~ — feito na `main`.
+- **B2** Deduplicar as duas cópias fica registrado como dívida, **fora do bloco
+  A**: o risco de tocar nisso agora é maior que o de deixar, e um teste que
+  prove que os dois caminhos concordam vale mais do que a fusão.
 
 ### Bloco B — Agendamento nos três motores
 

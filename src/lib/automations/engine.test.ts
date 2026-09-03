@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
     logInserts: [] as Record<string, unknown>[],
     logUpdates: [] as Record<string, unknown>[],
   },
+  startFlowRun: vi.fn(),
 }));
 
 vi.mock("./admin-client", () => {
@@ -98,6 +99,18 @@ vi.mock("./admin-client", () => {
   };
 });
 
+vi.mock("@/lib/flows/engine", async () => {
+  // The refusal sentences are the shared vocabulary between this step's
+  // log detail and the agent's tool result — keep the real ones.
+  const actual = await vi.importActual<typeof import("@/lib/flows/engine")>(
+    "@/lib/flows/engine",
+  );
+  return {
+    describeStartFlowRefusal: actual.describeStartFlowRefusal,
+    startFlowRun: h.startFlowRun,
+  };
+});
+
 vi.mock("./meta-send", () => ({
   engineSendText: vi.fn(async () => ({ whatsapp_message_id: "m1" })),
   engineSendTemplate: vi.fn(async () => ({ whatsapp_message_id: "m1" })),
@@ -119,6 +132,12 @@ beforeEach(() => {
   h.state.upsertCalls = [];
   h.state.logInserts = [];
   h.state.logUpdates = [];
+  h.startFlowRun.mockReset();
+  h.startFlowRun.mockResolvedValue({
+    started: true,
+    flowRunId: "run-1",
+    outcome: "advanced",
+  });
 });
 
 describe("runAutomationsForTrigger — tenant isolation", () => {
@@ -448,5 +467,105 @@ describe("tag_added — conversation policy", () => {
       status: "failed",
       error_message: "tag_added automation cannot send: contact has no existing conversation",
     }));
+  });
+});
+
+// ------------------------------------------------------------
+// The bridge: an automation has no memory, so anything that must WAIT
+// for the customer belongs on the flow side of this step.
+// ------------------------------------------------------------
+
+function startFlowAutomation() {
+  return {
+    id: "a1",
+    account_id: ACCOUNT,
+    user_id: "u1",
+    trigger_type: "tag_added",
+    trigger_config: { tag_id: "tag-inadimplente" },
+    is_active: true,
+  };
+}
+
+function startFlowStep(config: Record<string, unknown> = {}) {
+  return {
+    id: "s1",
+    automation_id: "a1",
+    step_type: "start_flow",
+    position: 0,
+    parent_step_id: null,
+    step_config: { flow_id: "flow-cobranca", ...config },
+  };
+}
+
+async function runStartFlow(context: Record<string, unknown> = {}) {
+  h.state.owned = { id: "c1" };
+  h.state.automations = [startFlowAutomation()];
+  h.state.steps = [startFlowStep(context.step_config as Record<string, unknown>)];
+  await runAutomationsForTrigger({
+    accountId: ACCOUNT,
+    triggerType: "tag_added",
+    contactId: "c1",
+    context: {
+      tag_id: "tag-inadimplente",
+      conversation_id: "conv-1",
+      ...(context.context as Record<string, unknown>),
+    },
+  });
+}
+
+describe("start_flow step", () => {
+  it("hands the contact to the flow on the automation's own thread", async () => {
+    await runStartFlow();
+
+    expect(h.startFlowRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: ACCOUNT,
+        contactId: "c1",
+        flowId: "flow-cobranca",
+        startedBy: "automation",
+        conversationId: "conv-1",
+        chainDepth: 0,
+      }),
+    );
+  });
+
+  it("interpolates the vars it seeds into the run", async () => {
+    await runStartFlow({
+      step_config: { vars: { valor: "{{ vars.valor }}" } },
+      context: { vars: { valor: "80,00" } },
+    });
+
+    const seeded = h.startFlowRun.mock.calls[0][0].vars as Record<string, unknown>;
+    expect(seeded.valor).toBe("80,00");
+  });
+
+  // The counter crosses the bridge in the automation context, which is
+  // where the flow's own set_tag node put it. Without this, flow →
+  // tag → automation → flow has nothing counting the laps.
+  it("carries the chain depth across the bridge", async () => {
+    await runStartFlow({ context: { vars: { _flow_chain_depth: 2 } } });
+    expect(h.startFlowRun.mock.calls[0][0].chainDepth).toBe(2);
+  });
+
+  // A customer already mid-menu is the ordinary case, not a broken
+  // automation. Throwing would mark the whole run failed and stop every
+  // step after this one.
+  it("records a refusal without failing the run", async () => {
+    h.startFlowRun.mockResolvedValue({
+      started: false,
+      reason: "active_run_exists",
+      flowRunId: "run-old",
+    });
+
+    await runStartFlow();
+
+    expect(h.state.logUpdates).toContainEqual(
+      expect.objectContaining({ status: "success" }),
+    );
+    const steps = h.state.logUpdates
+      .map((u) => u.steps_executed)
+      .filter(Boolean)
+      .flat() as { detail?: string }[];
+    expect(JSON.stringify(steps)).toContain("already in a flow");
   });
 });

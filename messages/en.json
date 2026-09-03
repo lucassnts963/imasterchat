@@ -867,7 +867,8 @@
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
-        "close_conversation": "Close Conversation"
+        "close_conversation": "Close Conversation",
+        "start_flow": "Start Flow"
       },
       "triggers": {
         "new_message_received": {
@@ -1004,7 +1005,12 @@
         "matchType": "Match type",
         "matchContains": "Contains",
         "matchExact": "Exact",
-        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed.",
+        "flowLabel": "Flow",
+        "flowSelect": "Select a flow…",
+        "flowPlaceholder": "Flow ID",
+        "flowUnknown": "Unavailable flow ({id})",
+        "startFlowHint": "Hands the customer over to a flow, which can wait for an answer — an automation cannot. Only one flow runs per contact at a time; if the customer is already in one, this step is skipped and says so in the log."
       },
       "delete": "Delete"
     }

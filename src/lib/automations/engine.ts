@@ -17,6 +17,7 @@ import type {
   WaitStepConfig,
   CreateDealStepConfig,
   AssignConversationStepConfig,
+  StartFlowStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
 import { addContactTagIfAbsent } from '@/lib/contacts/tag-write'
@@ -24,6 +25,8 @@ import { MAX_TAG_CHAIN_DEPTH, getTagChainDepth } from '@/lib/contacts/tag-chain'
 import { engineSendText, engineSendTemplate, engineSendInteractive } from './meta-send'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
+import { describeStartFlowRefusal, startFlowRun } from '@/lib/flows/engine'
+import { getFlowChainDepth } from '@/lib/flows/chain'
 
 // ------------------------------------------------------------
 // Public API
@@ -617,6 +620,40 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       })
       if (!res.ok) throw new Error(`webhook returned ${res.status}`)
       return `webhook ${res.status}`
+    }
+
+    case 'start_flow': {
+      const cfg = step.step_config as StartFlowStepConfig
+      if (!args.contactId) throw new Error('start_flow needs a contact')
+      if (!cfg.flow_id) throw new Error('start_flow needs flow_id')
+
+      // The vars the flow will interpolate. The automation's own
+      // context goes in interpolated, so `{{ message.text }}` in the
+      // step config means what it means everywhere else here.
+      const seeded: Record<string, unknown> = { ...(args.context.vars ?? {}) }
+      for (const [k, v] of Object.entries(cfg.vars ?? {})) {
+        seeded[k] = interpolate(String(v), args)
+      }
+
+      const result = await startFlowRun({
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        flowId: cfg.flow_id,
+        startedBy: 'automation',
+        conversationId: args.context.conversation_id ?? null,
+        vars: seeded,
+        chainDepth: getFlowChainDepth(args.context.vars),
+      })
+
+      // A refusal is NOT a step failure. "The contact is already in a
+      // flow" is the correct outcome of a correctly-built automation
+      // whose customer happens to be mid-menu, and throwing would mark
+      // the whole run failed and stop every step after this one. It is
+      // recorded in the step detail, where the operator reads it.
+      if (!result.started) {
+        return `flow not started: ${describeStartFlowRefusal(result.reason)}`
+      }
+      return `flow started (run ${result.flowRunId})`
     }
 
     case 'close_conversation': {

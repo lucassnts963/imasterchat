@@ -40,6 +40,7 @@ import {
   engineSendText,
 } from "./meta-send";
 import { decideFallback, resolveFallbackPolicy } from "./fallback";
+import { MAX_FLOW_CHAIN_DEPTH } from "./chain";
 import { addContactTagAndDispatch } from "@/lib/contacts/tag-events";
 import { removeContactTag } from "@/lib/contacts/tag-write";
 import {
@@ -1083,9 +1084,60 @@ async function startNewRun(
   input: DispatchInboundInput,
   nodes: Map<string, FlowNodeRow>,
 ): Promise<DispatchInboundResult> {
+  const started = await insertRunAndAdvance(db, flow, nodes, {
+    contactId: input.contactId,
+    conversationId: input.conversationId,
+    startedPayload: {
+      flow_id: flow.id,
+      trigger_type: flow.trigger_type,
+      meta_message_id: input.message.meta_message_id,
+      started_by: "inbound",
+    },
+  });
+  if (!started.ok) {
+    return started.reason === "duplicate_run"
+      ? { consumed: true, outcome: "duplicate_inbound_ignored" }
+      : { consumed: false, outcome: "no_match" };
+  }
+  return {
+    consumed: true,
+    flow_run_id: started.run.id,
+    outcome: started.outcome === "advanced" ? "started" : started.outcome,
+  };
+}
+
+/**
+ * Create the run row and walk it forward. The one place a run is born,
+ * shared by the inbound path (`startNewRun`) and the bridge
+ * (`startFlowRun`) so the two can never drift on what a fresh run looks
+ * like — same tenancy fields, same counter bump, same first event.
+ *
+ * `vars` seeds the run: the bridge uses it to carry the chain depth and
+ * whatever context the caller wants interpolated into the nodes.
+ */
+async function insertRunAndAdvance(
+  db: AdminClient,
+  flow: FlowRow,
+  nodes: Map<string, FlowNodeRow>,
+  opts: {
+    contactId: string;
+    conversationId: string | null;
+    startedPayload: Record<string, unknown>;
+    vars?: Record<string, unknown>;
+  },
+): Promise<
+  | {
+      ok: true;
+      run: FlowRunRow;
+      outcome: "advanced" | "completed" | "handed_off";
+    }
+  | { ok: false; reason: "duplicate_run" | "insert_failed" }
+> {
   // INSERT — partial unique index `idx_one_active_run_per_contact`
-  // catches concurrent inserts with 23505. We catch and return as
-  // consumed:true (the parallel webhook handles it).
+  // catches concurrent inserts with 23505. We report it as a duplicate
+  // and let the caller decide what that means: for the webhook it is
+  // "the parallel delivery is handling it", for the bridge it is a
+  // refusal the operator needs to see.
   const { data: inserted, error: insErr } = await db
     .from("flow_runs")
     .insert({
@@ -1098,28 +1150,25 @@ async function startNewRun(
       // Audit: preserves the flow's author on the run row for log
       // attribution.
       user_id: flow.user_id,
-      contact_id: input.contactId,
-      conversation_id: input.conversationId,
+      contact_id: opts.contactId,
+      conversation_id: opts.conversationId,
       status: "active",
       current_node_key: flow.entry_node_id,
+      ...(opts.vars ? { vars: opts.vars } : {}),
     })
     .select("*")
     .maybeSingle();
   if (insErr) {
-    // 23505 = unique_violation → another webhook is starting the run.
+    // 23505 = unique_violation → this contact already has an active run.
     const msg = insErr.message ?? "";
     if (msg.includes("23505") || msg.includes("duplicate key")) {
-      return { consumed: true, outcome: "duplicate_inbound_ignored" };
+      return { ok: false, reason: "duplicate_run" };
     }
-    console.error("[flows] startNewRun insert error:", insErr.message);
-    return { consumed: false, outcome: "no_match" };
+    console.error("[flows] insertRunAndAdvance insert error:", insErr.message);
+    return { ok: false, reason: "insert_failed" };
   }
   const run = inserted as FlowRunRow;
-  await logEvent(db, run.id, "started", flow.entry_node_id, {
-    flow_id: flow.id,
-    trigger_type: flow.trigger_type,
-    meta_message_id: input.message.meta_message_id,
-  });
+  await logEvent(db, run.id, "started", flow.entry_node_id, opts.startedPayload);
   // Bump the flow's execution counter — used by the builder UI to
   // surface "X runs since activation" on the flow card.
   //
@@ -1138,9 +1187,236 @@ async function startNewRun(
 
   // Run the advance loop starting from the entry node.
   const outcome = await advanceFromNodeKey(db, run, flow.entry_node_id!, nodes);
-  return {
-    consumed: true,
-    flow_run_id: run.id,
-    outcome: outcome.outcome === "advanced" ? "started" : outcome.outcome,
-  };
+  return { ok: true, run, outcome: outcome.outcome };
+}
+
+// ============================================================
+// Second public entry point — the bridge.
+//
+// `dispatchInboundToFlows` starts a run because the CUSTOMER said
+// something. This starts one because something else in the system
+// decided to: an automation that just sent a cobrança template, the AI
+// agent handing a menu to the flow, an operator on the inbox.
+//
+// Why this belongs to the flow engine and not to the callers: every
+// rule about what a run IS lives here — one active run per contact, the
+// entry node, the counter, the first event. A caller that inserted its
+// own row would be a second definition of "a run", and the two would
+// drift. The callers stay adapters: they translate their own shape into
+// `StartFlowRunInput` and translate the result back into their own
+// vocabulary.
+//
+// It never throws. Both adapters are fire-and-forget paths where an
+// exception would take down an automation run or an agent turn, so
+// every failure comes back as a NAMED refusal instead. Silence is not
+// an option either: "the flow did not start and nobody said why" is the
+// bug this whole shape exists to prevent.
+// ============================================================
+
+/** Why a start was refused. Every one of these is reportable to a human. */
+export type StartFlowRefusal =
+  /** No such flow in this account. Also covers a flow in another
+   *  account: the caller must not learn that the id exists. */
+  | "flow_not_found"
+  | "flow_not_active"
+  | "flow_has_no_entry"
+  | "contact_not_in_account"
+  /** The contact is mid-flow. The existing run's id comes back with it. */
+  | "active_run_exists"
+  /** Nothing to talk on — the contact has never had a conversation. */
+  | "no_conversation"
+  | "max_chain_depth"
+  | "error";
+
+export interface StartFlowRunInput {
+  accountId: string;
+  contactId: string;
+  flowId: string;
+  /** Who asked. Recorded on the run's `started` event, which is the
+   *  only place anyone can later find out where a run came from. */
+  startedBy: "automation" | "agent" | "human" | "api";
+  /** The thread to talk on. Null resolves to the contact's most recent
+   *  conversation. */
+  conversationId?: string | null;
+  /** Seeded into `flow_runs.vars`, so the flow can interpolate what the
+   *  caller knew — the invoice amount, the due date. */
+  vars?: Record<string, unknown>;
+  /** Chain depth carried across the bridge. See `./chain.ts`. */
+  chainDepth?: number;
+}
+
+export type StartFlowRunResult =
+  | {
+      started: true;
+      flowRunId: string;
+      outcome: "advanced" | "completed" | "handed_off";
+    }
+  | {
+      started: false;
+      reason: StartFlowRefusal;
+      /** Present for `active_run_exists`. */
+      flowRunId?: string;
+      detail?: string;
+    };
+
+/** One sentence per refusal, so the automation log, the agent's tool
+ *  result and the inbox all say the same thing. */
+export function describeStartFlowRefusal(
+  reason: StartFlowRefusal,
+  flowName?: string,
+): string {
+  const which = flowName ? `"${flowName}"` : "that flow";
+  switch (reason) {
+    case "flow_not_found":
+      return `${which} does not exist in this account.`;
+    case "flow_not_active":
+      return `${which} is not active, so it cannot be started.`;
+    case "flow_has_no_entry":
+      return `${which} has no entry node — open it in the builder and connect the start.`;
+    case "contact_not_in_account":
+      return "That contact does not belong to this account.";
+    case "active_run_exists":
+      return "The contact is already in a flow; only one runs at a time.";
+    case "no_conversation":
+      return "The contact has no conversation yet, so there is nowhere to send the flow.";
+    case "max_chain_depth":
+      return "Too many flows started one another in a row; stopped to avoid a loop.";
+    case "error":
+      return "The flow could not be started.";
+  }
+}
+
+/**
+ * Find the thread to talk on. Newest first rather than `.maybeSingle()`:
+ * a contact with two conversation rows is a data state we have seen, and
+ * it must not turn the bridge into an error — the newest thread is the
+ * one the customer is actually looking at.
+ */
+async function resolveConversationForContact(
+  db: AdminClient,
+  accountId: string,
+  contactId: string,
+): Promise<string | null> {
+  const { data, error } = await db
+    .from("conversations")
+    .select("id")
+    .eq("account_id", accountId)
+    .eq("contact_id", contactId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(1);
+  if (error) {
+    console.error("[flows] resolveConversationForContact error:", error.message);
+    return null;
+  }
+  const rows = (data as { id: string }[] | null) ?? [];
+  return rows[0]?.id ?? null;
+}
+
+export async function startFlowRun(
+  input: StartFlowRunInput,
+): Promise<StartFlowRunResult> {
+  const db = supabaseAdmin();
+  try {
+    // Depth first: it is the cheapest check and the one whose whole
+    // point is to run before anything costs anything.
+    const depth = input.chainDepth ?? 0;
+    if (depth >= MAX_FLOW_CHAIN_DEPTH) {
+      console.warn("[flows] flow chain depth limit reached", {
+        accountId: input.accountId,
+        contactId: input.contactId,
+        flowId: input.flowId,
+        depth,
+      });
+      return { started: false, reason: "max_chain_depth" };
+    }
+
+    const flow = await loadFlow(db, input.flowId);
+    // Account mismatch is reported as "not found" on purpose: this runs
+    // on the service-role client, which bypasses RLS, so a caller
+    // probing ids must not be able to tell a foreign flow from a
+    // missing one.
+    if (!flow || flow.account_id !== input.accountId) {
+      return { started: false, reason: "flow_not_found" };
+    }
+    if (flow.status !== "active") {
+      return { started: false, reason: "flow_not_active" };
+    }
+    if (!flow.entry_node_id) {
+      return { started: false, reason: "flow_has_no_entry" };
+    }
+
+    // Same discipline as the automations engine: the service-role
+    // client bypasses RLS, so tenancy is checked here or nowhere.
+    const { data: contact, error: contactErr } = await db
+      .from("contacts")
+      .select("id")
+      .eq("id", input.contactId)
+      .eq("account_id", input.accountId)
+      .maybeSingle();
+    if (contactErr) {
+      console.error("[flows] contact ownership check failed:", contactErr.message);
+      return { started: false, reason: "error", detail: contactErr.message };
+    }
+    if (!contact) {
+      return { started: false, reason: "contact_not_in_account" };
+    }
+
+    // Checked before the INSERT so the refusal can name the run the
+    // contact is actually in. The partial unique index is still the
+    // authority — see the duplicate_run branch below for the race.
+    const active = await loadActiveRunForContact(
+      db,
+      input.accountId,
+      input.contactId,
+    );
+    if (active) {
+      return {
+        started: false,
+        reason: "active_run_exists",
+        flowRunId: active.id,
+      };
+    }
+
+    const conversationId =
+      input.conversationId ??
+      (await resolveConversationForContact(
+        db,
+        input.accountId,
+        input.contactId,
+      ));
+    if (!conversationId) {
+      return { started: false, reason: "no_conversation" };
+    }
+
+    const nodes = await loadAllNodes(db, flow.id);
+    const started = await insertRunAndAdvance(db, flow, nodes, {
+      contactId: input.contactId,
+      conversationId,
+      startedPayload: {
+        flow_id: flow.id,
+        trigger_type: flow.trigger_type,
+        started_by: input.startedBy,
+      },
+      vars: { ...(input.vars ?? {}), _flow_chain_depth: depth + 1 },
+    });
+
+    if (!started.ok) {
+      if (started.reason === "duplicate_run") {
+        // Lost the race with a concurrent start. Same answer as the
+        // check above, minus the run id we no longer have cheaply.
+        return { started: false, reason: "active_run_exists" };
+      }
+      return { started: false, reason: "error" };
+    }
+
+    return {
+      started: true,
+      flowRunId: started.run.id,
+      outcome: started.outcome,
+    };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[flows] startFlowRun threw:", detail);
+    return { started: false, reason: "error", detail };
+  }
 }

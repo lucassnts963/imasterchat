@@ -1106,7 +1106,8 @@
         "wait": "Espera",
         "condition": "Condição (Se/Senão)",
         "send_webhook": "Enviar webhook",
-        "close_conversation": "Fechar conversa"
+        "close_conversation": "Fechar conversa",
+        "start_flow": "Iniciar fluxo"
       },
       "triggers": {
         "new_message_received": {
@@ -1243,7 +1244,12 @@
         "matchType": "Tipo de correspondência",
         "matchContains": "Contém",
         "matchExact": "Exata",
-        "closeConversationHint": "Define o status da conversa como \"fechada\". Nenhuma configuração necessária."
+        "closeConversationHint": "Define o status da conversa como \"fechada\". Nenhuma configuração necessária.",
+        "flowLabel": "Fluxo",
+        "flowSelect": "Escolha um fluxo…",
+        "flowPlaceholder": "ID do fluxo",
+        "flowUnknown": "Fluxo indisponível ({id})",
+        "startFlowHint": "Entrega o cliente a um fluxo, que sabe esperar uma resposta — a automação não sabe. Só um fluxo roda por contato de cada vez; se o cliente já estiver em um, este passo é recusado e o motivo fica no histórico."
       },
       "delete": "Excluir"
     }

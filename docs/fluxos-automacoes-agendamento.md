@@ -84,18 +84,25 @@ disparam mesmo assim, porque são sobre *quem* mandou, não sobre *o que* disse.
 E o fallback `ignore` **de propósito não consome** — o comentário no código diz
 "let automations have a shot at it". É a válvula de escape.
 
-### 3.2 A ponte que já existe — e é de mão única
-
-Este é o achado:
+### 3.2 A ponte
 
 | Direção | Funciona? | Por quê |
 |---|---|---|
 | **Fluxo → automação** | **sim** | o `set_tag` do fluxo chama `addContactTagAndDispatch`, que **dispara os `tag_added`** |
-| Automação → automação | não | o `add_tag` da automação chama `addContactTagIfAbsent`, **sem dispatch** — proteção deliberada contra laço, junto com `MAX_TAG_CHAIN_DEPTH` |
-| **Automação → fluxo** | **não existe** | não há passo "iniciar fluxo", nem gatilho `tag_added` no fluxo |
+| **Automação → automação** | **sim** | o `add_tag` da automação também despacha `tag_added`, com o mesmo teto `MAX_TAG_CHAIN_DEPTH` |
+| **Automação → fluxo** | **sim** | passo `start_flow` (fase 1, R-1) |
+| **IA → fluxo** | **sim** | ferramenta `start_flow`, restrita a fluxos ativos com gatilho `manual` |
 
-Ou seja: **já dá para encadear fluxo → automação hoje, via tag.** Isso não está
-documentado em lugar nenhum e é a composição mais útil que o sistema tem.
+> **Duas correções ao que este documento dizia antes (03/09/2026).**
+>
+> 1. Eu havia registrado que a ponte era **de mão única** e que o `add_tag` da
+>    automação não despachava `tag_added`. Verificando o código: ele despacha,
+>    com proteção de profundidade — a `main` já tinha fechado essa assimetria.
+>    O que sobra ali não é falta de comportamento, é **duplicação**: o motor de
+>    automações reimplementa `addContactTagAndDispatch` em vez de chamá-la.
+> 2. "Automação → fluxo não existe" deixou de valer: `startFlowRun` é a segunda
+>    entrada pública do motor de fluxos, e o passo `start_flow` e a ferramenta
+>    homônima são os dois adaptadores em cima dela.
 
 ---
 

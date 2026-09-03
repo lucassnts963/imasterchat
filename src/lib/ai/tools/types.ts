@@ -50,6 +50,17 @@ export interface ToolOutcome {
    * not keep talking (a booking that half-succeeded, say).
    */
   handoff?: boolean
+  /**
+   * Stop the loop WITHOUT calling anyone: another part of the system is
+   * now driving the conversation. Set by `start_flow` — the flow has
+   * already sent its first message, so anything the agent adds arrives
+   * on top of it and confuses the reply.
+   *
+   * Separate from `handoff` because the two mean opposite things to the
+   * caller: handoff pauses the bot, assigns the thread and leaves a
+   * note; this leaves the thread exactly where it is.
+   */
+  yieldTurn?: boolean
 }
 
 /** A tool the agent loop can actually run. */

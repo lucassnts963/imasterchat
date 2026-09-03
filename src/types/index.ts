@@ -480,7 +480,11 @@ export type AutomationStepType =
   | 'wait'
   | 'condition'
   | 'send_webhook'
-  | 'close_conversation';
+  | 'close_conversation'
+  /** Hand the customer over to a flow — the bridge. An automation has
+   *  no memory, so anything that needs to WAIT for an answer belongs on
+   *  the other side of this step. */
+  | 'start_flow';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
 
@@ -585,6 +589,17 @@ export interface SendWebhookStepConfig {
   body_template?: string;
 }
 
+export interface StartFlowStepConfig {
+  /** Which flow to start. Must be active and in the same account. */
+  flow_id: string;
+  /**
+   * Extra variables seeded into the run, on top of the automation's own
+   * context. This is how a cobrança automation hands the amount and the
+   * due date to the menu that asks about them.
+   */
+  vars?: Record<string, string>;
+}
+
 export type AutomationStepConfig =
   | SendMessageStepConfig
   | SendButtonsStepConfig
@@ -597,6 +612,7 @@ export type AutomationStepConfig =
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
+  | StartFlowStepConfig
   | Record<string, never>
   | Record<string, unknown>;
 
