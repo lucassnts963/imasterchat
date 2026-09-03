@@ -296,6 +296,32 @@ export interface RouteToQueueNodeConfig {
   reason?: string;
 }
 
+/**
+ * Para o run e marca hora para voltar.
+ *
+ * É a única espera do fluxo que NÃO é esperar o cliente. Um nó que
+ * suspende aguardando resposta é acordado pela mensagem dele; este não
+ * tem quem o acorde, e por isso grava `flow_runs.resume_at` e depende do
+ * cron. Enquanto espera, o fluxo não escuta: uma mensagem que chegue
+ * nesse meio é do agente e das automações, não dele.
+ */
+export interface WaitNodeConfig {
+  amount: number;
+  unit: "minutes" | "hours" | "days";
+  next_node_key: string;
+}
+
+export interface SendWebhookNodeConfig {
+  url: string;
+  headers?: Record<string, string>;
+  /** Corpo enviado; interpola `{{vars.X}}`. Vazio manda as variáveis do
+   *  run como JSON. */
+  body_template?: string;
+  next_node_key: string;
+  /** Destino recusado, tempo esgotado, ou resposta de erro. */
+  on_error_next: string;
+}
+
 export interface SetTagNodeConfig {
   mode: "add" | "remove";
   /** Tag UUID. The builder picks from the user's existing tags. */
@@ -338,6 +364,8 @@ export type FlowNodeConfig =
       config: CloseConversationNodeConfig;
     }
   | { node_type: "route_to_queue"; config: RouteToQueueNodeConfig }
+  | { node_type: "wait"; config: WaitNodeConfig }
+  | { node_type: "send_webhook"; config: SendWebhookNodeConfig }
   | { node_type: "offer_slots"; config: OfferSlotsNodeConfig }
   | { node_type: "book_appointment"; config: BookAppointmentNodeConfig }
   | {
@@ -427,6 +455,9 @@ export interface FlowRunRow {
   last_prompt_message_id: string | null;
   vars: Record<string, unknown>;
   reprompt_count: number;
+  /** Quando o cron deve retomar um run parado num nó `wait`. Null para
+   *  todo o resto — inclusive para quem espera o cliente. */
+  resume_at?: string | null;
   started_at: string;
   last_advanced_at: string;
   ended_at: string | null;

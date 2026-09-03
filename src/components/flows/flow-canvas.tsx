@@ -706,6 +706,8 @@ const ADD_NODE_TYPES: NodeType[] = [
   'assign_conversation',
   'close_conversation',
   'route_to_queue',
+  'wait',
+  'send_webhook',
   'offer_slots',
   'book_appointment',
   'reschedule_appointment',

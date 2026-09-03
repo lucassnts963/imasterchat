@@ -20,6 +20,8 @@ import {
   Flag,
   GitFork,
   Inbox,
+  Hourglass,
+  Webhook,
   FileText,
   PencilLine,
   Users,
@@ -65,6 +67,8 @@ export type NodeType =
   | 'assign_conversation'
   | 'close_conversation'
   | 'route_to_queue'
+  | 'wait'
+  | 'send_webhook'
   | 'offer_slots'
   | 'book_appointment'
   | 'reschedule_appointment'
@@ -214,6 +218,20 @@ export const NODE_META: Record<
     blurb: 'Hands the conversation to a team and ends the run',
     category: 'flow',
   },
+  wait: {
+    label: 'Wait',
+    icon: Hourglass,
+    color: 'text-muted-foreground',
+    blurb: 'Pauses the run for a set time',
+    category: 'logic',
+  },
+  send_webhook: {
+    label: 'Call webhook',
+    icon: Webhook,
+    color: 'text-cyan-400',
+    blurb: 'Posts to a URL and branches on the result',
+    category: 'logic',
+  },
   offer_slots: {
     label: 'Offer times',
     icon: CalendarSearch,
@@ -303,6 +321,8 @@ const NODE_HUE: Record<NodeType, { l: number; c: number; h: number }> = {
   assign_conversation: { l: 0.65, c: 0.17, h: 16 }, // rosé — entrega a gente
   close_conversation: { l: 0.55, c: 0.01, h: 260 }, // neutro — encerra
   route_to_queue: { l: 0.65, c: 0.17, h: 16 },
+  wait: { l: 0.55, c: 0.01, h: 260 }, // neutro — não acontece nada
+  send_webhook: { l: 0.65, c: 0.12, h: 210 }, // céu — sai do sistema
   offer_slots: { l: 0.68, c: 0.13, h: 150 },
   book_appointment: { l: 0.62, c: 0.14, h: 150 },
   reschedule_appointment: { l: 0.62, c: 0.14, h: 150 },
@@ -437,6 +457,15 @@ export function summarizeNode(
     case 'route_to_queue': {
       const reason = typeof cfg.reason === 'string' ? cfg.reason : '';
       return reason ? truncate(reason, 50) : 'Encaminha e encerra o run';
+    }
+    case 'wait': {
+      const amount = typeof cfg.amount === 'number' ? cfg.amount : null;
+      const unit = typeof cfg.unit === 'string' ? cfg.unit : '';
+      return amount ? `${amount} ${unit}` : null;
+    }
+    case 'send_webhook': {
+      const url = typeof cfg.url === 'string' ? cfg.url : '';
+      return url ? truncate(url, 50) : null;
     }
     case 'offer_slots': {
       const max = typeof cfg.max_options === 'number' ? cfg.max_options : 5;

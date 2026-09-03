@@ -974,7 +974,17 @@
         "queueLabel": "Fila",
         "queuePlaceholder": "ID da fila",
         "routeReasonLabel": "Nota para quem for atender",
-        "routeToQueueHint": "O run TERMINA aqui — a conversa passa a ter dono, e um fluxo que continuasse falando por cima de uma pessoa é o pior desfecho possível."
+        "routeToQueueHint": "O run TERMINA aqui — a conversa passa a ter dono, e um fluxo que continuasse falando por cima de uma pessoa é o pior desfecho possível.",
+        "waitAmount": "Esperar",
+        "waitUnit": "Unidade",
+        "unitMinutes": "minutos",
+        "unitHours": "horas",
+        "unitDays": "dias",
+        "waitHint": "Enquanto espera, o fluxo não escuta — uma mensagem que chegue nesse meio é do agente e das automações, não dele.",
+        "webhookUrl": "URL",
+        "webhookBody": "Corpo (vazio manda as variáveis do run como JSON)",
+        "onWebhookOk": "Chamada deu certo →",
+        "onWebhookFailed": "Chamada falhou →"
       },
       "categories": {
         "messaging": "Mensagens",
@@ -1037,6 +1047,14 @@
         "route_to_queue": {
           "label": "Encaminhar para fila",
           "blurb": "Entrega a conversa a um time e encerra o run"
+        },
+        "wait": {
+          "label": "Esperar",
+          "blurb": "Para o run por um tempo"
+        },
+        "send_webhook": {
+          "label": "Chamar webhook",
+          "blurb": "Faz um POST numa URL e desvia pelo resultado"
         },
         "offer_slots": {
           "label": "Oferecer horários",

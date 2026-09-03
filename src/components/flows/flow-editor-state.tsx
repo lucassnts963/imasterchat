@@ -201,6 +201,15 @@ export function defaultConfigFor(type: NodeType): Record<string, unknown> {
       return { next_node_key: "" };
     case "route_to_queue":
       return { queue_id: "", reason: "" };
+    case "wait":
+      return { amount: 1, unit: "hours", next_node_key: "" };
+    case "send_webhook":
+      return {
+        url: "",
+        body_template: "",
+        next_node_key: "",
+        on_error_next: "",
+      };
     case "offer_slots":
       return {
         text: "Estes são os horários livres:",

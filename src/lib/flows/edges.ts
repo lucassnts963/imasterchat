@@ -56,6 +56,10 @@ interface NamedSlot {
 }
 
 const SCHEDULING_SLOTS: Record<string, NamedSlot[]> = {
+  send_webhook: [
+    { key: "next_node_key", handle: "next", label: "called" },
+    { key: "on_error_next", handle: "error", label: "call failed" },
+  ],
   offer_slots: [
     { key: "next_node_key", handle: "next", label: "chose a time" },
     { key: "no_slots_next", handle: "no_slots", label: "no times free" },
@@ -121,6 +125,7 @@ export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
       case "update_contact_field":
       case "create_deal":
       case "assign_conversation":
+      case "wait":
       case "close_conversation": {
         const next = (cfg as { next_node_key?: string }).next_node_key;
         if (next && knownKeys.has(next)) {
@@ -211,6 +216,7 @@ export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
         break;
       }
 
+      case "send_webhook":
       case "route_to_queue":
       case "handoff":
       case "end":
@@ -263,6 +269,7 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
     case "update_contact_field":
     case "create_deal":
     case "assign_conversation":
+    case "wait":
     case "close_conversation":
       return [{ id: "next", label: "Next" }];
 
@@ -319,6 +326,7 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
       // compilador continuar cobrando exaustividade dos outros.
       return [];
 
+    case "send_webhook":
     case "route_to_queue":
     case "handoff":
     case "end":
@@ -357,6 +365,7 @@ export function applyEdgeConnection(
     case "update_contact_field":
     case "create_deal":
     case "assign_conversation":
+    case "wait":
     case "close_conversation":
       if (sourceHandle === "next") return { next_node_key: targetKey };
       return null;
@@ -421,6 +430,7 @@ export function applyEdgeConnection(
     case "cancel_appointment":
       return null;
 
+    case "send_webhook":
     case "route_to_queue":
     case "handoff":
     case "end":
@@ -472,6 +482,7 @@ function patchedConfigWithoutKey(
     case "update_contact_field":
     case "create_deal":
     case "assign_conversation":
+    case "wait":
     case "close_conversation": {
       const next = (cfg as { next_node_key?: string }).next_node_key;
       if (next !== deletedKey) return null;
@@ -536,6 +547,7 @@ function patchedConfigWithoutKey(
     case "cancel_appointment":
       return null;
 
+    case "send_webhook":
     case "route_to_queue":
     case "handoff":
     case "end":

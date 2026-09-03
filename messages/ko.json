@@ -1216,7 +1216,17 @@
         "queueLabel": "대기열",
         "queuePlaceholder": "대기열 ID",
         "routeReasonLabel": "담당자를 위한 메모",
-        "routeToQueueHint": "여기서 실행이 끝납니다 — 대화에 담당자가 생겼고, 사람이 응대하는 위로 플로우가 계속 말하는 것이 최악입니다."
+        "routeToQueueHint": "여기서 실행이 끝납니다 — 대화에 담당자가 생겼고, 사람이 응대하는 위로 플로우가 계속 말하는 것이 최악입니다.",
+        "waitAmount": "대기",
+        "waitUnit": "단위",
+        "unitMinutes": "분",
+        "unitHours": "시간",
+        "unitDays": "일",
+        "waitHint": "대기 중에는 플로우가 듣지 않습니다 — 그 사이 도착한 메시지는 에이전트와 자동화가 처리합니다.",
+        "webhookUrl": "URL",
+        "webhookBody": "본문 (비우면 실행 변수를 JSON으로 보냅니다)",
+        "onWebhookOk": "호출 성공 →",
+        "onWebhookFailed": "호출 실패 →"
       },
       "categories": {
         "messaging": "메시징",
@@ -1279,6 +1289,14 @@
         "route_to_queue": {
           "label": "대기열로 전달",
           "blurb": "팀에 넘기고 실행을 종료합니다"
+        },
+        "wait": {
+          "label": "대기",
+          "blurb": "정해진 시간 동안 실행을 멈춥니다"
+        },
+        "send_webhook": {
+          "label": "웹훅 호출",
+          "blurb": "URL로 POST하고 결과에 따라 분기합니다"
         },
         "offer_slots": {
           "label": "시간 제안",

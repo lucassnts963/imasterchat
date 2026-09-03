@@ -605,6 +605,8 @@ function AddNodeButton({ onAdd, t }: { onAdd: (type: NodeType) => void; t: Retur
     'assign_conversation',
     'close_conversation',
     'route_to_queue',
+    'wait',
+    'send_webhook',
     'offer_slots',
     'book_appointment',
     'reschedule_appointment',

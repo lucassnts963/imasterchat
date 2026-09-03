@@ -283,6 +283,94 @@ export function NodeConfigForm({
         />
       );
 
+    case "wait":
+      return (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t("waitAmount")}
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={(cfg as { amount?: number }).amount ?? 1}
+                onChange={(e) =>
+                  onUpdateConfig({ amount: Math.max(1, Number(e.target.value)) })
+                }
+                className="bg-muted text-xs"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t("waitUnit")}
+              </label>
+              <Select
+                value={(cfg as { unit?: string }).unit ?? "hours"}
+                onValueChange={(v) => onUpdateConfig({ unit: v ?? "hours" })}
+              >
+                <SelectTrigger className="bg-muted">
+                  <SelectValue>
+                    {labelOf({
+                      minutes: t("unitMinutes"),
+                      hours: t("unitHours"),
+                      days: t("unitDays"),
+                    })((cfg as { unit?: string }).unit ?? "hours")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minutes">{t("unitMinutes")}</SelectItem>
+                  <SelectItem value="hours">{t("unitHours")}</SelectItem>
+                  <SelectItem value="days">{t("unitDays")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <NextNodeRow
+            value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onChange={(v) => onUpdateConfig({ next_node_key: v })}
+            label={t("advancesTo")}
+          />
+          <p className="text-xs text-muted-foreground">{t("waitHint")}</p>
+        </>
+      );
+
+    case "send_webhook":
+      return (
+        <>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">
+              {t("webhookUrl")}
+            </label>
+            <Input
+              value={(cfg as { url?: string }).url ?? ""}
+              onChange={(e) => onUpdateConfig({ url: e.target.value })}
+              placeholder="https://…"
+              className="bg-muted font-mono text-xs"
+            />
+          </div>
+          <TextRow
+            label={t("webhookBody")}
+            value={(cfg as { body_template?: string }).body_template ?? ""}
+            onChange={(v) => onUpdateConfig({ body_template: v })}
+            rows={3}
+          />
+          <SchedulingEdges
+            cfg={cfg as Record<string, string | undefined>}
+            keys={[
+              ["next_node_key", "onWebhookOk"],
+              ["on_error_next", "onWebhookFailed"],
+            ]}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onUpdateConfig={onUpdateConfig}
+            t={t}
+          />
+        </>
+      );
+
     case "route_to_queue":
       return (
         <RouteToQueueForm

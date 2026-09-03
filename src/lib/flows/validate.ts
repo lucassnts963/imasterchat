@@ -796,6 +796,70 @@ function validateNode(
       validateSingleNext(node, knownKeys, issues, "Close-conversation");
       break;
 
+    case "wait": {
+      const cfg = node.config as { amount?: number; unit?: string };
+      if (
+        typeof cfg.amount !== "number" ||
+        !Number.isFinite(cfg.amount) ||
+        cfg.amount <= 0
+      ) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "amount",
+          message: "Wait amount must be greater than 0.",
+        });
+      }
+      if (!["minutes", "hours", "days"].includes(String(cfg.unit))) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "unit",
+          message: "Wait unit must be minutes, hours, or days.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Wait");
+      break;
+    }
+
+    case "send_webhook": {
+      const cfg = node.config as { url?: string };
+      if (!cfg.url?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "url",
+          message: "Webhook needs a URL.",
+        });
+      } else {
+        try {
+          const parsed = new URL(cfg.url);
+          if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            issues.push({
+              severity: "error",
+              scope: "node",
+              node_key: node.node_key,
+              field: "url",
+              message: "Webhook URL must use http or https.",
+            });
+          }
+        } catch {
+          issues.push({
+            severity: "error",
+            scope: "node",
+            node_key: node.node_key,
+            field: "url",
+            message: "Webhook URL is not a valid URL.",
+          });
+        }
+      }
+      validateSchedulingEdges(node, knownKeys, issues);
+      break;
+    }
+
     case "route_to_queue": {
       const cfg = node.config as { queue_id?: string };
       if (!cfg.queue_id) {
@@ -916,10 +980,15 @@ function outgoingEdges(node: NodeInput): string[] {
     case "update_contact_field":
     case "create_deal":
     case "assign_conversation":
-    case "close_conversation": {
+    case "close_conversation":
+    case "wait": {
       const cfg = node.config as { next_node_key?: string };
       return cfg.next_node_key ? [cfg.next_node_key] : [];
     }
+    case "send_webhook":
+      return schedulingEdgeKeys("send_webhook")
+        .map((key) => (node.config as Record<string, unknown>)[key])
+        .filter((k): k is string => typeof k === "string" && k.length > 0);
     case "condition": {
       const cfg = node.config as {
         true_next?: string;
@@ -976,6 +1045,10 @@ function outgoingEdges(node: NodeInput): string[] {
 // ============================================================
 
 const SCHEDULING_EDGE_KEYS: Record<string, string[]> = {
+  // O webhook usa a mesma máquina de arestas nomeadas: uma saída boa e
+  // uma de erro, ambas obrigatórias. Um webhook que falha sem destino
+  // deixaria o run morto no meio.
+  send_webhook: ["next_node_key", "on_error_next"],
   offer_slots: ["next_node_key", "no_slots_next", "on_error_next"],
   book_appointment: [
     "next_node_key",

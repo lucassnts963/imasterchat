@@ -44,8 +44,8 @@ Duas consequências que justificam a fase sozinha:
 | Encerrar conversa | ❌ | ✅ | ✅ |
 | Passar para humano | ✅ | ✅ | ✅ |
 | **Rotear para fila** | ✅ | ✅ | ✅ |
-| Webhook de saída | ❌ | ❌ | ✅ |
-| Esperar (relógio) | ❌ | ❌ | ✅ |
+| Webhook de saída | ❌ | ✅ | ✅ |
+| Esperar (relógio) | ➖ | ✅ | ✅ |
 | **Consultar disponibilidade** | ✅ | ✅ | ➖ |
 | **Agendar / remarcar / cancelar** | ✅ | ✅ | ✅ |
 | **Iniciar fluxo** | ✅ | ❌ | ✅ |
@@ -268,9 +268,28 @@ O envio de template mora em `automations/meta-send` e é usado pelos dois, do
 mesmo jeito que o envio interativo mora em `flows/meta-send` e é usado lá. Uma
 implementação por formato de envio, dois motores — que já era o padrão da casa.
 
-#### R-9 · Espera e webhook no fluxo — `P`
+#### R-9 · Espera e webhook no fluxo — `P` — **feito**
 - **I1** Nó `esperar` (relógio), distinto de suspender aguardando resposta.
 - **I2** Nó `chamar_webhook`.
+
+**Como ficou.** A espera é a única coisa desta fase que precisou de estado
+novo. Todo o resto que o fluxo aprendeu acontece dentro de um percurso do laço;
+um `wait` não — ele para e precisa de quem o traga de volta.
+
+- **`flow_runs.resume_at`** (migração 078) marca a hora, e o cron do fluxo ganha
+  um primeiro passo que retoma quem venceu. A limpeza de `resume_at` **é a
+  trava**: feita com a precondição de que ela ainda esteja preenchida, duas
+  varreduras simultâneas não avançam o mesmo run duas vezes.
+- **A varredura de abandono passa a pular quem tem hora marcada.** Sem isso um
+  degrau de "espera 3 dias" seria varrido em 24 horas, e a régua de cobrança
+  pararia sozinha no segundo degrau.
+- **Dormir não é esperar o cliente.** Uma mensagem que chega durante um `wait`
+  volta como `consumed: false`, e o agente e as automações a atendem. Tratá-la
+  como resposta faria a política de fallback repromptar ou transferir por causa
+  de uma frase que não foi dirigida ao fluxo.
+- O nó de webhook usa a **mesma guarda de SSRF** da automação e da entrega de
+  webhooks, com `redirect: "manual"` — uma URL pública que responde 302 para um
+  endereço interno derrotaria a checagem.
 
 ---
 

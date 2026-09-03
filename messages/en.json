@@ -1216,7 +1216,17 @@
         "queueLabel": "Queue",
         "queuePlaceholder": "Queue ID",
         "routeReasonLabel": "Note for whoever picks it up",
-        "routeToQueueHint": "The run ENDS here — the conversation now has an owner, and a flow that kept talking over a person is the worst outcome there is."
+        "routeToQueueHint": "The run ENDS here — the conversation now has an owner, and a flow that kept talking over a person is the worst outcome there is.",
+        "waitAmount": "Wait",
+        "waitUnit": "Unit",
+        "unitMinutes": "minutes",
+        "unitHours": "hours",
+        "unitDays": "days",
+        "waitHint": "The flow stops listening while it waits — a message that arrives meanwhile goes to the agent and the automations, not here.",
+        "webhookUrl": "URL",
+        "webhookBody": "Body (empty sends the run variables as JSON)",
+        "onWebhookOk": "Call succeeded →",
+        "onWebhookFailed": "Call failed →"
       },
       "categories": {
         "messaging": "Messaging",
@@ -1279,6 +1289,14 @@
         "route_to_queue": {
           "label": "Route to queue",
           "blurb": "Hands the conversation to a team and ends the run"
+        },
+        "wait": {
+          "label": "Wait",
+          "blurb": "Pauses the run for a set time"
+        },
+        "send_webhook": {
+          "label": "Call webhook",
+          "blurb": "Posts to a URL and branches on the result"
         },
         "offer_slots": {
           "label": "Offer times",

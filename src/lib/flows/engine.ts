@@ -50,6 +50,7 @@ import {
 } from "@/lib/actions/crm";
 import { loadQueue, routeConversationToQueue } from "@/lib/actions/queue-routing";
 import { templateParams } from "@/lib/whatsapp/template-params";
+import { isDeliverableUrl } from "@/lib/webhooks/ssrf";
 // O template mora no módulo de automações e é usado pelos dois, do mesmo
 // jeito que o envio interativo mora aqui e é usado lá — uma
 // implementação por formato de envio, dois motores.
@@ -91,6 +92,8 @@ import {
   type AssignConversationNodeConfig,
   type CloseConversationNodeConfig,
   type RouteToQueueNodeConfig,
+  type WaitNodeConfig,
+  type SendWebhookNodeConfig,
   type OfferSlotsNodeConfig,
   type BookAppointmentNodeConfig,
   type RescheduleAppointmentNodeConfig,
@@ -163,6 +166,7 @@ export function isAutoAdvancing(node_type: string): boolean {
     node_type === "create_deal" ||
     node_type === "assign_conversation" ||
     node_type === "close_conversation" ||
+    node_type === "send_webhook" ||
     node_type === "book_appointment" ||
     node_type === "reschedule_appointment" ||
     node_type === "cancel_appointment"
@@ -177,6 +181,17 @@ export function isSuspending(node_type: string): boolean {
     node_type === "collect_input" ||
     node_type === "offer_slots"
   );
+}
+
+/**
+ * Nós que param o run sem esperar o cliente.
+ *
+ * A distinção importa em dois lugares: a varredura de abandono não pode
+ * matar quem está legitimamente dormindo, e uma mensagem que chegue
+ * durante a espera não é resposta a nada — o fluxo não está escutando.
+ */
+export function isSleeping(node_type: string): boolean {
+  return node_type === "wait";
 }
 
 /** Nodes that end the run. */
@@ -604,6 +619,61 @@ async function endRun(
       end_reason: reason,
     })
     .eq("id", runId);
+}
+
+/** Quanto tempo um nó `wait` dorme, com piso de um segundo. */
+function waitMs(cfg: WaitNodeConfig): number {
+  const unitMs =
+    cfg.unit === "days" ? 86_400_000 : cfg.unit === "hours" ? 3_600_000 : 60_000;
+  const amount = Number.isFinite(cfg.amount) ? cfg.amount : 1;
+  return Math.max(1_000, amount * unitMs);
+}
+
+/**
+ * Chama a URL configurada. Devolve `true` quando falhou.
+ *
+ * A guarda de SSRF é a mesma da automação e da entrega de webhooks: a
+ * URL e os cabeçalhos são escritos por quem configura, e quem faz a
+ * requisição é o servidor — sem isto, um fluxo alcança qualquer coisa
+ * dentro da rede. `redirect: "manual"` fecha o outro lado da mesma
+ * porta: uma URL pública que responde 302 para um endereço interno
+ * derrotaria a checagem.
+ */
+async function callWebhook(
+  db: AdminClient,
+  run: FlowRunRow,
+  node: FlowNodeRow,
+  cfg: SendWebhookNodeConfig,
+): Promise<boolean> {
+  try {
+    if (!cfg.url || !(await isDeliverableUrl(cfg.url))) {
+      await logEvent(db, run.id, "error", node.node_key, {
+        reason: "webhook_destination_not_allowed",
+      });
+      return true;
+    }
+    const body = cfg.body_template
+      ? interpolateVars(cfg.body_template, run.vars)
+      : JSON.stringify(run.vars);
+    const res = await fetch(cfg.url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(cfg.headers ?? {}) },
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+    await logEvent(db, run.id, "node_entered", node.node_key, {
+      node_type: "send_webhook",
+      status: res.status,
+    });
+    return !res.ok;
+  } catch (err) {
+    await logEvent(db, run.id, "error", node.node_key, {
+      reason: "webhook_failed",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+    return true;
+  }
 }
 
 // ============================================================
@@ -1119,6 +1189,39 @@ async function advanceFromNodeKey(
       await endRun(db, run.id, "handed_off", "routed_to_queue");
       return { outcome: "handed_off" };
     }
+    if (node.node_type === "wait") {
+      const cfg = node.config as unknown as WaitNodeConfig;
+      const resumeAt = new Date(Date.now() + waitMs(cfg));
+      // Grava o ponteiro e a hora de voltar numa escrita só. O UPDATE
+      // otimista é o mesmo dos nós que esperam o cliente: se outro
+      // webhook já moveu o run, esta escrita não pega e nós saímos.
+      const { data: parked } = await db
+        .from("flow_runs")
+        .update({
+          current_node_key: node.node_key,
+          resume_at: resumeAt.toISOString(),
+          last_advanced_at: new Date().toISOString(),
+        })
+        .eq("id", run.id)
+        .eq("status", "active")
+        .select("id");
+      if (!Array.isArray(parked) || parked.length === 0) {
+        return { outcome: "advanced" };
+      }
+      run.current_node_key = node.node_key;
+      run.resume_at = resumeAt.toISOString();
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "wait",
+        resume_at: resumeAt.toISOString(),
+      });
+      return { outcome: "advanced" };
+    }
+    if (node.node_type === "send_webhook") {
+      const cfg = node.config as unknown as SendWebhookNodeConfig;
+      const failed = await callWebhook(db, run, node, cfg);
+      currentKey = failed ? cfg.on_error_next : cfg.next_node_key;
+      continue;
+    }
     if (node.node_type === "offer_slots") {
       const outcome = await offerSlots(
         db,
@@ -1421,6 +1524,15 @@ async function handleReplyForActiveRun(
   if (!currentNode) {
     await endRun(db, run.id, "failed", "current_node_not_found");
     return { consumed: true, flow_run_id: run.id, outcome: "no_match" };
+  }
+
+  // Parado num `wait`: o fluxo não está escutando, e a mensagem não é
+  // resposta a nada. Devolver `consumed: false` deixa o agente e as
+  // automações atenderem — o contrário faria a política de fallback
+  // reprompt ou transferir por causa de uma frase que não foi dirigida
+  // ao fluxo.
+  if (isSleeping(currentNode.node_type)) {
+    return { consumed: false, flow_run_id: run.id, outcome: "no_match" };
   }
 
   // Two ways a reply can advance:
@@ -1928,5 +2040,97 @@ export async function startFlowRun(
     const detail = err instanceof Error ? err.message : String(err);
     console.error("[flows] startFlowRun threw:", detail);
     return { started: false, reason: "error", detail };
+  }
+}
+
+// ============================================================
+// Terceira entrada pública — o relógio.
+//
+// `dispatchInboundToFlows` acorda um run porque o cliente falou;
+// `startFlowRun` cria um porque o sistema decidiu. Esta acorda um que
+// marcou hora consigo mesmo, e só o cron a chama.
+// ============================================================
+
+export interface DueRun {
+  id: string
+  flow_id: string
+  current_node_key: string | null
+}
+
+/**
+ * Runs cuja hora de voltar já passou.
+ *
+ * Limite explícito: uma varredura que tenta acordar dez mil runs numa
+ * requisição estoura antes de acordar o primeiro. O cron roda de novo
+ * em minutos, então uma fila que não coube nesta rodada não se perde —
+ * só espera a próxima.
+ */
+export async function loadDueRuns(limit = 200): Promise<DueRun[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("flow_runs")
+    .select("id, flow_id, current_node_key")
+    .eq("status", "active")
+    .not("resume_at", "is", null)
+    .lte("resume_at", new Date().toISOString())
+    .order("resume_at", { ascending: true })
+    .limit(limit);
+  if (error) {
+    console.error("[flows] loadDueRuns error:", error.message);
+    return [];
+  }
+  return (data as DueRun[] | null) ?? [];
+}
+
+export type ResumeOutcome =
+  | "resumed"
+  | "already_taken"
+  | "not_waiting"
+  | "error";
+
+/**
+ * Retoma um run parado num `wait`.
+ *
+ * A limpeza de `resume_at` é a TRAVA: é feita com a precondição de que
+ * ela ainda esteja preenchida, então duas execuções simultâneas do cron
+ * não avançam o mesmo run duas vezes. Quem perder a corrida recebe zero
+ * linhas e sai — que é o mesmo protocolo do `advanceCurrentNodeKey`.
+ */
+export async function resumeWaitingRun(runId: string): Promise<ResumeOutcome> {
+  const db = supabaseAdmin();
+  try {
+    const { data: claimed, error: claimErr } = await db
+      .from("flow_runs")
+      .update({ resume_at: null, last_advanced_at: new Date().toISOString() })
+      .eq("id", runId)
+      .eq("status", "active")
+      .not("resume_at", "is", null)
+      .select("*");
+    if (claimErr) {
+      console.error("[flows] resumeWaitingRun claim error:", claimErr.message);
+      return "error";
+    }
+    const rows = (claimed as FlowRunRow[] | null) ?? [];
+    if (rows.length === 0) return "already_taken";
+    const run = rows[0];
+
+    const nodes = await loadAllNodes(db, run.flow_id);
+    const node = run.current_node_key ? nodes.get(run.current_node_key) : null;
+    if (!node || node.node_type !== "wait") {
+      // O run mudou de nó entre a leitura e agora, ou o fluxo foi
+      // reescrito e o nó sumiu. Não é erro: o `resume_at` já foi
+      // limpo, e o run segue a vida por onde estiver.
+      return "not_waiting";
+    }
+
+    const cfg = node.config as unknown as WaitNodeConfig;
+    await advanceFromNodeKey(db, run, cfg.next_node_key, nodes);
+    return "resumed";
+  } catch (err) {
+    console.error(
+      "[flows] resumeWaitingRun threw:",
+      err instanceof Error ? err.message : err,
+    );
+    return "error";
   }
 }

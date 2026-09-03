@@ -410,3 +410,66 @@ início → Oferecer horários ─── escolheu ──→ Agendar ─── ag
   **Fazer:** conversa em que a IA decide encaminhar.
   **Esperar:** igual a antes. A ferramenta passou a chamar
   `src/lib/actions/queue-routing.ts`.
+
+---
+
+## Bloco C (continuação) — espera e webhook no fluxo (R-9)
+
+**Preparação adicional**
+
+- [ ] `bash deploy/apply-migrations.sh` — a **078** precisa ter aplicado
+      (`flow_runs.resume_at`).
+- [ ] O **cron do fluxo** rodando. Sem ele nada do que está abaixo volta.
+      Confira `docker compose logs cron` como na Fase 0 do checklist de produção.
+- [ ] Uma URL de teste que aceite POST e que você consiga inspecionar
+      (webhook.site ou equivalente).
+
+- [ ] **⚡ 🔴 O fluxo espera e volta**
+  **Fazer:** fluxo: mensagem "vou verificar" → **Esperar 2 minutos** → mensagem
+  "obrigado por aguardar". Disparar.
+  **Esperar:** a primeira mensagem chega na hora; a segunda chega depois de
+  ~2 minutos **mais** o intervalo do cron.
+  **Onde olhar se falhar:** a resposta de `/api/flows/cron` traz `resumed`.
+
+- [ ] **⚡ Uma espera longa NÃO é varrida como abandono**
+  **Fazer:** fluxo com **Esperar 2 dias**. Disparar e deixar passar mais de 24h
+  (ou baixar `on_timeout_hours` do fluxo para 1 e esperar uma hora).
+  **Esperar:** o run continua `active`, com `resume_at` no futuro.
+  **Não pode:** virar `timed_out`. Sem esta guarda, um degrau de régua de
+  "espera 3 dias" morre no segundo degrau — e ninguém vê, porque a régua
+  simplesmente para.
+
+- [ ] **Mensagem durante a espera vai para o agente, não para o fluxo**
+  **Fazer:** com o run parado num **Esperar**, mandar uma mensagem do celular.
+  **Esperar:** o agente de IA (ou as automações) respondem normalmente. O fluxo
+  **não** reprompta nem transfere, e o run continua parado.
+  **Por que assim:** o fluxo não está escutando. Tratar aquilo como resposta
+  faria o fallback disparar por causa de uma frase que não foi dirigida a ele.
+
+- [ ] **❓ Duas voltas do cron não mandam a mensagem duas vezes**
+  **Fazer:** disparar `/api/flows/cron` duas vezes seguidas, rápido, com um run
+  vencido.
+  **Esperar:** **uma** mensagem. A segunda chamada devolve `resumed: 0`.
+
+- [ ] **⚡ O webhook é chamado e o fluxo desvia pelo resultado**
+  **Fazer:** nó **Chamar webhook** para a URL de teste, com as duas saídas
+  ligadas a mensagens diferentes.
+  **Esperar:** o POST chega com as variáveis do run em JSON, e o fluxo segue
+  pela saída de sucesso.
+
+- [ ] **🔴 Resposta de erro segue a outra saída**
+  **Fazer:** apontar para uma URL que devolva 500.
+  **Esperar:** o fluxo segue pela saída de falha.
+
+- [ ] **⚡ Endereço interno é recusado**
+  **Fazer:** apontar o nó para `http://127.0.0.1:3000/` ou `http://169.254.169.254/`.
+  **Esperar:** **nenhuma** requisição sai; o run segue pela saída de falha, com
+  `webhook_destination_not_allowed` nos eventos.
+  **Por que importa:** a URL é escrita por quem configura e quem faz a
+  requisição é o servidor. Sem a guarda, um fluxo alcança qualquer coisa dentro
+  da rede — incluindo o metadata do provedor de nuvem.
+
+- [ ] **O validador exige as duas saídas do webhook**
+  **Fazer:** adicionar o nó e tentar ativar sem ligar a saída de falha.
+  **Esperar:** o painel de validação acusa. Um webhook que falha sem destino
+  deixa o run morto no meio.
