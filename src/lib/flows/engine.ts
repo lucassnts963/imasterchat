@@ -40,7 +40,37 @@ import {
   engineSendText,
 } from "./meta-send";
 import { decideFallback, resolveFallbackPolicy } from "./fallback";
+import { MAX_FLOW_CHAIN_DEPTH } from "./chain";
 import { addContactTagAndDispatch } from "@/lib/contacts/tag-events";
+import {
+  assignConversation,
+  closeConversation,
+  createDeal,
+  updateContactField,
+} from "@/lib/actions/crm";
+import { loadQueue, routeConversationToQueue } from "@/lib/actions/queue-routing";
+import { templateParams } from "@/lib/whatsapp/template-params";
+import { isDeliverableUrl } from "@/lib/webhooks/ssrf";
+// O template mora no módulo de automações e é usado pelos dois, do mesmo
+// jeito que o envio interativo mora aqui e é usado lá — uma
+// implementação por formato de envio, dois motores.
+import { engineSendTemplate } from "@/lib/automations/meta-send";
+import {
+  bookForContact,
+  cancelForContact,
+  listAvailability,
+  rescheduleForContact,
+  resolveSchedulingContext,
+  type SchedulingContext,
+  type SchedulingFailure,
+} from "@/lib/actions/scheduling";
+import {
+  parseSlotReplyId,
+  readOfferedSlots,
+  slotOptionDescription,
+  slotOptionTitle,
+  slotReplyId,
+} from "@/lib/scheduling/slot-option";
 import { removeContactTag } from "@/lib/contacts/tag-write";
 import {
   type CollectInputNodeConfig,
@@ -56,6 +86,18 @@ import {
   type SendMediaNodeConfig,
   type SendMessageNodeConfig,
   type SetTagNodeConfig,
+  type SendTemplateNodeConfig,
+  type UpdateContactFieldNodeConfig,
+  type CreateDealNodeConfig,
+  type AssignConversationNodeConfig,
+  type CloseConversationNodeConfig,
+  type RouteToQueueNodeConfig,
+  type WaitNodeConfig,
+  type SendWebhookNodeConfig,
+  type OfferSlotsNodeConfig,
+  type BookAppointmentNodeConfig,
+  type RescheduleAppointmentNodeConfig,
+  type CancelAppointmentNodeConfig,
   type StartNodeConfig,
   type KeywordTriggerConfig,
 } from "./types";
@@ -118,7 +160,16 @@ export function isAutoAdvancing(node_type: string): boolean {
     node_type === "send_message" ||
     node_type === "send_media" ||
     node_type === "condition" ||
-    node_type === "set_tag"
+    node_type === "set_tag" ||
+    node_type === "send_template" ||
+    node_type === "update_contact_field" ||
+    node_type === "create_deal" ||
+    node_type === "assign_conversation" ||
+    node_type === "close_conversation" ||
+    node_type === "send_webhook" ||
+    node_type === "book_appointment" ||
+    node_type === "reschedule_appointment" ||
+    node_type === "cancel_appointment"
   );
 }
 
@@ -127,13 +178,29 @@ export function isSuspending(node_type: string): boolean {
   return (
     node_type === "send_buttons" ||
     node_type === "send_list" ||
-    node_type === "collect_input"
+    node_type === "collect_input" ||
+    node_type === "offer_slots"
   );
+}
+
+/**
+ * Nós que param o run sem esperar o cliente.
+ *
+ * A distinção importa em dois lugares: a varredura de abandono não pode
+ * matar quem está legitimamente dormindo, e uma mensagem que chegue
+ * durante a espera não é resposta a nada — o fluxo não está escutando.
+ */
+export function isSleeping(node_type: string): boolean {
+  return node_type === "wait";
 }
 
 /** Nodes that end the run. */
 export function isTerminal(node_type: string): boolean {
-  return node_type === "handoff" || node_type === "end";
+  return (
+    node_type === "handoff" ||
+    node_type === "route_to_queue" ||
+    node_type === "end"
+  );
 }
 
 /**
@@ -554,6 +621,238 @@ async function endRun(
     .eq("id", runId);
 }
 
+/** Quanto tempo um nó `wait` dorme, com piso de um segundo. */
+function waitMs(cfg: WaitNodeConfig): number {
+  const unitMs =
+    cfg.unit === "days" ? 86_400_000 : cfg.unit === "hours" ? 3_600_000 : 60_000;
+  const amount = Number.isFinite(cfg.amount) ? cfg.amount : 1;
+  return Math.max(1_000, amount * unitMs);
+}
+
+/**
+ * Chama a URL configurada. Devolve `true` quando falhou.
+ *
+ * A guarda de SSRF é a mesma da automação e da entrega de webhooks: a
+ * URL e os cabeçalhos são escritos por quem configura, e quem faz a
+ * requisição é o servidor — sem isto, um fluxo alcança qualquer coisa
+ * dentro da rede. `redirect: "manual"` fecha o outro lado da mesma
+ * porta: uma URL pública que responde 302 para um endereço interno
+ * derrotaria a checagem.
+ */
+async function callWebhook(
+  db: AdminClient,
+  run: FlowRunRow,
+  node: FlowNodeRow,
+  cfg: SendWebhookNodeConfig,
+): Promise<boolean> {
+  try {
+    if (!cfg.url || !(await isDeliverableUrl(cfg.url))) {
+      await logEvent(db, run.id, "error", node.node_key, {
+        reason: "webhook_destination_not_allowed",
+      });
+      return true;
+    }
+    const body = cfg.body_template
+      ? interpolateVars(cfg.body_template, run.vars)
+      : JSON.stringify(run.vars);
+    const res = await fetch(cfg.url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(cfg.headers ?? {}) },
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+    await logEvent(db, run.id, "node_entered", node.node_key, {
+      node_type: "send_webhook",
+      status: res.status,
+    });
+    return !res.ok;
+  } catch (err) {
+    await logEvent(db, run.id, "error", node.node_key, {
+      reason: "webhook_failed",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+    return true;
+  }
+}
+
+// ============================================================
+// Agendamento dentro do fluxo — fase 1, R-4.
+//
+// Toda a regra vem de `src/lib/actions/scheduling.ts`, a mesma que o
+// agente de IA usa. O que existe aqui é a tradução para o vocabulário do
+// fluxo: um resultado da ação vira uma ARESTA, e o cliente segue por ela
+// sem nunca ler uma mensagem de erro nossa.
+//
+// A configuração da conta é carregada uma vez por percurso do laço, e só
+// quando um nó de agendamento aparece: um fluxo que nunca agenda não
+// paga uma consulta por isso.
+// ============================================================
+
+interface SchedulingCache {
+  loaded: boolean;
+  value: SchedulingContext | null;
+}
+
+async function schedulingFor(
+  db: AdminClient,
+  accountId: string,
+  cache: SchedulingCache,
+): Promise<SchedulingContext | null> {
+  if (!cache.loaded) {
+    cache.value = await resolveSchedulingContext(db, accountId);
+    cache.loaded = true;
+  }
+  return cache.value;
+}
+
+/**
+ * Consulta os horários e oferece como lista.
+ *
+ * Três saídas, e a diferença entre duas delas é a razão de o nó existir:
+ * "não há horário" manda o cliente por um caminho ("me avisa quando
+ * abrir vaga"), "não consegui ler a agenda" manda por outro. Tratar as
+ * duas como a mesma coisa faz o fluxo dizer que a agenda está cheia
+ * quando na verdade o Google caiu.
+ */
+async function offerSlots(
+  db: AdminClient,
+  run: FlowRunRow,
+  node: FlowNodeRow,
+  scheduling: SchedulingContext | null,
+): Promise<{ kind: "suspended" } | { kind: "advance"; to: string }> {
+  const cfg = node.config as unknown as OfferSlotsNodeConfig;
+
+  if (!scheduling) {
+    await logEvent(db, run.id, "error", node.node_key, {
+      reason: "scheduling_not_configured",
+    });
+    return { kind: "advance", to: cfg.on_error_next };
+  }
+
+  const { settings, connection } = scheduling;
+  const now = new Date();
+  const days = cfg.lookahead_days ?? settings.lookaheadDays ?? 7;
+  const result = await listAvailability({
+    db,
+    accountId: run.account_id,
+    settings,
+    connection,
+    from: now,
+    to: new Date(now.getTime() + days * 86_400_000),
+    now,
+  });
+
+  if (!result.ok) {
+    await logEvent(db, run.id, "error", node.node_key, {
+      reason: result.reason,
+      detail: result.message,
+    });
+    return { kind: "advance", to: cfg.on_error_next };
+  }
+
+  // Meta aceita no máximo 10 linhas numa lista; o padrão de 5 é o que
+  // cabe numa tela sem virar formulário.
+  const max = Math.min(Math.max(cfg.max_options ?? 5, 1), 10);
+  const slots = result.data.slice(0, max);
+  if (slots.length === 0) {
+    await logEvent(db, run.id, "node_entered", node.node_key, {
+      node_type: "offer_slots",
+      offered: 0,
+    });
+    return { kind: "advance", to: cfg.no_slots_next };
+  }
+
+  // Guardar ANTES de mandar. Se a Meta falhar depois disto sobra uma
+  // oferta registrada que ninguém viu, o que é inofensivo; na ordem
+  // inversa sobraria uma lista na mão do cliente cujos índices não
+  // apontam para nada.
+  const offered = slots.map((slot) => ({
+    starts_at: slot.startsAt.toISOString(),
+    ends_at: slot.endsAt.toISOString(),
+  }));
+  const newVars = { ...run.vars, _offered_slots: offered };
+  const { error: varsErr } = await db
+    .from("flow_runs")
+    .update({ vars: newVars })
+    .eq("id", run.id);
+  if (varsErr) {
+    await logEvent(db, run.id, "error", node.node_key, {
+      reason: "offer_slots_vars_write_failed",
+      detail: varsErr.message,
+    });
+    return { kind: "advance", to: cfg.on_error_next };
+  }
+  run.vars = newVars;
+
+  const { whatsapp_message_id } = await engineSendInteractiveList({
+    accountId: run.account_id,
+    userId: run.user_id,
+    conversationId: run.conversation_id!,
+    contactId: run.contact_id!,
+    bodyText: interpolateVars(cfg.text, run.vars),
+    buttonLabel: cfg.button_label,
+    headerText: cfg.header_text,
+    footerText: cfg.footer_text,
+    sections: [
+      {
+        rows: slots.map((slot, index) => ({
+          id: slotReplyId(index),
+          title: slotOptionTitle(slot, settings.timezone),
+          description: slotOptionDescription(slot, settings.timezone),
+        })),
+      },
+    ],
+  });
+
+  await logEvent(db, run.id, "message_sent", node.node_key, {
+    node_type: "offer_slots",
+    offered: slots.length,
+    whatsapp_message_id,
+  });
+
+  const { data: msg } = await db
+    .from("messages")
+    .select("id")
+    .eq("message_id", whatsapp_message_id)
+    .maybeSingle();
+  await db
+    .from("flow_runs")
+    .update({
+      last_prompt_message_id: (msg as { id: string } | null)?.id ?? null,
+    })
+    .eq("id", run.id);
+
+  return { kind: "suspended" };
+}
+
+/**
+ * Qual aresta uma recusa da ação toma.
+ *
+ * `slot_unavailable` é a única que tem caminho próprio, e é a que
+ * acontece de verdade: entre oferecer e confirmar, o cliente demora, e o
+ * horário vai embora. Tudo o mais — agenda ilegível, escrita falhada,
+ * gravado sem sincronizar — é `on_error_next`, porque para o cliente
+ * são a mesma coisa: não deu, e continuar como se tivesse dado é o
+ * único desfecho de fato ruim.
+ */
+function schedulingEdgeFor(
+  failure: SchedulingFailure,
+  cfg: {
+    on_unavailable_next?: string;
+    on_no_appointment_next?: string;
+    on_error_next: string;
+  },
+): string {
+  if (failure.reason === "slot_unavailable" && cfg.on_unavailable_next) {
+    return cfg.on_unavailable_next;
+  }
+  if (failure.reason === "no_appointment" && cfg.on_no_appointment_next) {
+    return cfg.on_no_appointment_next;
+  }
+  return cfg.on_error_next;
+}
+
 // ============================================================
 // The synchronous advance loop. Walks through auto-advance nodes
 // until it hits one that suspends (send_buttons/send_list) or
@@ -568,6 +867,9 @@ async function advanceFromNodeKey(
   nodes: Map<string, FlowNodeRow>,
 ): Promise<{ outcome: "advanced" | "completed" | "handed_off" }> {
   let currentKey: string | null = startNodeKey;
+  // Configuração de agendamento, carregada sob demanda e no máximo uma
+  // vez por percurso — um fluxo que nunca agenda não paga por ela.
+  const scheduling: SchedulingCache = { loaded: false, value: null };
   // Defensive cap — if a flow has a cycle (which the validator
   // SHOULD catch but doesn't yet in v1), we bail rather than loop.
   for (let safety = 0; safety < 64; safety += 1) {
@@ -751,6 +1053,291 @@ async function advanceFromNodeKey(
         });
       }
       currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "send_template") {
+      const cfg = node.config as unknown as SendTemplateNodeConfig;
+      try {
+        const { whatsapp_message_id } = await engineSendTemplate({
+          accountId: run.account_id,
+          userId: run.user_id,
+          conversationId: run.conversation_id!,
+          contactId: run.contact_id!,
+          templateName: cfg.template_name,
+          language: cfg.language,
+          params: templateParams(cfg.variables, (v) =>
+            interpolateVars(v, run.vars),
+          ),
+        });
+        await logEvent(db, run.id, "message_sent", node.node_key, {
+          node_type: "send_template",
+          template_name: cfg.template_name,
+          whatsapp_message_id,
+        });
+      } catch (err) {
+        // Falha de template é fatal para o run, ao contrário de uma
+        // etiqueta que não gravou: o template É a mensagem, e seguir
+        // adiante deixaria o cliente esperando um texto que não chegou.
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: "send_template_failed",
+          detail: err instanceof Error ? err.message : String(err),
+        });
+        await endRun(db, run.id, "failed", "send_template_failed");
+        return { outcome: "completed" };
+      }
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "update_contact_field") {
+      const cfg = node.config as unknown as UpdateContactFieldNodeConfig;
+      const result = await updateContactField({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id!,
+        field: cfg.field,
+        value: interpolateVars(cfg.value, run.vars),
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "update_contact_field",
+        ok: result.ok,
+        detail: result.message,
+      });
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "create_deal") {
+      const cfg = node.config as unknown as CreateDealNodeConfig;
+      const result = await createDeal({
+        db,
+        accountId: run.account_id,
+        userId: run.user_id,
+        pipelineId: cfg.pipeline_id,
+        stageId: cfg.stage_id,
+        contactId: run.contact_id,
+        title: interpolateVars(cfg.title, run.vars),
+        value: cfg.value,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "create_deal",
+        ok: result.ok,
+        detail: result.message,
+      });
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "assign_conversation") {
+      const cfg = node.config as unknown as AssignConversationNodeConfig;
+      const result = await assignConversation({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id!,
+        mode: cfg.mode,
+        agentId: cfg.agent_id,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "assign_conversation",
+        ok: result.ok,
+        detail: result.message,
+      });
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "close_conversation") {
+      const cfg = node.config as unknown as CloseConversationNodeConfig;
+      const result = await closeConversation({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id!,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "close_conversation",
+        ok: result.ok,
+        detail: result.message,
+      });
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "route_to_queue") {
+      const cfg = node.config as unknown as RouteToQueueNodeConfig;
+      const queue = await loadQueue(db, run.account_id, cfg.queue_id);
+      if (!queue) {
+        // Fila apagada, desativada, ou trocada para atendimento por
+        // robô. Encerra como transferência mesmo assim: a decisão de
+        // parar de falar continua valendo, e o run não pode ficar preso.
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: "queue_not_available",
+          queue_id: cfg.queue_id,
+        });
+        await endRun(db, run.id, "handed_off", "queue_not_available");
+        return { outcome: "handed_off" };
+      }
+      const result = await routeConversationToQueue({
+        db,
+        accountId: run.account_id,
+        conversationId: run.conversation_id!,
+        queue,
+        summary: cfg.reason
+          ? interpolateVars(cfg.reason, run.vars)
+          : `🤖 ${queue.name}`,
+      });
+      await logEvent(db, run.id, "handoff", node.node_key, {
+        node_type: "route_to_queue",
+        queue_id: queue.id,
+        ok: result.ok,
+        assigned_to: result.assignedTo ?? null,
+      });
+      await endRun(db, run.id, "handed_off", "routed_to_queue");
+      return { outcome: "handed_off" };
+    }
+    if (node.node_type === "wait") {
+      const cfg = node.config as unknown as WaitNodeConfig;
+      const resumeAt = new Date(Date.now() + waitMs(cfg));
+      // Grava o ponteiro e a hora de voltar numa escrita só. O UPDATE
+      // otimista é o mesmo dos nós que esperam o cliente: se outro
+      // webhook já moveu o run, esta escrita não pega e nós saímos.
+      const { data: parked } = await db
+        .from("flow_runs")
+        .update({
+          current_node_key: node.node_key,
+          resume_at: resumeAt.toISOString(),
+          last_advanced_at: new Date().toISOString(),
+        })
+        .eq("id", run.id)
+        .eq("status", "active")
+        .select("id");
+      if (!Array.isArray(parked) || parked.length === 0) {
+        return { outcome: "advanced" };
+      }
+      run.current_node_key = node.node_key;
+      run.resume_at = resumeAt.toISOString();
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "wait",
+        resume_at: resumeAt.toISOString(),
+      });
+      return { outcome: "advanced" };
+    }
+    if (node.node_type === "send_webhook") {
+      const cfg = node.config as unknown as SendWebhookNodeConfig;
+      const failed = await callWebhook(db, run, node, cfg);
+      currentKey = failed ? cfg.on_error_next : cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "offer_slots") {
+      const outcome = await offerSlots(
+        db,
+        run,
+        node,
+        await schedulingFor(db, run.account_id, scheduling),
+      );
+      if (outcome.kind === "advance") {
+        currentKey = outcome.to;
+        continue;
+      }
+      // Suspenso à espera da escolha. Mesmo protocolo dos outros nós que
+      // esperam: grava o ponteiro por UPDATE otimista e sai.
+      const advanced = await advanceCurrentNodeKey(
+        db,
+        run.id,
+        run.current_node_key,
+        node.node_key,
+      );
+      if (!advanced) return { outcome: "advanced" };
+      run.current_node_key = node.node_key;
+      return { outcome: "advanced" };
+    }
+    if (node.node_type === "book_appointment") {
+      const cfg = node.config as unknown as BookAppointmentNodeConfig;
+      const ctx = await schedulingFor(db, run.account_id, scheduling);
+      const chosen = readOfferedSlots(run.vars)[
+        typeof run.vars._chosen_slot === "number" ? run.vars._chosen_slot : -1
+      ];
+      if (!ctx || !chosen) {
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: ctx ? "no_slot_chosen" : "scheduling_not_configured",
+        });
+        currentKey = cfg.on_error_next;
+        continue;
+      }
+      const result = await bookForContact({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id,
+        conversationId: run.conversation_id,
+        settings: ctx.settings,
+        connection: ctx.connection,
+        startsAt: chosen.starts_at,
+        endsAt: chosen.ends_at,
+        title: cfg.title ? interpolateVars(cfg.title, run.vars) : null,
+        createdVia: "native",
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "book_appointment",
+        booked: result.ok,
+        reason: result.ok ? null : result.reason,
+      });
+      currentKey = result.ok
+        ? cfg.next_node_key
+        : schedulingEdgeFor(result, cfg);
+      continue;
+    }
+    if (node.node_type === "reschedule_appointment") {
+      const cfg = node.config as unknown as RescheduleAppointmentNodeConfig;
+      const ctx = await schedulingFor(db, run.account_id, scheduling);
+      const chosen = readOfferedSlots(run.vars)[
+        typeof run.vars._chosen_slot === "number" ? run.vars._chosen_slot : -1
+      ];
+      if (!ctx || !chosen) {
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: ctx ? "no_slot_chosen" : "scheduling_not_configured",
+        });
+        currentKey = cfg.on_error_next;
+        continue;
+      }
+      const result = await rescheduleForContact({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id,
+        settings: ctx.settings,
+        connection: ctx.connection,
+        startsAt: chosen.starts_at,
+        endsAt: chosen.ends_at,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "reschedule_appointment",
+        moved: result.ok,
+        reason: result.ok ? null : result.reason,
+      });
+      currentKey = result.ok
+        ? cfg.next_node_key
+        : schedulingEdgeFor(result, cfg);
+      continue;
+    }
+    if (node.node_type === "cancel_appointment") {
+      const cfg = node.config as unknown as CancelAppointmentNodeConfig;
+      const ctx = await schedulingFor(db, run.account_id, scheduling);
+      if (!ctx) {
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: "scheduling_not_configured",
+        });
+        currentKey = cfg.on_error_next;
+        continue;
+      }
+      const result = await cancelForContact({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id,
+        settings: ctx.settings,
+        connection: ctx.connection,
+        reason: cfg.reason ? interpolateVars(cfg.reason, run.vars) : null,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "cancel_appointment",
+        cancelled: result.ok,
+        reason: result.ok ? null : result.reason,
+      });
+      currentKey = result.ok
+        ? cfg.next_node_key
+        : schedulingEdgeFor(result, cfg);
       continue;
     }
     if (node.node_type === "send_buttons") {
@@ -939,6 +1526,15 @@ async function handleReplyForActiveRun(
     return { consumed: true, flow_run_id: run.id, outcome: "no_match" };
   }
 
+  // Parado num `wait`: o fluxo não está escutando, e a mensagem não é
+  // resposta a nada. Devolver `consumed: false` deixa o agente e as
+  // automações atenderem — o contrário faria a política de fallback
+  // reprompt ou transferir por causa de uma frase que não foi dirigida
+  // ao fluxo.
+  if (isSleeping(currentNode.node_type)) {
+    return { consumed: false, flow_run_id: run.id, outcome: "no_match" };
+  }
+
   // Two ways a reply can advance:
   //   1. Interactive button/list tap on a send_buttons/send_list node.
   //   2. Text reply on a collect_input node — capture into vars.
@@ -951,6 +1547,33 @@ async function handleReplyForActiveRun(
       currentNode.node_type === "send_list")
   ) {
     matched = matchReplyId(currentNode, message.reply_id);
+  } else if (
+    message.kind === "interactive_reply" &&
+    currentNode.node_type === "offer_slots"
+  ) {
+    // A escolha volta como índice, e o horário sai de
+    // `vars._offered_slots` — o registro do que REALMENTE foi oferecido.
+    // Um índice fora da oferta cai no fallback como qualquer resposta
+    // que não casa, em vez de virar um agendamento inventado.
+    const cfg = currentNode.config as unknown as OfferSlotsNodeConfig;
+    const index = parseSlotReplyId(message.reply_id);
+    const offered = readOfferedSlots(run.vars);
+    if (index !== null && index < offered.length) {
+      const newVars = { ...run.vars, _chosen_slot: index };
+      const { error: chooseErr } = await db
+        .from("flow_runs")
+        .update({ vars: newVars, reprompt_count: 0 })
+        .eq("id", run.id);
+      if (!chooseErr) {
+        run.vars = newVars;
+        run.reprompt_count = 0;
+        await logEvent(db, run.id, "node_entered", currentNode.node_key, {
+          chosen_slot: index,
+          starts_at: offered[index].starts_at,
+        });
+        matched = cfg.next_node_key;
+      }
+    }
   } else if (
     message.kind === "text" &&
     currentNode.node_type === "collect_input"
@@ -1083,9 +1706,60 @@ async function startNewRun(
   input: DispatchInboundInput,
   nodes: Map<string, FlowNodeRow>,
 ): Promise<DispatchInboundResult> {
+  const started = await insertRunAndAdvance(db, flow, nodes, {
+    contactId: input.contactId,
+    conversationId: input.conversationId,
+    startedPayload: {
+      flow_id: flow.id,
+      trigger_type: flow.trigger_type,
+      meta_message_id: input.message.meta_message_id,
+      started_by: "inbound",
+    },
+  });
+  if (!started.ok) {
+    return started.reason === "duplicate_run"
+      ? { consumed: true, outcome: "duplicate_inbound_ignored" }
+      : { consumed: false, outcome: "no_match" };
+  }
+  return {
+    consumed: true,
+    flow_run_id: started.run.id,
+    outcome: started.outcome === "advanced" ? "started" : started.outcome,
+  };
+}
+
+/**
+ * Create the run row and walk it forward. The one place a run is born,
+ * shared by the inbound path (`startNewRun`) and the bridge
+ * (`startFlowRun`) so the two can never drift on what a fresh run looks
+ * like — same tenancy fields, same counter bump, same first event.
+ *
+ * `vars` seeds the run: the bridge uses it to carry the chain depth and
+ * whatever context the caller wants interpolated into the nodes.
+ */
+async function insertRunAndAdvance(
+  db: AdminClient,
+  flow: FlowRow,
+  nodes: Map<string, FlowNodeRow>,
+  opts: {
+    contactId: string;
+    conversationId: string | null;
+    startedPayload: Record<string, unknown>;
+    vars?: Record<string, unknown>;
+  },
+): Promise<
+  | {
+      ok: true;
+      run: FlowRunRow;
+      outcome: "advanced" | "completed" | "handed_off";
+    }
+  | { ok: false; reason: "duplicate_run" | "insert_failed" }
+> {
   // INSERT — partial unique index `idx_one_active_run_per_contact`
-  // catches concurrent inserts with 23505. We catch and return as
-  // consumed:true (the parallel webhook handles it).
+  // catches concurrent inserts with 23505. We report it as a duplicate
+  // and let the caller decide what that means: for the webhook it is
+  // "the parallel delivery is handling it", for the bridge it is a
+  // refusal the operator needs to see.
   const { data: inserted, error: insErr } = await db
     .from("flow_runs")
     .insert({
@@ -1098,28 +1772,25 @@ async function startNewRun(
       // Audit: preserves the flow's author on the run row for log
       // attribution.
       user_id: flow.user_id,
-      contact_id: input.contactId,
-      conversation_id: input.conversationId,
+      contact_id: opts.contactId,
+      conversation_id: opts.conversationId,
       status: "active",
       current_node_key: flow.entry_node_id,
+      ...(opts.vars ? { vars: opts.vars } : {}),
     })
     .select("*")
     .maybeSingle();
   if (insErr) {
-    // 23505 = unique_violation → another webhook is starting the run.
+    // 23505 = unique_violation → this contact already has an active run.
     const msg = insErr.message ?? "";
     if (msg.includes("23505") || msg.includes("duplicate key")) {
-      return { consumed: true, outcome: "duplicate_inbound_ignored" };
+      return { ok: false, reason: "duplicate_run" };
     }
-    console.error("[flows] startNewRun insert error:", insErr.message);
-    return { consumed: false, outcome: "no_match" };
+    console.error("[flows] insertRunAndAdvance insert error:", insErr.message);
+    return { ok: false, reason: "insert_failed" };
   }
   const run = inserted as FlowRunRow;
-  await logEvent(db, run.id, "started", flow.entry_node_id, {
-    flow_id: flow.id,
-    trigger_type: flow.trigger_type,
-    meta_message_id: input.message.meta_message_id,
-  });
+  await logEvent(db, run.id, "started", flow.entry_node_id, opts.startedPayload);
   // Bump the flow's execution counter — used by the builder UI to
   // surface "X runs since activation" on the flow card.
   //
@@ -1138,9 +1809,328 @@ async function startNewRun(
 
   // Run the advance loop starting from the entry node.
   const outcome = await advanceFromNodeKey(db, run, flow.entry_node_id!, nodes);
-  return {
-    consumed: true,
-    flow_run_id: run.id,
-    outcome: outcome.outcome === "advanced" ? "started" : outcome.outcome,
-  };
+  return { ok: true, run, outcome: outcome.outcome };
+}
+
+// ============================================================
+// Second public entry point — the bridge.
+//
+// `dispatchInboundToFlows` starts a run because the CUSTOMER said
+// something. This starts one because something else in the system
+// decided to: an automation that just sent a cobrança template, the AI
+// agent handing a menu to the flow, an operator on the inbox.
+//
+// Why this belongs to the flow engine and not to the callers: every
+// rule about what a run IS lives here — one active run per contact, the
+// entry node, the counter, the first event. A caller that inserted its
+// own row would be a second definition of "a run", and the two would
+// drift. The callers stay adapters: they translate their own shape into
+// `StartFlowRunInput` and translate the result back into their own
+// vocabulary.
+//
+// It never throws. Both adapters are fire-and-forget paths where an
+// exception would take down an automation run or an agent turn, so
+// every failure comes back as a NAMED refusal instead. Silence is not
+// an option either: "the flow did not start and nobody said why" is the
+// bug this whole shape exists to prevent.
+// ============================================================
+
+/** Why a start was refused. Every one of these is reportable to a human. */
+export type StartFlowRefusal =
+  /** No such flow in this account. Also covers a flow in another
+   *  account: the caller must not learn that the id exists. */
+  | "flow_not_found"
+  | "flow_not_active"
+  | "flow_has_no_entry"
+  | "contact_not_in_account"
+  /** The contact is mid-flow. The existing run's id comes back with it. */
+  | "active_run_exists"
+  /** Nothing to talk on — the contact has never had a conversation. */
+  | "no_conversation"
+  | "max_chain_depth"
+  | "error";
+
+export interface StartFlowRunInput {
+  accountId: string;
+  contactId: string;
+  flowId: string;
+  /** Who asked. Recorded on the run's `started` event, which is the
+   *  only place anyone can later find out where a run came from. */
+  startedBy: "automation" | "agent" | "human" | "api";
+  /** The thread to talk on. Null resolves to the contact's most recent
+   *  conversation. */
+  conversationId?: string | null;
+  /** Seeded into `flow_runs.vars`, so the flow can interpolate what the
+   *  caller knew — the invoice amount, the due date. */
+  vars?: Record<string, unknown>;
+  /** Chain depth carried across the bridge. See `./chain.ts`. */
+  chainDepth?: number;
+}
+
+export type StartFlowRunResult =
+  | {
+      started: true;
+      flowRunId: string;
+      outcome: "advanced" | "completed" | "handed_off";
+    }
+  | {
+      started: false;
+      reason: StartFlowRefusal;
+      /** Present for `active_run_exists`. */
+      flowRunId?: string;
+      detail?: string;
+    };
+
+/** One sentence per refusal, so the automation log, the agent's tool
+ *  result and the inbox all say the same thing. */
+export function describeStartFlowRefusal(
+  reason: StartFlowRefusal,
+  flowName?: string,
+): string {
+  const which = flowName ? `"${flowName}"` : "that flow";
+  switch (reason) {
+    case "flow_not_found":
+      return `${which} does not exist in this account.`;
+    case "flow_not_active":
+      return `${which} is not active, so it cannot be started.`;
+    case "flow_has_no_entry":
+      return `${which} has no entry node — open it in the builder and connect the start.`;
+    case "contact_not_in_account":
+      return "That contact does not belong to this account.";
+    case "active_run_exists":
+      return "The contact is already in a flow; only one runs at a time.";
+    case "no_conversation":
+      return "The contact has no conversation yet, so there is nowhere to send the flow.";
+    case "max_chain_depth":
+      return "Too many flows started one another in a row; stopped to avoid a loop.";
+    case "error":
+      return "The flow could not be started.";
+  }
+}
+
+/**
+ * Find the thread to talk on. Newest first rather than `.maybeSingle()`:
+ * a contact with two conversation rows is a data state we have seen, and
+ * it must not turn the bridge into an error — the newest thread is the
+ * one the customer is actually looking at.
+ */
+async function resolveConversationForContact(
+  db: AdminClient,
+  accountId: string,
+  contactId: string,
+): Promise<string | null> {
+  const { data, error } = await db
+    .from("conversations")
+    .select("id")
+    .eq("account_id", accountId)
+    .eq("contact_id", contactId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(1);
+  if (error) {
+    console.error("[flows] resolveConversationForContact error:", error.message);
+    return null;
+  }
+  const rows = (data as { id: string }[] | null) ?? [];
+  return rows[0]?.id ?? null;
+}
+
+export async function startFlowRun(
+  input: StartFlowRunInput,
+): Promise<StartFlowRunResult> {
+  const db = supabaseAdmin();
+  try {
+    // Depth first: it is the cheapest check and the one whose whole
+    // point is to run before anything costs anything.
+    const depth = input.chainDepth ?? 0;
+    if (depth >= MAX_FLOW_CHAIN_DEPTH) {
+      console.warn("[flows] flow chain depth limit reached", {
+        accountId: input.accountId,
+        contactId: input.contactId,
+        flowId: input.flowId,
+        depth,
+      });
+      return { started: false, reason: "max_chain_depth" };
+    }
+
+    const flow = await loadFlow(db, input.flowId);
+    // Account mismatch is reported as "not found" on purpose: this runs
+    // on the service-role client, which bypasses RLS, so a caller
+    // probing ids must not be able to tell a foreign flow from a
+    // missing one.
+    if (!flow || flow.account_id !== input.accountId) {
+      return { started: false, reason: "flow_not_found" };
+    }
+    if (flow.status !== "active") {
+      return { started: false, reason: "flow_not_active" };
+    }
+    if (!flow.entry_node_id) {
+      return { started: false, reason: "flow_has_no_entry" };
+    }
+
+    // Same discipline as the automations engine: the service-role
+    // client bypasses RLS, so tenancy is checked here or nowhere.
+    const { data: contact, error: contactErr } = await db
+      .from("contacts")
+      .select("id")
+      .eq("id", input.contactId)
+      .eq("account_id", input.accountId)
+      .maybeSingle();
+    if (contactErr) {
+      console.error("[flows] contact ownership check failed:", contactErr.message);
+      return { started: false, reason: "error", detail: contactErr.message };
+    }
+    if (!contact) {
+      return { started: false, reason: "contact_not_in_account" };
+    }
+
+    // Checked before the INSERT so the refusal can name the run the
+    // contact is actually in. The partial unique index is still the
+    // authority — see the duplicate_run branch below for the race.
+    const active = await loadActiveRunForContact(
+      db,
+      input.accountId,
+      input.contactId,
+    );
+    if (active) {
+      return {
+        started: false,
+        reason: "active_run_exists",
+        flowRunId: active.id,
+      };
+    }
+
+    const conversationId =
+      input.conversationId ??
+      (await resolveConversationForContact(
+        db,
+        input.accountId,
+        input.contactId,
+      ));
+    if (!conversationId) {
+      return { started: false, reason: "no_conversation" };
+    }
+
+    const nodes = await loadAllNodes(db, flow.id);
+    const started = await insertRunAndAdvance(db, flow, nodes, {
+      contactId: input.contactId,
+      conversationId,
+      startedPayload: {
+        flow_id: flow.id,
+        trigger_type: flow.trigger_type,
+        started_by: input.startedBy,
+      },
+      vars: { ...(input.vars ?? {}), _flow_chain_depth: depth + 1 },
+    });
+
+    if (!started.ok) {
+      if (started.reason === "duplicate_run") {
+        // Lost the race with a concurrent start. Same answer as the
+        // check above, minus the run id we no longer have cheaply.
+        return { started: false, reason: "active_run_exists" };
+      }
+      return { started: false, reason: "error" };
+    }
+
+    return {
+      started: true,
+      flowRunId: started.run.id,
+      outcome: started.outcome,
+    };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[flows] startFlowRun threw:", detail);
+    return { started: false, reason: "error", detail };
+  }
+}
+
+// ============================================================
+// Terceira entrada pública — o relógio.
+//
+// `dispatchInboundToFlows` acorda um run porque o cliente falou;
+// `startFlowRun` cria um porque o sistema decidiu. Esta acorda um que
+// marcou hora consigo mesmo, e só o cron a chama.
+// ============================================================
+
+export interface DueRun {
+  id: string
+  flow_id: string
+  current_node_key: string | null
+}
+
+/**
+ * Runs cuja hora de voltar já passou.
+ *
+ * Limite explícito: uma varredura que tenta acordar dez mil runs numa
+ * requisição estoura antes de acordar o primeiro. O cron roda de novo
+ * em minutos, então uma fila que não coube nesta rodada não se perde —
+ * só espera a próxima.
+ */
+export async function loadDueRuns(limit = 200): Promise<DueRun[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("flow_runs")
+    .select("id, flow_id, current_node_key")
+    .eq("status", "active")
+    .not("resume_at", "is", null)
+    .lte("resume_at", new Date().toISOString())
+    .order("resume_at", { ascending: true })
+    .limit(limit);
+  if (error) {
+    console.error("[flows] loadDueRuns error:", error.message);
+    return [];
+  }
+  return (data as DueRun[] | null) ?? [];
+}
+
+export type ResumeOutcome =
+  | "resumed"
+  | "already_taken"
+  | "not_waiting"
+  | "error";
+
+/**
+ * Retoma um run parado num `wait`.
+ *
+ * A limpeza de `resume_at` é a TRAVA: é feita com a precondição de que
+ * ela ainda esteja preenchida, então duas execuções simultâneas do cron
+ * não avançam o mesmo run duas vezes. Quem perder a corrida recebe zero
+ * linhas e sai — que é o mesmo protocolo do `advanceCurrentNodeKey`.
+ */
+export async function resumeWaitingRun(runId: string): Promise<ResumeOutcome> {
+  const db = supabaseAdmin();
+  try {
+    const { data: claimed, error: claimErr } = await db
+      .from("flow_runs")
+      .update({ resume_at: null, last_advanced_at: new Date().toISOString() })
+      .eq("id", runId)
+      .eq("status", "active")
+      .not("resume_at", "is", null)
+      .select("*");
+    if (claimErr) {
+      console.error("[flows] resumeWaitingRun claim error:", claimErr.message);
+      return "error";
+    }
+    const rows = (claimed as FlowRunRow[] | null) ?? [];
+    if (rows.length === 0) return "already_taken";
+    const run = rows[0];
+
+    const nodes = await loadAllNodes(db, run.flow_id);
+    const node = run.current_node_key ? nodes.get(run.current_node_key) : null;
+    if (!node || node.node_type !== "wait") {
+      // O run mudou de nó entre a leitura e agora, ou o fluxo foi
+      // reescrito e o nó sumiu. Não é erro: o `resume_at` já foi
+      // limpo, e o run segue a vida por onde estiver.
+      return "not_waiting";
+    }
+
+    const cfg = node.config as unknown as WaitNodeConfig;
+    await advanceFromNodeKey(db, run, cfg.next_node_key, nodes);
+    return "resumed";
+  } catch (err) {
+    console.error(
+      "[flows] resumeWaitingRun threw:",
+      err instanceof Error ? err.message : err,
+    );
+    return "error";
+  }
 }

@@ -166,6 +166,162 @@ export interface ConditionNodeConfig {
   false_next: string;
 }
 
+// ============================================================
+// Agendamento no fluxo — fase 1, R-4.
+//
+// Existem porque o cliente que recusa o custo do modelo também precisa
+// marcar horário. Toda a regra — expediente, antecedência, horizonte,
+// colisão — vem de `src/lib/actions/scheduling.ts`, a mesma que o agente
+// de IA usa; estes nós são o invólucro de menu por cima dela.
+//
+// Repare que os quatro têm arestas de erro SEPARADAS de "não deu certo".
+// Uma agenda que não conseguimos ler não é uma agenda vazia: mandar o
+// cliente pelo caminho de "não tenho horário" quando o Google caiu é
+// perder a venda e mentir. Por isso `on_error_next` existe em todos.
+// ============================================================
+
+/**
+ * Consulta os horários livres e oferece como lista, esperando a escolha.
+ *
+ * É o único nó cujas opções não estão na configuração: elas são
+ * calculadas na hora e guardadas em `flow_runs.vars._offered_slots`, na
+ * mesma ordem dos `reply_id`. O runner casa a resposta por índice.
+ */
+export interface OfferSlotsNodeConfig {
+  /** Texto acima da lista. */
+  text: string;
+  /** Rótulo do botão que abre a lista. */
+  button_label: string;
+  header_text?: string;
+  footer_text?: string;
+  /** Quantos horários oferecer, no máximo. Meta limita a 10 linhas. */
+  max_options?: number;
+  /** Quantos dias à frente olhar. Sem isto, `lookahead_days` da conta. */
+  lookahead_days?: number;
+  /** O cliente escolheu um horário → aqui. */
+  next_node_key: string;
+  /** Não há horário livre no período. */
+  no_slots_next: string;
+  /** A agenda não pôde ser lida. NUNCA é o mesmo que "sem horário". */
+  on_error_next: string;
+}
+
+/**
+ * Marca o horário escolhido no nó `offer_slots` anterior.
+ *
+ * Separado dele de propósito: entre a oferta e a escolha o cliente leva
+ * tempo, e o horário pode ter ido embora. Um nó só não teria onde
+ * desviar quando isso acontece.
+ */
+export interface BookAppointmentNodeConfig {
+  /** Descrição do compromisso; interpola `{{vars.X}}`. */
+  title?: string;
+  /** Marcado. */
+  next_node_key: string;
+  /** O horário caiu entre a oferta e a confirmação. */
+  on_unavailable_next: string;
+  /** Nenhum horário escolhido, agenda ilegível, ou a escrita falhou. */
+  on_error_next: string;
+}
+
+export interface RescheduleAppointmentNodeConfig {
+  next_node_key: string;
+  on_unavailable_next: string;
+  /** O cliente não tem agendamento para mover. */
+  on_no_appointment_next: string;
+  on_error_next: string;
+}
+
+export interface CancelAppointmentNodeConfig {
+  /** Motivo registrado no agendamento; interpola `{{vars.X}}`. */
+  reason?: string;
+  next_node_key: string;
+  /** O cliente não tem agendamento para cancelar. */
+  on_no_appointment_next: string;
+  on_error_next: string;
+}
+
+/**
+ * Envia um template aprovado da Meta e avança.
+ *
+ * É o nó que tira o fluxo da dependência da janela de 24 horas: sem
+ * ele, um fluxo só sabe REAGIR — fora da janela ele não fala. Com ele,
+ * cada degrau de uma régua de cobrança é um fluxo, e a resposta do
+ * cliente cai num menu.
+ */
+export interface SendTemplateNodeConfig {
+  template_name: string;
+  language?: string;
+  /** Valores posicionais `{{1}}`, `{{2}}`, … Interpolam `{{vars.X}}`. */
+  variables?: Record<string, string>;
+  next_node_key: string;
+}
+
+export interface UpdateContactFieldNodeConfig {
+  /** Coluna nativa (`name` | `email` | `company`) ou `custom:<id>`. */
+  field: string;
+  /** Interpola `{{vars.X}}`. */
+  value: string;
+  next_node_key: string;
+}
+
+export interface CreateDealNodeConfig {
+  pipeline_id: string;
+  stage_id: string;
+  title: string;
+  value?: number;
+  next_node_key: string;
+}
+
+export interface AssignConversationNodeConfig {
+  mode: "specific" | "round_robin";
+  agent_id?: string;
+  next_node_key: string;
+}
+
+export interface CloseConversationNodeConfig {
+  next_node_key: string;
+}
+
+/**
+ * Encaminha para uma fila humana e TERMINA o run.
+ *
+ * Terminal como o `handoff`, e pela mesma razão: a partir daqui a
+ * conversa tem dono. Um fluxo que continuasse mandando mensagem por cima
+ * de uma pessoa atendendo é o pior desfecho possível.
+ */
+export interface RouteToQueueNodeConfig {
+  queue_id: string;
+  /** A nota que quem pegar vai ler; interpola `{{vars.X}}`. */
+  reason?: string;
+}
+
+/**
+ * Para o run e marca hora para voltar.
+ *
+ * É a única espera do fluxo que NÃO é esperar o cliente. Um nó que
+ * suspende aguardando resposta é acordado pela mensagem dele; este não
+ * tem quem o acorde, e por isso grava `flow_runs.resume_at` e depende do
+ * cron. Enquanto espera, o fluxo não escuta: uma mensagem que chegue
+ * nesse meio é do agente e das automações, não dele.
+ */
+export interface WaitNodeConfig {
+  amount: number;
+  unit: "minutes" | "hours" | "days";
+  next_node_key: string;
+}
+
+export interface SendWebhookNodeConfig {
+  url: string;
+  headers?: Record<string, string>;
+  /** Corpo enviado; interpola `{{vars.X}}`. Vazio manda as variáveis do
+   *  run como JSON. */
+  body_template?: string;
+  next_node_key: string;
+  /** Destino recusado, tempo esgotado, ou resposta de erro. */
+  on_error_next: string;
+}
+
 export interface SetTagNodeConfig {
   mode: "add" | "remove";
   /** Tag UUID. The builder picks from the user's existing tags. */
@@ -193,6 +349,30 @@ export type FlowNodeConfig =
   | { node_type: "collect_input"; config: CollectInputNodeConfig }
   | { node_type: "condition"; config: ConditionNodeConfig }
   | { node_type: "set_tag"; config: SetTagNodeConfig }
+  | { node_type: "send_template"; config: SendTemplateNodeConfig }
+  | {
+      node_type: "update_contact_field";
+      config: UpdateContactFieldNodeConfig;
+    }
+  | { node_type: "create_deal"; config: CreateDealNodeConfig }
+  | {
+      node_type: "assign_conversation";
+      config: AssignConversationNodeConfig;
+    }
+  | {
+      node_type: "close_conversation";
+      config: CloseConversationNodeConfig;
+    }
+  | { node_type: "route_to_queue"; config: RouteToQueueNodeConfig }
+  | { node_type: "wait"; config: WaitNodeConfig }
+  | { node_type: "send_webhook"; config: SendWebhookNodeConfig }
+  | { node_type: "offer_slots"; config: OfferSlotsNodeConfig }
+  | { node_type: "book_appointment"; config: BookAppointmentNodeConfig }
+  | {
+      node_type: "reschedule_appointment";
+      config: RescheduleAppointmentNodeConfig;
+    }
+  | { node_type: "cancel_appointment"; config: CancelAppointmentNodeConfig }
   | { node_type: "handoff"; config: HandoffNodeConfig }
   | { node_type: "end"; config: EndNodeConfig };
 
@@ -275,6 +455,9 @@ export interface FlowRunRow {
   last_prompt_message_id: string | null;
   vars: Record<string, unknown>;
   reprompt_count: number;
+  /** Quando o cron deve retomar um run parado num nó `wait`. Null para
+   *  todo o resto — inclusive para quem espera o cliente. */
+  resume_at?: string | null;
   started_at: string;
   last_advanced_at: string;
   ended_at: string | null;

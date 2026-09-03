@@ -325,7 +325,7 @@ export async function dispatchInboundToAiReply(
       scheduling,
     })
 
-    const { text, handoff, handoffSource, usage, steps } = await runAgent({
+    const { text, handoff, handoffSource, yielded, usage, steps } = await runAgent({
       config,
       systemPrompt,
       messages,
@@ -352,6 +352,12 @@ export async function dispatchInboundToAiReply(
     if (steps.length > 0) {
       void recordAgentSteps(db, { accountId, conversationId, steps })
     }
+
+    // Um fluxo assumiu a conversa. Sai antes do bloco de transferência
+    // logo abaixo: o texto vem vazio de propósito, e sem esta guarda o
+    // `!text` leria isso como "o modelo não soube responder" e chamaria
+    // uma pessoa por cima de um fluxo que está funcionando.
+    if (yielded) return
 
     if (handoff || !text) {
       // The model can't (or shouldn't) answer. `request_human` already

@@ -37,18 +37,96 @@ export interface CanvasEdge {
   label?: string;
 }
 
+
+// ============================================================
+// Nós de agendamento — fase 1, R-4.
+//
+// Os quatro têm a mesma forma: um punhado de saídas nomeadas, cada uma
+// uma chave da config. Uma tabela em vez de quatro blocos repetidos,
+// porque a diferença entre eles é só QUAIS saídas, e um bloco por nó
+// seria quatro chances de esquecer uma quando a quinta aparecer.
+// ============================================================
+
+interface NamedSlot {
+  /** Chave na config do nó. */
+  key: string;
+  /** `sourceHandle` no canvas. */
+  handle: string;
+  label: string;
+}
+
+const SCHEDULING_SLOTS: Record<string, NamedSlot[]> = {
+  send_webhook: [
+    { key: "next_node_key", handle: "next", label: "called" },
+    { key: "on_error_next", handle: "error", label: "call failed" },
+  ],
+  offer_slots: [
+    { key: "next_node_key", handle: "next", label: "chose a time" },
+    { key: "no_slots_next", handle: "no_slots", label: "no times free" },
+    { key: "on_error_next", handle: "error", label: "calendar error" },
+  ],
+  book_appointment: [
+    { key: "next_node_key", handle: "next", label: "booked" },
+    { key: "on_unavailable_next", handle: "unavailable", label: "time taken" },
+    { key: "on_error_next", handle: "error", label: "error" },
+  ],
+  reschedule_appointment: [
+    { key: "next_node_key", handle: "next", label: "moved" },
+    { key: "on_unavailable_next", handle: "unavailable", label: "time taken" },
+    {
+      key: "on_no_appointment_next",
+      handle: "no_appointment",
+      label: "nothing booked",
+    },
+    { key: "on_error_next", handle: "error", label: "error" },
+  ],
+  cancel_appointment: [
+    { key: "next_node_key", handle: "next", label: "cancelled" },
+    {
+      key: "on_no_appointment_next",
+      handle: "no_appointment",
+      label: "nothing booked",
+    },
+    { key: "on_error_next", handle: "error", label: "error" },
+  ],
+};
+
+function isSchedulingNode(nodeType: string): boolean {
+  return nodeType in SCHEDULING_SLOTS;
+}
+
 export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
   const knownKeys = new Set(nodes.map((n) => n.node_key));
   const edges: CanvasEdge[] = [];
 
   for (const node of nodes) {
     const cfg = node.config;
+    if (isSchedulingNode(node.node_type)) {
+      for (const slot of SCHEDULING_SLOTS[node.node_type]) {
+        const target = (cfg as Record<string, unknown>)[slot.key];
+        if (typeof target !== "string" || !knownKeys.has(target)) continue;
+        edges.push({
+          id: `${node.node_key}--${slot.handle}--${target}`,
+          source: node.node_key,
+          target,
+          sourceHandle: slot.handle,
+          label: slot.label,
+        });
+      }
+      continue;
+    }
     switch (node.node_type) {
       case "start":
       case "send_message":
       case "send_media":
       case "collect_input":
-      case "set_tag": {
+      case "set_tag":
+      case "send_template":
+      case "update_contact_field":
+      case "create_deal":
+      case "assign_conversation":
+      case "wait":
+      case "close_conversation": {
         const next = (cfg as { next_node_key?: string }).next_node_key;
         if (next && knownKeys.has(next)) {
           edges.push({
@@ -138,6 +216,8 @@ export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
         break;
       }
 
+      case "send_webhook":
+      case "route_to_queue":
       case "handoff":
       case "end":
         // Terminal nodes — no outgoing edges.
@@ -173,12 +253,24 @@ export interface OutgoingSlot {
 
 export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
   const cfg = node.config;
+  if (isSchedulingNode(node.node_type)) {
+    return SCHEDULING_SLOTS[node.node_type].map((slot) => ({
+      id: slot.handle,
+      label: slot.label,
+    }));
+  }
   switch (node.node_type) {
     case "start":
     case "send_message":
     case "send_media":
     case "collect_input":
     case "set_tag":
+    case "send_template":
+    case "update_contact_field":
+    case "create_deal":
+    case "assign_conversation":
+    case "wait":
+    case "close_conversation":
       return [{ id: "next", label: "Next" }];
 
     case "condition":
@@ -226,6 +318,16 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
       return slots;
     }
 
+    case "offer_slots":
+    case "book_appointment":
+    case "reschedule_appointment":
+    case "cancel_appointment":
+      // Resolvidos antes do switch, pela tabela. O caso existe só para o
+      // compilador continuar cobrando exaustividade dos outros.
+      return [];
+
+    case "send_webhook":
+    case "route_to_queue":
     case "handoff":
     case "end":
       return [];
@@ -247,12 +349,24 @@ export function applyEdgeConnection(
   sourceHandle: string,
   targetKey: string,
 ): Record<string, unknown> | null {
+  if (isSchedulingNode(node.node_type)) {
+    const slot = SCHEDULING_SLOTS[node.node_type].find(
+      (candidate) => candidate.handle === sourceHandle,
+    );
+    return slot ? { [slot.key]: targetKey } : null;
+  }
   switch (node.node_type) {
     case "start":
     case "send_message":
     case "send_media":
     case "collect_input":
     case "set_tag":
+    case "send_template":
+    case "update_contact_field":
+    case "create_deal":
+    case "assign_conversation":
+    case "wait":
+    case "close_conversation":
       if (sourceHandle === "next") return { next_node_key: targetKey };
       return null;
 
@@ -310,6 +424,14 @@ export function applyEdgeConnection(
       return matched ? { sections: next } : null;
     }
 
+    case "offer_slots":
+    case "book_appointment":
+    case "reschedule_appointment":
+    case "cancel_appointment":
+      return null;
+
+    case "send_webhook":
+    case "route_to_queue":
     case "handoff":
     case "end":
       return null;
@@ -341,12 +463,27 @@ function patchedConfigWithoutKey(
   deletedKey: string,
 ): Record<string, unknown> | null {
   const cfg = node.config;
+  if (isSchedulingNode(node.node_type)) {
+    const cleared: Record<string, unknown> = {};
+    for (const slot of SCHEDULING_SLOTS[node.node_type]) {
+      if ((cfg as Record<string, unknown>)[slot.key] === deletedKey) {
+        cleared[slot.key] = "";
+      }
+    }
+    return Object.keys(cleared).length > 0 ? { ...cfg, ...cleared } : null;
+  }
   switch (node.node_type) {
     case "start":
     case "send_message":
     case "send_media":
     case "collect_input":
-    case "set_tag": {
+    case "set_tag":
+    case "send_template":
+    case "update_contact_field":
+    case "create_deal":
+    case "assign_conversation":
+    case "wait":
+    case "close_conversation": {
       const next = (cfg as { next_node_key?: string }).next_node_key;
       if (next !== deletedKey) return null;
       return { ...cfg, next_node_key: "" };
@@ -404,6 +541,14 @@ function patchedConfigWithoutKey(
       return dirty ? { ...cfg, sections: next } : null;
     }
 
+    case "offer_slots":
+    case "book_appointment":
+    case "reschedule_appointment":
+    case "cancel_appointment":
+      return null;
+
+    case "send_webhook":
+    case "route_to_queue":
     case "handoff":
     case "end":
       return null;

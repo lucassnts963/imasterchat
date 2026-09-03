@@ -17,13 +17,40 @@ import type {
   WaitStepConfig,
   CreateDealStepConfig,
   AssignConversationStepConfig,
+  StartFlowStepConfig,
+  BookAppointmentStepConfig,
+  RescheduleAppointmentStepConfig,
+  CancelAppointmentStepConfig,
+  SendMediaStepConfig,
+  RouteToQueueStepConfig,
+  HandoffStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
 import { addContactTagIfAbsent } from '@/lib/contacts/tag-write'
 import { MAX_TAG_CHAIN_DEPTH, getTagChainDepth } from '@/lib/contacts/tag-chain'
 import { engineSendText, engineSendTemplate, engineSendInteractive } from './meta-send'
+// A mídia mora no módulo de fluxos e é usada pelos dois, do mesmo jeito
+// que o envio interativo — uma implementação, dois motores.
+import { engineSendMedia } from '@/lib/flows/meta-send'
+import { templateParams } from '@/lib/whatsapp/template-params'
+import {
+  assignConversation,
+  closeConversation,
+  createDeal,
+  updateContactField,
+} from '@/lib/actions/crm'
+import { loadQueue, routeConversationToQueue } from '@/lib/actions/queue-routing'
+import { handOffConversation } from '@/lib/conversations/handoff'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
+import { describeStartFlowRefusal, startFlowRun } from '@/lib/flows/engine'
+import {
+  bookForContact,
+  cancelForContact,
+  rescheduleForContact,
+  resolveSchedulingContext,
+} from '@/lib/actions/scheduling'
+import { getFlowChainDepth } from '@/lib/flows/chain'
 
 // ------------------------------------------------------------
 // Public API
@@ -400,24 +427,9 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!args.contactId) throw new Error('send_template needs a contact')
       if (!cfg.template_name) throw new Error('send_template needs template_name')
       const conversationId = await resolveConversationId(args)
-      // Meta templates use positional {{1}}, {{2}}, … placeholders, so
-      // we MUST emit params in strict numeric order. Lexicographic sort
-      // of "1", "2", …, "10" yields "1", "10", "2", … which silently
-      // scrambles every template with ≥10 variables.
-      const params = cfg.variables
-        ? Object.keys(cfg.variables)
-            .sort((a, b) => {
-              const na = Number(a)
-              const nb = Number(b)
-              const aNum = Number.isFinite(na)
-              const bNum = Number.isFinite(nb)
-              if (aNum && bNum) return na - nb
-              if (aNum) return -1
-              if (bNum) return 1
-              return a.localeCompare(b)
-            })
-            .map((k) => String(cfg.variables![k]))
-        : []
+      // A ordem posicional é regra da Meta e vale para os três lugares
+      // que mandam template — ver `templateParams`.
+      const params = templateParams(cfg.variables)
       const { whatsapp_message_id } = await engineSendTemplate({
         accountId: args.automation.account_id,
         userId: args.automation.user_id,
@@ -483,115 +495,45 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
     case 'assign_conversation': {
       const cfg = step.step_config as AssignConversationStepConfig
       if (!args.contactId) throw new Error('assign_conversation needs a contact')
-      let agentId = cfg.agent_id
-      if (cfg.mode === 'round_robin') {
-        // NÃO é rodízio, e a tela deixou de chamar assim: o rótulo agora
-        // é "Qualquer pessoa da equipe", que é o que esta consulta faz.
-        //
-        // Sem ORDER BY e sem estado do último escolhido, o Postgres
-        // devolve a linha que quiser — na prática quase sempre a mesma
-        // pessoa. Prometer revezamento aqui era pior que não oferecer:
-        // quem ligava acreditava que a equipe estava sendo repartida.
-        //
-        // O nome da chave continua `round_robin` de propósito, para não
-        // quebrar as automações já salvas. Quando o rodízio de verdade
-        // existir (por FILA, com cursor travado na própria linha — ver
-        // docs/plano.md, onda 6), ele entra como um modo NOVO, e este
-        // continua sendo o que sempre foi.
-        const { data: profiles } = await db
-          .from('profiles')
-          .select('user_id')
-          .eq('account_id', args.automation.account_id)
-          .limit(1)
-        agentId = profiles?.[0]?.user_id
-      }
-      if (!agentId) return 'no agent resolved'
-      await db
-        .from('conversations')
-        .update({ assigned_agent_id: agentId })
-        .eq('account_id', args.automation.account_id)
-        .eq('contact_id', args.contactId)
-      return `assigned to ${agentId}`
+      const result = await assignConversation({
+        db,
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        mode: cfg.mode,
+        agentId: cfg.agent_id,
+      })
+      return result.message
     }
 
     case 'update_contact_field': {
       const cfg = step.step_config as UpdateContactFieldStepConfig
       if (!args.contactId) throw new Error('update_contact_field needs a contact')
-      // Resolve workflow variables ({{ vars.* }}, {{ message.text }}) so custom
-      // values can be populated dynamically from the triggering context.
-      const value = interpolate(cfg.value, args)
-
-      // Custom fields are encoded as `custom:<custom_field_id>`; anything else
-      // is a built-in contact column.
-      if (cfg.field.startsWith('custom:')) {
-        const customFieldId = cfg.field.slice('custom:'.length)
-        if (!customFieldId) {
-          return `field ${cfg.field} not writable from automations`
-        }
-        // Defense in depth: the service-role client bypasses RLS, so confirm
-        // the field definition belongs to this account before writing.
-        const { data: field } = await db
-          .from('custom_fields')
-          .select('id')
-          .eq('id', customFieldId)
-          .eq('account_id', args.automation.account_id)
-          .maybeSingle()
-        if (!field) {
-          return `field ${cfg.field} not writable from automations`
-        }
-        // Upsert on the table's UNIQUE(contact_id, custom_field_id) so repeated
-        // runs overwrite rather than duplicate. Tenancy is enforced above and,
-        // for the contact side, by the entry-point ownership guard.
-        await db
-          .from('contact_custom_values')
-          .upsert(
-            { contact_id: args.contactId, custom_field_id: customFieldId, value },
-            { onConflict: 'contact_id,custom_field_id' },
-          )
-        return `custom field updated`
-      }
-
-      const allowed = new Set(['name', 'email', 'company'])
-      if (!allowed.has(cfg.field)) {
-        return `field ${cfg.field} not writable from automations`
-      }
-      // Defense in depth: scope the service-role write to the account so
-      // a future caller that skips the entry-point ownership guard still
-      // cannot write across tenants.
-      await db
-        .from('contacts')
-        .update({ [cfg.field]: value, updated_at: new Date().toISOString() })
-        .eq('id', args.contactId)
-        .eq('account_id', args.automation.account_id)
-      return `${cfg.field} updated`
+      const result = await updateContactField({
+        db,
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        field: cfg.field,
+        // Resolve as variáveis do gatilho antes de gravar; a ação não
+        // conhece as variáveis de nenhum motor.
+        value: interpolate(cfg.value, args),
+      })
+      return result.message
     }
 
     case 'create_deal': {
       const cfg = step.step_config as CreateDealStepConfig
       if (!cfg.pipeline_id || !cfg.stage_id) throw new Error('create_deal needs pipeline + stage')
-      // Match the account's configured default currency rather than
-      // the static `deals.currency` DB default — keeps automation-
-      // created deals consistent with the one-currency-per-account
-      // rule (issue #218). Fall back to USD if the row is somehow
-      // missing the value (pre-021 forks).
-      const { data: acct } = await db
-        .from('accounts')
-        .select('default_currency')
-        .eq('id', args.automation.account_id)
-        .maybeSingle()
-      await db.from('deals').insert({
-        // Tenancy + audit, same split as automation_logs above.
-        account_id: args.automation.account_id,
-        user_id: args.automation.user_id,
-        pipeline_id: cfg.pipeline_id,
-        stage_id: cfg.stage_id,
-        contact_id: args.contactId,
+      const result = await createDeal({
+        db,
+        accountId: args.automation.account_id,
+        userId: args.automation.user_id,
+        pipelineId: cfg.pipeline_id,
+        stageId: cfg.stage_id,
+        contactId: args.contactId,
         title: interpolate(cfg.title, args),
-        value: cfg.value ?? 0,
-        currency: acct?.default_currency ?? 'USD',
-        status: 'open',
+        value: cfg.value,
       })
-      return 'deal created'
+      return result.message
     }
 
     case 'send_webhook': {
@@ -619,14 +561,167 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       return `webhook ${res.status}`
     }
 
+    case 'start_flow': {
+      const cfg = step.step_config as StartFlowStepConfig
+      if (!args.contactId) throw new Error('start_flow needs a contact')
+      if (!cfg.flow_id) throw new Error('start_flow needs flow_id')
+
+      // The vars the flow will interpolate. The automation's own
+      // context goes in interpolated, so `{{ message.text }}` in the
+      // step config means what it means everywhere else here.
+      const seeded: Record<string, unknown> = { ...(args.context.vars ?? {}) }
+      for (const [k, v] of Object.entries(cfg.vars ?? {})) {
+        seeded[k] = interpolate(String(v), args)
+      }
+
+      const result = await startFlowRun({
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        flowId: cfg.flow_id,
+        startedBy: 'automation',
+        conversationId: args.context.conversation_id ?? null,
+        vars: seeded,
+        chainDepth: getFlowChainDepth(args.context.vars),
+      })
+
+      // A refusal is NOT a step failure. "The contact is already in a
+      // flow" is the correct outcome of a correctly-built automation
+      // whose customer happens to be mid-menu, and throwing would mark
+      // the whole run failed and stop every step after this one. It is
+      // recorded in the step detail, where the operator reads it.
+      if (!result.started) {
+        return `flow not started: ${describeStartFlowRefusal(result.reason)}`
+      }
+      return `flow started (run ${result.flowRunId})`
+    }
+
+    // Agendamento — fase 1, R-5. Toda a regra vem de
+    // `@/lib/actions/scheduling`, a mesma que o agente e o fluxo usam.
+    // Aqui só existe a tradução para o vocabulário da automação: um
+    // resultado da ação vira uma linha no log do passo.
+    //
+    // `consultar_horarios` NÃO existe como passo, e a ausência é
+    // deliberada: apresentar horários exige esperar a escolha, e esperar
+    // uma pessoa é fluxo. A automação que precisa disso usa `start_flow`.
+    case 'book_appointment':
+    case 'reschedule_appointment':
+    case 'cancel_appointment': {
+      if (!args.contactId) throw new Error(`${step.step_type} needs a contact`)
+      const scheduling = await resolveSchedulingContext(db, args.automation.account_id)
+      if (!scheduling) {
+        // Não lança: uma conta com o agendamento desligado não é uma
+        // automação quebrada, e derrubar a execução mataria os passos
+        // seguintes.
+        return 'scheduling is not set up for this account'
+      }
+
+      if (step.step_type === 'cancel_appointment') {
+        const cfg = step.step_config as CancelAppointmentStepConfig
+        const result = await cancelForContact({
+          db,
+          accountId: args.automation.account_id,
+          contactId: args.contactId,
+          settings: scheduling.settings,
+          connection: scheduling.connection,
+          reason: cfg.reason ? interpolate(cfg.reason, args) : null,
+        })
+        return result.ok ? 'appointment cancelled' : `not cancelled: ${result.message}`
+      }
+
+      const cfg = step.step_config as
+        | BookAppointmentStepConfig
+        | RescheduleAppointmentStepConfig
+      const startsAt = interpolate(cfg.starts_at, args)
+      const endsAt = interpolate(cfg.ends_at, args)
+
+      if (step.step_type === 'reschedule_appointment') {
+        const result = await rescheduleForContact({
+          db,
+          accountId: args.automation.account_id,
+          contactId: args.contactId,
+          settings: scheduling.settings,
+          connection: scheduling.connection,
+          startsAt,
+          endsAt,
+        })
+        return result.ok ? 'appointment moved' : `not moved: ${result.message}`
+      }
+
+      const result = await bookForContact({
+        db,
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        conversationId: args.context.conversation_id ?? null,
+        settings: scheduling.settings,
+        connection: scheduling.connection,
+        startsAt,
+        endsAt,
+        title: (cfg as BookAppointmentStepConfig).title
+          ? interpolate((cfg as BookAppointmentStepConfig).title!, args)
+          : null,
+        createdVia: 'native',
+      })
+      return result.ok ? 'appointment booked' : `not booked: ${result.message}`
+    }
+
     case 'close_conversation': {
       if (!args.contactId) throw new Error('close_conversation needs a contact')
-      await db
-        .from('conversations')
-        .update({ status: 'closed', updated_at: new Date().toISOString() })
-        .eq('account_id', args.automation.account_id)
-        .eq('contact_id', args.contactId)
-      return 'conversation closed'
+      const result = await closeConversation({
+        db,
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+      })
+      return result.message
+    }
+
+    case 'send_media': {
+      const cfg = step.step_config as SendMediaStepConfig
+      if (!args.contactId) throw new Error('send_media needs a contact')
+      if (!cfg.media_url) throw new Error('send_media needs a file')
+      const conversationId = await resolveConversationId(args)
+      const { whatsapp_message_id } = await engineSendMedia({
+        accountId: args.automation.account_id,
+        userId: args.automation.user_id,
+        conversationId,
+        contactId: args.contactId,
+        kind: cfg.media_type,
+        link: cfg.media_url,
+        caption: cfg.caption ? interpolate(cfg.caption, args) : undefined,
+        filename: cfg.filename,
+      })
+      return `media sent via Meta (${whatsapp_message_id})`
+    }
+
+    case 'route_to_queue': {
+      const cfg = step.step_config as RouteToQueueStepConfig
+      if (!cfg.queue_id) throw new Error('route_to_queue needs a queue')
+      const conversationId = await resolveConversationId(args)
+      const queue = await loadQueue(db, args.automation.account_id, cfg.queue_id)
+      // Fila apagada, desativada, ou trocada para atendimento por robô.
+      // Não é falha da automação — mas encaminhar para o nada seria pior
+      // que dizer que não deu.
+      if (!queue) return 'queue not available for routing'
+      const result = await routeConversationToQueue({
+        db,
+        accountId: args.automation.account_id,
+        conversationId,
+        queue,
+        summary: cfg.reason ? interpolate(cfg.reason, args) : `🤖 ${queue.name}`,
+      })
+      return result.message
+    }
+
+    case 'handoff': {
+      const cfg = step.step_config as HandoffStepConfig
+      const conversationId = await resolveConversationId(args)
+      const result = await handOffConversation({
+        db,
+        accountId: args.automation.account_id,
+        conversationId,
+        summary: cfg.note ? interpolate(cfg.note, args) : '🤖 Transferido por automação.',
+        assignTo: cfg.assign_to || null,
+      })
+      return result.ok ? 'handed off to a human' : `not handed off: ${result.message}`
     }
 
     default:

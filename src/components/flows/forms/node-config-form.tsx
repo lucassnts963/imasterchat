@@ -25,6 +25,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   Loader2,
   Paperclip,
@@ -207,6 +208,250 @@ export function NodeConfigForm({
           onUpdateConfig={onUpdateConfig}
           t={t}
         />
+      );
+
+    case "send_template":
+      return (
+        <SendTemplateForm
+          cfg={cfg as SendTemplateCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      );
+
+    case "update_contact_field":
+      return (
+        <>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">
+              {t("fieldLabel")}
+            </label>
+            <Input
+              value={(cfg as { field?: string }).field ?? ""}
+              onChange={(e) => onUpdateConfig({ field: e.target.value })}
+              placeholder="name"
+              className="bg-muted text-xs"
+            />
+          </div>
+          <TextRow
+            label={t("valueLabel")}
+            value={(cfg as { value?: string }).value ?? ""}
+            onChange={(v) => onUpdateConfig({ value: v })}
+          />
+          <NextNodeRow
+            value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onChange={(v) => onUpdateConfig({ next_node_key: v })}
+            label={t("advancesTo")}
+          />
+        </>
+      );
+
+    case "create_deal":
+      return (
+        <CreateDealForm
+          cfg={cfg as CreateDealCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      );
+
+    case "assign_conversation":
+      return (
+        <AssignConversationForm
+          cfg={cfg as AssignConversationCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      );
+
+    case "close_conversation":
+      return (
+        <NextNodeRow
+          value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onChange={(v) => onUpdateConfig({ next_node_key: v })}
+          label={t("advancesTo")}
+        />
+      );
+
+    case "wait":
+      return (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t("waitAmount")}
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={(cfg as { amount?: number }).amount ?? 1}
+                onChange={(e) =>
+                  onUpdateConfig({ amount: Math.max(1, Number(e.target.value)) })
+                }
+                className="bg-muted text-xs"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t("waitUnit")}
+              </label>
+              <Select
+                value={(cfg as { unit?: string }).unit ?? "hours"}
+                onValueChange={(v) => onUpdateConfig({ unit: v ?? "hours" })}
+              >
+                <SelectTrigger className="bg-muted">
+                  <SelectValue>
+                    {labelOf({
+                      minutes: t("unitMinutes"),
+                      hours: t("unitHours"),
+                      days: t("unitDays"),
+                    })((cfg as { unit?: string }).unit ?? "hours")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minutes">{t("unitMinutes")}</SelectItem>
+                  <SelectItem value="hours">{t("unitHours")}</SelectItem>
+                  <SelectItem value="days">{t("unitDays")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <NextNodeRow
+            value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onChange={(v) => onUpdateConfig({ next_node_key: v })}
+            label={t("advancesTo")}
+          />
+          <p className="text-xs text-muted-foreground">{t("waitHint")}</p>
+        </>
+      );
+
+    case "send_webhook":
+      return (
+        <>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">
+              {t("webhookUrl")}
+            </label>
+            <Input
+              value={(cfg as { url?: string }).url ?? ""}
+              onChange={(e) => onUpdateConfig({ url: e.target.value })}
+              placeholder="https://…"
+              className="bg-muted font-mono text-xs"
+            />
+          </div>
+          <TextRow
+            label={t("webhookBody")}
+            value={(cfg as { body_template?: string }).body_template ?? ""}
+            onChange={(v) => onUpdateConfig({ body_template: v })}
+            rows={3}
+          />
+          <SchedulingEdges
+            cfg={cfg as Record<string, string | undefined>}
+            keys={[
+              ["next_node_key", "onWebhookOk"],
+              ["on_error_next", "onWebhookFailed"],
+            ]}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onUpdateConfig={onUpdateConfig}
+            t={t}
+          />
+        </>
+      );
+
+    case "route_to_queue":
+      return (
+        <RouteToQueueForm
+          cfg={cfg as RouteToQueueCfg}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      );
+
+    case "offer_slots":
+      return (
+        <OfferSlotsForm
+          cfg={cfg as OfferSlotsCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      );
+
+    case "book_appointment":
+      return (
+        <>
+          <TextRow
+            label={t("appointmentTitle")}
+            value={(cfg as { title?: string }).title ?? ""}
+            onChange={(v) => onUpdateConfig({ title: v })}
+          />
+          <SchedulingEdges
+            cfg={cfg as Record<string, string | undefined>}
+            keys={[
+              ["next_node_key", "onBooked"],
+              ["on_unavailable_next", "onSlotTaken"],
+              ["on_error_next", "onCalendarError"],
+            ]}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onUpdateConfig={onUpdateConfig}
+            t={t}
+          />
+        </>
+      );
+
+    case "reschedule_appointment":
+      return (
+        <SchedulingEdges
+          cfg={cfg as Record<string, string | undefined>}
+          keys={[
+            ["next_node_key", "onMoved"],
+            ["on_unavailable_next", "onSlotTaken"],
+            ["on_no_appointment_next", "onNothingBooked"],
+            ["on_error_next", "onCalendarError"],
+          ]}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      );
+
+    case "cancel_appointment":
+      return (
+        <>
+          <TextRow
+            label={t("cancelReason")}
+            value={(cfg as { reason?: string }).reason ?? ""}
+            onChange={(v) => onUpdateConfig({ reason: v })}
+          />
+          <SchedulingEdges
+            cfg={cfg as Record<string, string | undefined>}
+            keys={[
+              ["next_node_key", "onCancelled"],
+              ["on_no_appointment_next", "onNothingBooked"],
+              ["on_error_next", "onCalendarError"],
+            ]}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onUpdateConfig={onUpdateConfig}
+            t={t}
+          />
+        </>
       );
 
     case "handoff":
@@ -1094,6 +1339,580 @@ function SendMediaForm({
         onChange={(v) => onUpdateConfig({ next_node_key: v })}
         label={t("advanceAfterSending")}
       />
+    </>
+  );
+}
+
+// ============================================================
+// Agendamento — fase 1, R-4
+//
+// Os quatro nós têm a mesma forma: um ou dois campos próprios e um
+// punhado de saídas nomeadas. As saídas ganham um componente só, porque
+// a parte que o operador precisa entender não é o campo — é que
+// "calendário com erro" e "sem horário livre" NÃO são o mesmo caminho.
+// ============================================================
+
+interface OfferSlotsCfg {
+  text?: string;
+  button_label?: string;
+  max_options?: number;
+  lookahead_days?: number;
+  next_node_key?: string;
+  no_slots_next?: string;
+  on_error_next?: string;
+}
+
+function OfferSlotsForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: OfferSlotsCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <>
+      <TextRow
+        label={t("textToCustomer")}
+        value={cfg.text ?? ""}
+        onChange={(v) => onUpdateConfig({ text: v })}
+        rows={2}
+      />
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">
+          {t("listButtonLabel")}
+        </label>
+        <Input
+          value={cfg.button_label ?? ""}
+          onChange={(e) => onUpdateConfig({ button_label: e.target.value })}
+          className="bg-muted text-xs"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">
+            {t("maxOptions")}
+          </label>
+          <Input
+            type="number"
+            min={1}
+            max={10}
+            value={cfg.max_options ?? 5}
+            onChange={(e) =>
+              onUpdateConfig({
+                max_options: Math.min(10, Math.max(1, Number(e.target.value))),
+              })
+            }
+            className="bg-muted text-xs"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">
+            {t("lookaheadDays")}
+          </label>
+          <Input
+            type="number"
+            min={1}
+            value={cfg.lookahead_days ?? ""}
+            placeholder={t("lookaheadDaysPlaceholder")}
+            onChange={(e) =>
+              onUpdateConfig({
+                lookahead_days: e.target.value
+                  ? Math.max(1, Number(e.target.value))
+                  : undefined,
+              })
+            }
+            className="bg-muted text-xs"
+          />
+        </div>
+      </div>
+      <SchedulingEdges
+        cfg={cfg as Record<string, string | undefined>}
+        keys={[
+          ["next_node_key", "onSlotChosen"],
+          ["no_slots_next", "onNoSlots"],
+          ["on_error_next", "onCalendarError"],
+        ]}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onUpdateConfig={onUpdateConfig}
+        t={t}
+      />
+    </>
+  );
+}
+
+function SchedulingEdges({
+  cfg,
+  keys,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: Record<string, string | undefined>;
+  /** `[chave da config, chave de tradução do rótulo]`, na ordem da tela. */
+  keys: Array<[string, string]>;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <>
+      {keys.map(([key, labelKey]) => (
+        <NextNodeRow
+          key={key}
+          value={cfg[key] ?? ""}
+          allNodes={allNodes}
+          currentKey={currentKey}
+          onChange={(v) => onUpdateConfig({ [key]: v })}
+          label={t(labelKey)}
+        />
+      ))}
+    </>
+  );
+}
+
+// ============================================================
+// CRM e encaminhamento — fase 1, R-6 a R-8
+//
+// Os seletores carregam do banco pelo cliente do navegador, como a tela
+// de automações já faz, e TODOS caem num campo de texto quando a lista
+// vem vazia. Conta nova, migração ainda não aplicada, endpoint fora do
+// ar: um fluxo precisa continuar sendo escrevível, mesmo que o autor
+// tenha de colar um id.
+// ============================================================
+
+interface ApprovedTemplate {
+  name: string;
+}
+
+function useApprovedTemplates(): ApprovedTemplate[] {
+  const [templates, setTemplates] = useState<ApprovedTemplate[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      // Só APROVADOS: qualquer outro estado dá 400 no envio, e oferecer
+      // na tela seria construir um nó que sempre falha.
+      const { data } = await createClient()
+        .from("message_templates")
+        .select("name")
+        .eq("status", "APPROVED")
+        .order("name");
+      if (!cancelled && Array.isArray(data)) {
+        setTemplates(data as ApprovedTemplate[]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return templates;
+}
+
+interface SendTemplateCfg {
+  template_name?: string;
+  language?: string;
+  variables?: Record<string, string>;
+  next_node_key?: string;
+}
+
+function SendTemplateForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: SendTemplateCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const templates = useApprovedTemplates();
+
+  return (
+    <>
+      <PickerRow
+        label={t("templateLabel")}
+        value={cfg.template_name ?? ""}
+        options={templates.map((tpl) => ({ value: tpl.name, label: tpl.name }))}
+        placeholder={t("templatePlaceholder")}
+        onChange={(v) => onUpdateConfig({ template_name: v })}
+      />
+      <TemplateVariablesRow
+        variables={cfg.variables ?? {}}
+        onChange={(variables) => onUpdateConfig({ variables })}
+        t={t}
+      />
+      <NextNodeRow
+        value={cfg.next_node_key ?? ""}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onChange={(v) => onUpdateConfig({ next_node_key: v })}
+        label={t("advanceAfterSending")}
+      />
+    </>
+  );
+}
+
+interface PickerOption {
+  value: string;
+  label: string;
+}
+
+function PickerRow({
+  label,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: PickerOption[];
+  placeholder: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs text-muted-foreground">{label}</label>
+      {options.length > 0 ? (
+        <Select value={value} onValueChange={(v) => onChange(v ?? "")}>
+          <SelectTrigger className="bg-muted">
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+            {/* Preserva um valor salvo que sumiu da lista, para editar um
+                fluxo antigo não apagar silenciosamente o alvo. */}
+            {value && !options.some((o) => o.value === value) && (
+              <SelectItem value={value}>{value}</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="bg-muted text-xs"
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * As variáveis posicionais do template.
+ *
+ * Editadas como uma linha por número porque é assim que a Meta as
+ * consome — `{{1}}`, `{{2}}`, … — e porque a ordem importa: uma lista
+ * ordenada na tela é a única forma de o autor ver o que o cliente vai
+ * receber em cada lacuna.
+ */
+function TemplateVariablesRow({
+  variables,
+  onChange,
+  t,
+}: {
+  variables: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const keys = Object.keys(variables).sort((a, b) => Number(a) - Number(b));
+  const nextKey = String(keys.length + 1);
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs text-muted-foreground">
+        {t("templateVariables")}
+      </label>
+      {keys.map((key) => (
+        <div key={key} className="flex items-center gap-2">
+          <span className="w-10 shrink-0 text-xs text-muted-foreground">
+            {`{{${key}}}`}
+          </span>
+          <Input
+            value={variables[key]}
+            onChange={(e) => onChange({ ...variables, [key]: e.target.value })}
+            className="bg-muted text-xs"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const next = { ...variables };
+              delete next[key];
+              onChange(next);
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground"
+            aria-label={t("removeVariable")}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange({ ...variables, [nextKey]: "" })}
+        className="text-xs text-muted-foreground hover:text-foreground"
+      >
+        + {t("addVariable")}
+      </button>
+    </div>
+  );
+}
+
+interface CreateDealCfg {
+  pipeline_id?: string;
+  stage_id?: string;
+  title?: string;
+  value?: number;
+  next_node_key?: string;
+}
+
+function CreateDealForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: CreateDealCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [pipelines, setPipelines] = useState<Array<{ id: string; name: string }>>([]);
+  const [stages, setStages] = useState<
+    Array<{ id: string; name: string; pipeline_id: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const db = createClient();
+      const [p, st] = await Promise.all([
+        db.from("pipelines").select("id, name").order("name"),
+        db
+          .from("pipeline_stages")
+          .select("id, name, pipeline_id")
+          .order("position"),
+      ]);
+      if (cancelled) return;
+      if (Array.isArray(p.data)) setPipelines(p.data as typeof pipelines);
+      if (Array.isArray(st.data)) setStages(st.data as typeof stages);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stagesOfPipeline = stages.filter(
+    (st) => st.pipeline_id === cfg.pipeline_id,
+  );
+
+  return (
+    <>
+      <PickerRow
+        label={t("pipelineLabel")}
+        value={cfg.pipeline_id ?? ""}
+        options={pipelines.map((p) => ({ value: p.id, label: p.name }))}
+        placeholder={t("pipelinePlaceholder")}
+        onChange={(v) =>
+          // Trocar o funil zera a etapa: uma etapa do funil anterior não
+          // existe no novo, e guardá-la seria salvar um negócio que o
+          // banco recusa na hora de criar.
+          onUpdateConfig({ pipeline_id: v, stage_id: "" })
+        }
+      />
+      <PickerRow
+        label={t("stageLabel")}
+        value={cfg.stage_id ?? ""}
+        options={stagesOfPipeline.map((st) => ({ value: st.id, label: st.name }))}
+        placeholder={t("stagePlaceholder")}
+        onChange={(v) => onUpdateConfig({ stage_id: v })}
+      />
+      <TextRow
+        label={t("dealTitleLabel")}
+        value={cfg.title ?? ""}
+        onChange={(v) => onUpdateConfig({ title: v })}
+      />
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">
+          {t("dealValueLabel")}
+        </label>
+        <Input
+          type="number"
+          value={cfg.value ?? 0}
+          onChange={(e) => onUpdateConfig({ value: Number(e.target.value) })}
+          className="bg-muted text-xs"
+        />
+      </div>
+      <NextNodeRow
+        value={cfg.next_node_key ?? ""}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onChange={(v) => onUpdateConfig({ next_node_key: v })}
+        label={t("advancesTo")}
+      />
+    </>
+  );
+}
+
+interface AssignConversationCfg {
+  mode?: "specific" | "round_robin";
+  agent_id?: string;
+  next_node_key?: string;
+}
+
+function AssignConversationForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: AssignConversationCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [members, setMembers] = useState<Array<{ user_id: string; full_name: string | null }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/account/members", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          members?: Array<{ user_id: string; full_name: string | null }>;
+        };
+        if (!cancelled) setMembers(json.members ?? []);
+      } catch {
+        // Endpoint ausente — o seletor cai no campo de texto.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const mode = cfg.mode ?? "round_robin";
+
+  return (
+    <>
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">
+          {t("assignModeLabel")}
+        </label>
+        <Select
+          value={mode}
+          onValueChange={(v) => onUpdateConfig({ mode: v })}
+        >
+          <SelectTrigger className="bg-muted">
+            <SelectValue>
+              {labelOf({
+                round_robin: t("assignAnyMember"),
+                specific: t("assignSpecific"),
+              })(mode)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="round_robin">{t("assignAnyMember")}</SelectItem>
+            <SelectItem value="specific">{t("assignSpecific")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {mode === "specific" && (
+        <PickerRow
+          label={t("agentLabel")}
+          value={cfg.agent_id ?? ""}
+          options={members.map((m) => ({
+            value: m.user_id,
+            label: m.full_name ?? m.user_id,
+          }))}
+          placeholder={t("agentPlaceholder")}
+          onChange={(v) => onUpdateConfig({ agent_id: v })}
+        />
+      )}
+      <NextNodeRow
+        value={cfg.next_node_key ?? ""}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onChange={(v) => onUpdateConfig({ next_node_key: v })}
+        label={t("advancesTo")}
+      />
+    </>
+  );
+}
+
+interface RouteToQueueCfg {
+  queue_id?: string;
+  reason?: string;
+}
+
+function RouteToQueueForm({
+  cfg,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: RouteToQueueCfg;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [queues, setQueues] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      // Só filas HUMANAS e ativas: mandar para a fila do robô seria
+      // encaminhar de volta para quem está encaminhando.
+      const { data } = await createClient()
+        .from("queues")
+        .select("id, name")
+        .eq("active", true)
+        .eq("attended_by", "humans")
+        .order("position");
+      if (!cancelled && Array.isArray(data)) {
+        setQueues(data as typeof queues);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <>
+      <PickerRow
+        label={t("queueLabel")}
+        value={cfg.queue_id ?? ""}
+        options={queues.map((q) => ({ value: q.id, label: q.name }))}
+        placeholder={t("queuePlaceholder")}
+        onChange={(v) => onUpdateConfig({ queue_id: v })}
+      />
+      <TextRow
+        label={t("routeReasonLabel")}
+        value={cfg.reason ?? ""}
+        onChange={(v) => onUpdateConfig({ reason: v })}
+        rows={2}
+      />
+      <p className="text-xs text-muted-foreground">{t("routeToQueueHint")}</p>
     </>
   );
 }

@@ -701,6 +701,230 @@ function validateNode(
       break;
     }
 
+    case "send_template": {
+      const cfg = node.config as { template_name?: string };
+      if (!cfg.template_name?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "template_name",
+          message: "Send-template needs an approved template.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Send-template");
+      break;
+    }
+
+    case "update_contact_field": {
+      const cfg = node.config as { field?: string; value?: string };
+      if (!cfg.field?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "field",
+          message: "Update-field needs a field to write.",
+        });
+      }
+      if (cfg.value === undefined || cfg.value === "") {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "value",
+          message: "Update-field needs a value.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Update-field");
+      break;
+    }
+
+    case "create_deal": {
+      const cfg = node.config as {
+        pipeline_id?: string;
+        stage_id?: string;
+        title?: string;
+      };
+      if (!cfg.pipeline_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "pipeline_id",
+          message: "Create-deal needs a pipeline.",
+        });
+      }
+      if (!cfg.stage_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "stage_id",
+          message: "Create-deal needs a stage.",
+        });
+      }
+      if (!cfg.title?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "title",
+          message: "Create-deal needs a title.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Create-deal");
+      break;
+    }
+
+    case "assign_conversation": {
+      const cfg = node.config as { mode?: string; agent_id?: string };
+      if (cfg.mode === "specific" && !cfg.agent_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "agent_id",
+          message: "Pick the agent to assign to.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Assign");
+      break;
+    }
+
+    case "close_conversation":
+      validateSingleNext(node, knownKeys, issues, "Close-conversation");
+      break;
+
+    case "wait": {
+      const cfg = node.config as { amount?: number; unit?: string };
+      if (
+        typeof cfg.amount !== "number" ||
+        !Number.isFinite(cfg.amount) ||
+        cfg.amount <= 0
+      ) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "amount",
+          message: "Wait amount must be greater than 0.",
+        });
+      }
+      if (!["minutes", "hours", "days"].includes(String(cfg.unit))) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "unit",
+          message: "Wait unit must be minutes, hours, or days.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Wait");
+      break;
+    }
+
+    case "send_webhook": {
+      const cfg = node.config as { url?: string };
+      if (!cfg.url?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "url",
+          message: "Webhook needs a URL.",
+        });
+      } else {
+        try {
+          const parsed = new URL(cfg.url);
+          if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            issues.push({
+              severity: "error",
+              scope: "node",
+              node_key: node.node_key,
+              field: "url",
+              message: "Webhook URL must use http or https.",
+            });
+          }
+        } catch {
+          issues.push({
+            severity: "error",
+            scope: "node",
+            node_key: node.node_key,
+            field: "url",
+            message: "Webhook URL is not a valid URL.",
+          });
+        }
+      }
+      validateSchedulingEdges(node, knownKeys, issues);
+      break;
+    }
+
+    case "route_to_queue": {
+      const cfg = node.config as { queue_id?: string };
+      if (!cfg.queue_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "queue_id",
+          message: "Route-to-queue needs a queue.",
+        });
+      }
+      // Terminal: a conversa passa a ter dono, e o run acaba aqui.
+      break;
+    }
+
+    case "offer_slots": {
+      const cfg = node.config as {
+        text?: string;
+        button_label?: string;
+        max_options?: number;
+      };
+      if (!cfg.text?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "text",
+          message: "Offer-slots needs a message to send above the times.",
+        });
+      }
+      if (!cfg.button_label?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "button_label",
+          message: "Offer-slots needs a label for the button that opens the list.",
+        });
+      }
+      // A Meta corta em 10 linhas. Autorizar 12 na tela e ver 10 chegar
+      // é o tipo de diferença que ninguém liga ao que configurou.
+      if (
+        cfg.max_options !== undefined &&
+        (!Number.isInteger(cfg.max_options) ||
+          cfg.max_options < 1 ||
+          cfg.max_options > 10)
+      ) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "max_options",
+          message: "WhatsApp shows at most 10 options in a list.",
+        });
+      }
+      validateSchedulingEdges(node, knownKeys, issues);
+      break;
+    }
+
+    case "book_appointment":
+    case "reschedule_appointment":
+    case "cancel_appointment":
+      validateSchedulingEdges(node, knownKeys, issues);
+      break;
+
     case "handoff":
     case "end":
       // Terminal nodes have no outgoing edges; nothing to validate
@@ -751,10 +975,20 @@ function outgoingEdges(node: NodeInput): string[] {
     case "send_message":
     case "send_media":
     case "collect_input":
-    case "set_tag": {
+    case "set_tag":
+    case "send_template":
+    case "update_contact_field":
+    case "create_deal":
+    case "assign_conversation":
+    case "close_conversation":
+    case "wait": {
       const cfg = node.config as { next_node_key?: string };
       return cfg.next_node_key ? [cfg.next_node_key] : [];
     }
+    case "send_webhook":
+      return schedulingEdgeKeys("send_webhook")
+        .map((key) => (node.config as Record<string, unknown>)[key])
+        .filter((k): k is string => typeof k === "string" && k.length > 0);
     case "condition": {
       const cfg = node.config as {
         true_next?: string;
@@ -785,9 +1019,113 @@ function outgoingEdges(node: NodeInput): string[] {
       }
       return out;
     }
+    case "offer_slots":
+    case "book_appointment":
+    case "reschedule_appointment":
+    case "cancel_appointment":
+      return schedulingEdgeKeys(node.node_type)
+        .map((key) => (node.config as Record<string, unknown>)[key])
+        .filter((k): k is string => typeof k === "string" && k.length > 0);
+    case "route_to_queue":
     case "handoff":
     case "end":
     default:
       return [];
+  }
+}
+
+// ============================================================
+// Arestas dos nós de agendamento — fase 1, R-4.
+//
+// Todas obrigatórias, e é de propósito. A tentação é deixar
+// `on_error_next` opcional "porque quase nunca acontece": quando
+// acontece, o run morre no meio e o cliente fica falando sozinho. Um
+// fluxo que agenda tem de dizer o que faz quando a agenda não responde,
+// nem que seja mandar para um humano.
+// ============================================================
+
+const SCHEDULING_EDGE_KEYS: Record<string, string[]> = {
+  // O webhook usa a mesma máquina de arestas nomeadas: uma saída boa e
+  // uma de erro, ambas obrigatórias. Um webhook que falha sem destino
+  // deixaria o run morto no meio.
+  send_webhook: ["next_node_key", "on_error_next"],
+  offer_slots: ["next_node_key", "no_slots_next", "on_error_next"],
+  book_appointment: [
+    "next_node_key",
+    "on_unavailable_next",
+    "on_error_next",
+  ],
+  reschedule_appointment: [
+    "next_node_key",
+    "on_unavailable_next",
+    "on_no_appointment_next",
+    "on_error_next",
+  ],
+  cancel_appointment: [
+    "next_node_key",
+    "on_no_appointment_next",
+    "on_error_next",
+  ],
+};
+
+function schedulingEdgeKeys(nodeType: string): string[] {
+  return SCHEDULING_EDGE_KEYS[nodeType] ?? [];
+}
+
+function validateSingleNext(
+  node: NodeInput,
+  knownKeys: Set<string>,
+  issues: ValidationIssue[],
+  label: string,
+): void {
+  const next = (node.config as { next_node_key?: string }).next_node_key;
+  if (!next) {
+    issues.push({
+      severity: "error",
+      scope: "node",
+      node_key: node.node_key,
+      field: "next_node_key",
+      message: `${label} must point to a next node.`,
+    });
+    return;
+  }
+  if (!knownKeys.has(next)) {
+    issues.push({
+      severity: "error",
+      scope: "node",
+      node_key: node.node_key,
+      field: "next_node_key",
+      message: `${label} points to non-existent node "${next}".`,
+    });
+  }
+}
+
+function validateSchedulingEdges(
+  node: NodeInput,
+  knownKeys: Set<string>,
+  issues: ValidationIssue[],
+): void {
+  const cfg = node.config as Record<string, unknown>;
+  for (const key of schedulingEdgeKeys(node.node_type)) {
+    const target = cfg[key];
+    if (typeof target !== "string" || target.length === 0) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        node_key: node.node_key,
+        field: key,
+        message: `Scheduling nodes must say where to go on "${key.replace(/_next$|_node_key$/, "").replace(/^on_/, "")}".`,
+      });
+      continue;
+    }
+    if (!knownKeys.has(target)) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        node_key: node.node_key,
+        field: key,
+        message: `Points to non-existent node "${target}".`,
+      });
+    }
   }
 }

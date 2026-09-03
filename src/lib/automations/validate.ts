@@ -143,6 +143,44 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
         issues.push({ path: `${path}.url`, message: 'webhook URL is not a valid URL' })
       }
       break
+    case 'send_media':
+      if (!nonEmpty(c.media_url)) {
+        issues.push({ path: `${path}.media_url`, message: 'a file is required' })
+      }
+      if (!['image', 'video', 'document'].includes(String(c.media_type))) {
+        issues.push({
+          path: `${path}.media_type`,
+          message: 'media type must be image, video, or document',
+        })
+      }
+      break
+    case 'route_to_queue':
+      if (!nonEmpty(c.queue_id)) {
+        issues.push({ path: `${path}.queue_id`, message: 'queue is required' })
+      }
+      break
+    case 'handoff':
+      // Nada obrigatório: nota e atendente são opcionais, e sem os dois
+      // a conversa cai na fila compartilhada — que é um destino válido.
+      break
+    case 'book_appointment':
+    case 'reschedule_appointment':
+      if (!nonEmpty(c.starts_at)) {
+        issues.push({ path: `${path}.starts_at`, message: 'start time is required' })
+      }
+      if (!nonEmpty(c.ends_at)) {
+        issues.push({ path: `${path}.ends_at`, message: 'end time is required' })
+      }
+      break
+    case 'cancel_appointment':
+      // Nada obrigatório: cancelar age sobre o único agendamento vivo do
+      // contato, e o motivo é opcional.
+      break
+    case 'start_flow':
+      if (!nonEmpty(c.flow_id)) {
+        issues.push({ path: `${path}.flow_id`, message: 'flow is required' })
+      }
+      break
     case 'close_conversation':
       // No config required.
       break

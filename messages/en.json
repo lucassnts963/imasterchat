@@ -867,7 +867,14 @@
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
-        "close_conversation": "Close Conversation"
+        "close_conversation": "Close Conversation",
+        "start_flow": "Start Flow",
+        "book_appointment": "Book Appointment",
+        "reschedule_appointment": "Reschedule Appointment",
+        "cancel_appointment": "Cancel Appointment",
+        "send_media": "Send Media",
+        "route_to_queue": "Route to Queue",
+        "handoff": "Hand off to a Human"
       },
       "triggers": {
         "new_message_received": {
@@ -1004,7 +1011,32 @@
         "matchType": "Match type",
         "matchContains": "Contains",
         "matchExact": "Exact",
-        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed.",
+        "flowLabel": "Flow",
+        "flowSelect": "Select a flow…",
+        "flowPlaceholder": "Flow ID",
+        "flowUnknown": "Unavailable flow ({id})",
+        "startFlowHint": "Hands the customer over to a flow, which can wait for an answer — an automation cannot. Only one flow runs per contact at a time; if the customer is already in one, this step is skipped and says so in the log.",
+        "startsAtLabel": "Start (ISO 8601)",
+        "endsAtLabel": "End (ISO 8601)",
+        "cancelReasonLabel": "Reason (optional)",
+        "appointmentTimeHint": "An automation never asks anything, so the time has to come from somewhere else — usually a variable a flow collected and handed over. Business hours, minimum notice and collisions are still checked before anything is written.",
+        "cancelAppointmentHint": "Cancels the customer’s single live appointment and frees the slot. If they have none, the step says so and the automation carries on.",
+        "mediaTypeLabel": "Type",
+        "mediaUrlLabel": "File URL",
+        "captionLabel": "Caption",
+        "filenameLabel": "Filename shown to the customer",
+        "mediaTypes": {
+          "image": "Image",
+          "video": "Video",
+          "document": "Document"
+        },
+        "queueLabel": "Queue",
+        "queueSelect": "Pick a queue…",
+        "queuePlaceholder": "Queue ID",
+        "routeReasonLabel": "Note for whoever picks it up",
+        "handoffNoteLabel": "Internal note",
+        "handoffHint": "Pauses the bot on this conversation and leaves it for a person. Leaving the agent empty drops it into the shared queue."
       },
       "delete": "Delete"
     }
@@ -1150,7 +1182,51 @@
         "filenamePlaceholder": "invoice.pdf",
         "advanceAfterSending": "After sending, advance to",
         "pickNextNode": "Pick a next node…",
-        "none": "— None —"
+        "none": "— None —",
+        "listButtonLabel": "Button that opens the list",
+        "maxOptions": "How many times to offer",
+        "lookaheadDays": "Days ahead",
+        "lookaheadDaysPlaceholder": "account default",
+        "appointmentTitle": "What the appointment is for",
+        "cancelReason": "Reason recorded on the appointment",
+        "onSlotChosen": "Customer picked a time →",
+        "onNoSlots": "No free times →",
+        "onCalendarError": "Calendar could not be read →",
+        "onBooked": "Booked →",
+        "onMoved": "Moved →",
+        "onCancelled": "Cancelled →",
+        "onSlotTaken": "Time taken meanwhile →",
+        "onNothingBooked": "Nothing booked →",
+        "templateLabel": "Approved template",
+        "templatePlaceholder": "Template name",
+        "templateVariables": "Template variables",
+        "addVariable": "Add variable",
+        "removeVariable": "Remove variable",
+        "pipelineLabel": "Pipeline",
+        "pipelinePlaceholder": "Pipeline ID",
+        "stageLabel": "Stage",
+        "stagePlaceholder": "Stage ID",
+        "dealTitleLabel": "Deal title",
+        "dealValueLabel": "Value",
+        "assignModeLabel": "Assign to",
+        "assignAnyMember": "Anyone on the team",
+        "assignSpecific": "A specific agent",
+        "agentLabel": "Agent",
+        "agentPlaceholder": "Agent user id",
+        "queueLabel": "Queue",
+        "queuePlaceholder": "Queue ID",
+        "routeReasonLabel": "Note for whoever picks it up",
+        "routeToQueueHint": "The run ENDS here — the conversation now has an owner, and a flow that kept talking over a person is the worst outcome there is.",
+        "waitAmount": "Wait",
+        "waitUnit": "Unit",
+        "unitMinutes": "minutes",
+        "unitHours": "hours",
+        "unitDays": "days",
+        "waitHint": "The flow stops listening while it waits — a message that arrives meanwhile goes to the agent and the automations, not here.",
+        "webhookUrl": "URL",
+        "webhookBody": "Body (empty sends the run variables as JSON)",
+        "onWebhookOk": "Call succeeded →",
+        "onWebhookFailed": "Call failed →"
       },
       "categories": {
         "messaging": "Messaging",
@@ -1189,6 +1265,54 @@
         "set_tag": {
           "label": "Tag contact",
           "blurb": "Adds or removes a contact tag"
+        },
+        "send_template": {
+          "label": "Send template",
+          "blurb": "Sends an approved template — works outside the 24h window"
+        },
+        "update_contact_field": {
+          "label": "Update field",
+          "blurb": "Writes a value onto the contact"
+        },
+        "create_deal": {
+          "label": "Create deal",
+          "blurb": "Opens a deal in the pipeline"
+        },
+        "assign_conversation": {
+          "label": "Assign",
+          "blurb": "Puts the conversation with someone"
+        },
+        "close_conversation": {
+          "label": "Close conversation",
+          "blurb": "Marks the conversation closed"
+        },
+        "route_to_queue": {
+          "label": "Route to queue",
+          "blurb": "Hands the conversation to a team and ends the run"
+        },
+        "wait": {
+          "label": "Wait",
+          "blurb": "Pauses the run for a set time"
+        },
+        "send_webhook": {
+          "label": "Call webhook",
+          "blurb": "Posts to a URL and branches on the result"
+        },
+        "offer_slots": {
+          "label": "Offer times",
+          "blurb": "Lists free slots and waits for the pick"
+        },
+        "book_appointment": {
+          "label": "Book",
+          "blurb": "Books the time the customer picked"
+        },
+        "reschedule_appointment": {
+          "label": "Reschedule",
+          "blurb": "Moves the existing appointment"
+        },
+        "cancel_appointment": {
+          "label": "Cancel appointment",
+          "blurb": "Cancels and frees the slot"
         },
         "handoff": {
           "label": "Handoff to agent",

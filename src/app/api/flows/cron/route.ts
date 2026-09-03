@@ -2,9 +2,16 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { resolveFallbackPolicy } from '@/lib/flows/fallback'
+import { loadDueRuns, resumeWaitingRun } from '@/lib/flows/engine'
 
 /**
- * Sweep abandoned active flow runs.
+ * Two passes, in this order.
+ *
+ * FIRST, resume the runs parked at a `wait` node whose time has come.
+ * A flow that suspends for the customer is woken by their message; one
+ * parked at a `wait` has nobody to wake it, so the clock is here.
+ *
+ * THEN, sweep abandoned active flow runs.
  *
  * Reads each active run's parent-flow `fallback_policy.on_timeout_hours`
  * to compute the staleness cutoff (default 24h), then marks any run
@@ -48,13 +55,21 @@ export async function GET(request: Request) {
   const admin = supabaseAdmin()
   const now = new Date()
 
+  // Passo 1: retomar quem marcou hora. Antes da varredura de propósito —
+  // um run que acabou de voltar tem `last_advanced_at` atualizado e não
+  // é candidato a abandono na mesma rodada.
+  let resumed = 0
+  for (const due of await loadDueRuns()) {
+    if ((await resumeWaitingRun(due.id)) === 'resumed') resumed += 1
+  }
+
   // Pull all currently-active runs along with their parent flow's
   // fallback_policy. Joined in one query — the small set of active
   // runs per tenant keeps this cheap.
   const { data: runs, error } = await admin
     .from('flow_runs')
     .select(
-      'id, flow_id, user_id, contact_id, last_advanced_at, flows ( fallback_policy )',
+      'id, flow_id, user_id, contact_id, last_advanced_at, resume_at, flows ( fallback_policy )',
     )
     .eq('status', 'active')
 
@@ -62,7 +77,7 @@ export async function GET(request: Request) {
     console.error('[flows-cron] active-run scan failed:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  if (!runs?.length) return NextResponse.json({ swept: 0 })
+  if (!runs?.length) return NextResponse.json({ swept: 0, resumed })
 
   type Row = {
     id: string
@@ -70,11 +85,17 @@ export async function GET(request: Request) {
     user_id: string
     contact_id: string | null
     last_advanced_at: string
+    resume_at: string | null
     flows: { fallback_policy: unknown } | { fallback_policy: unknown }[] | null
   }
 
   let swept = 0
   for (const r of runs as Row[]) {
+    // Quem está dormindo num `wait` não está abandonado. Sem esta
+    // guarda, um degrau de "espera 3 dias" seria varrido em 24 horas —
+    // e a régua de cobrança pararia sozinha no segundo degrau.
+    if (r.resume_at && new Date(r.resume_at) > now) continue
+
     const flowsField = Array.isArray(r.flows) ? r.flows[0] : r.flows
     const policy = resolveFallbackPolicy(flowsField?.fallback_policy ?? null)
     const lastAdvanced = new Date(r.last_advanced_at)
@@ -108,5 +129,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ swept })
+  return NextResponse.json({ swept, resumed })
 }

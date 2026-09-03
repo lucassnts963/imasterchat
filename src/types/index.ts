@@ -480,7 +480,22 @@ export type AutomationStepType =
   | 'wait'
   | 'condition'
   | 'send_webhook'
-  | 'close_conversation';
+  | 'close_conversation'
+  /** Hand the customer over to a flow — the bridge. An automation has
+   *  no memory, so anything that needs to WAIT for an answer belongs on
+   *  the other side of this step. */
+  | 'start_flow'
+  /** Agendamento sem conversa: a automação reage a um estado e mexe na
+   *  agenda. Consultar horários NÃO é um passo — apresentar opções exige
+   *  esperar a escolha, que é fluxo. */
+  | 'book_appointment'
+  | 'reschedule_appointment'
+  | 'cancel_appointment'
+  /** Mídia e encaminhamento: o que o fluxo já sabia fazer e a automação
+   *  não, fechado na fase 1 (R-7, R-8). */
+  | 'send_media'
+  | 'route_to_queue'
+  | 'handoff';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
 
@@ -585,6 +600,64 @@ export interface SendWebhookStepConfig {
   body_template?: string;
 }
 
+/**
+ * Marca um horário para o contato.
+ *
+ * O instante vem de fora — normalmente de uma variável que um fluxo
+ * coletou e entregou pela ponte. Uma automação não pergunta nada, então
+ * ela não tem como descobrir um horário sozinha; o que ela sabe fazer é
+ * agir sobre um que já foi decidido.
+ */
+export interface BookAppointmentStepConfig {
+  /** ISO 8601; interpola `{{ vars.X }}`. */
+  starts_at: string;
+  ends_at: string;
+  title?: string;
+}
+
+export interface RescheduleAppointmentStepConfig {
+  starts_at: string;
+  ends_at: string;
+}
+
+export interface CancelAppointmentStepConfig {
+  /** Motivo registrado no agendamento; interpola `{{ vars.X }}`. */
+  reason?: string;
+}
+
+export interface SendMediaStepConfig {
+  media_type: 'image' | 'video' | 'document';
+  /** URL pública que a Meta busca no envio. */
+  media_url: string;
+  caption?: string;
+  /** Só documentos; a Meta ignora para imagem e vídeo. */
+  filename?: string;
+}
+
+export interface RouteToQueueStepConfig {
+  queue_id: string;
+  /** A nota que quem pegar vai ler; interpola `{{ vars.X }}`. */
+  reason?: string;
+}
+
+export interface HandoffStepConfig {
+  /** Nota interna para quem assumir. */
+  note?: string;
+  /** Atendente específico; vazio deixa na fila compartilhada. */
+  assign_to?: string;
+}
+
+export interface StartFlowStepConfig {
+  /** Which flow to start. Must be active and in the same account. */
+  flow_id: string;
+  /**
+   * Extra variables seeded into the run, on top of the automation's own
+   * context. This is how a cobrança automation hands the amount and the
+   * due date to the menu that asks about them.
+   */
+  vars?: Record<string, string>;
+}
+
 export type AutomationStepConfig =
   | SendMessageStepConfig
   | SendButtonsStepConfig
@@ -597,6 +670,13 @@ export type AutomationStepConfig =
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
+  | StartFlowStepConfig
+  | BookAppointmentStepConfig
+  | RescheduleAppointmentStepConfig
+  | CancelAppointmentStepConfig
+  | SendMediaStepConfig
+  | RouteToQueueStepConfig
+  | HandoffStepConfig
   | Record<string, never>
   | Record<string, unknown>;
 

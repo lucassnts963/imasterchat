@@ -71,6 +71,14 @@ export interface RunAgentResult {
    * recorded anything yet and the caller must.
    */
   handoffSource: 'tool' | 'sentinel' | 'exhausted' | null
+  /**
+   * The agent stopped because something ELSE now owns the reply — today,
+   * a flow it started. Distinct from `handoff`, which means a person
+   * owns the thread: nobody was called, no queue was touched, and the
+   * customer is mid-conversation with the flow. The caller must send
+   * nothing; the flow already spoke.
+   */
+  yielded: boolean
   /** Token usage summed across every provider call in the run. */
   usage: AiUsage | null
   /** Tools actually executed, in order. Empty for a plain reply. */
@@ -208,6 +216,7 @@ interface ToolOutcomeInternal {
   content: string
   isError?: boolean
   handoff?: boolean
+  yieldTurn?: boolean
 }
 
 /**
@@ -248,6 +257,7 @@ export async function runAgent(args: RunAgentArgs): Promise<RunAgentResult> {
         text,
         handoff,
         handoffSource: handoff ? 'sentinel' : null,
+        yielded: false,
         usage,
         steps,
       }
@@ -277,6 +287,23 @@ export async function runAgent(args: RunAgentArgs): Promise<RunAgentResult> {
           text: result.text.split(HANDOFF_SENTINEL).join('').trim(),
           handoff: true,
           handoffSource: 'tool',
+          yielded: false,
+          usage,
+          steps,
+        }
+      }
+
+      if (outcome.yieldTurn) {
+        // A flow is talking to this customer now. Whatever the model
+        // wrote alongside the call is DROPPED on purpose: the flow has
+        // already sent its first node, and letting both out would put
+        // two messages on the thread and leave the customer answering
+        // the wrong one.
+        return {
+          text: '',
+          handoff: false,
+          handoffSource: null,
+          yielded: true,
           usage,
           steps,
         }
@@ -297,5 +324,12 @@ export async function runAgent(args: RunAgentArgs): Promise<RunAgentResult> {
   console.warn(
     `[ai agent] no final answer after ${steps.length} tool call(s) — handing off.`,
   )
-  return { text: '', handoff: true, handoffSource: 'exhausted', usage, steps }
+  return {
+    text: '',
+    handoff: true,
+    handoffSource: 'exhausted',
+    yielded: false,
+    usage,
+    steps,
+  }
 }
