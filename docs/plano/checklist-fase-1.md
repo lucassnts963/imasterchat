@@ -287,3 +287,126 @@ início → Oferecer horários ─── escolheu ──→ Agendar ─── ag
   **Esperar:** marca no horário coletado.
   **Por que está assim:** uma automação não pergunta nada, então ela não tem
   como descobrir um horário sozinha — só agir sobre um já decidido.
+
+---
+
+## Bloco C — encher a matriz (R-6, R-7, R-8)
+
+**Preparação adicional**
+
+- [ ] `bash deploy/apply-migrations.sh` — a **077** precisa ter aplicado.
+- [ ] Um **template APROVADO** na conta, com pelo menos duas variáveis.
+- [ ] Uma **fila humana ativa** (`attended_by = humans`), chamada `FINANCEIRO`.
+- [ ] Um **funil** com pelo menos uma etapa.
+
+### C.1 · Template no fluxo (R-7) — *o item que destrava a régua*
+
+- [ ] **⚡ 🔴 🌐 O fluxo manda template**
+  **Fazer:** fluxo com um nó **Enviar modelo** apontando para o template
+  aprovado, disparado manualmente (pela automação, com **Iniciar fluxo**).
+  **Esperar:** a mensagem chega no celular.
+  **Por que importa:** sem isto um fluxo só sabe *reagir*. Com isto, cada degrau
+  de uma régua de cobrança é um fluxo, e a resposta do cliente cai num menu.
+
+- [ ] **🔴 Fora da janela de 24 horas**
+  **Fazer:** o mesmo, para um contato que não manda mensagem há mais de 24h.
+  **Esperar:** chega assim mesmo. É o ponto inteiro do template.
+
+- [ ] **As variáveis saem na ordem certa**
+  **Fazer:** template com 10+ variáveis, preenchidas `{{1}}`…`{{10}}` na tela.
+  **Esperar:** cada valor na lacuna certa.
+  **Por que está aqui:** ordenar "1", "2", …, "10" como texto dá "1", "10",
+  "2" — e o cliente recebe o nome no lugar do valor **sem erro nenhum**, porque
+  para a Meta a mensagem foi entregue.
+
+- [ ] **Template recusado derruba o run com motivo**
+  **Fazer:** apontar o nó para um nome de template que não existe.
+  **Esperar:** o run termina como `failed`, com o evento `send_template_failed`
+  em `/flows/[id]/runs`.
+  **Não pode:** o run seguir para o próximo nó. O template **é** a mensagem;
+  seguir deixaria o cliente esperando um texto que nunca chegou.
+
+- [ ] **🔴 Automação manda mídia**
+  **Fazer:** automação com o passo **Enviar mídia**, apontando para uma URL
+  pública de imagem.
+  **Esperar:** a imagem chega.
+
+### C.2 · Ações de CRM no fluxo (R-6)
+
+- [ ] **⚡ Os nós aparecem**
+  **Fazer:** abrir um fluxo → adicionar nó.
+  **Esperar:** **Enviar modelo**, **Atualizar campo**, **Criar negócio**,
+  **Atribuir**, **Fechar conversa**, **Encaminhar para fila**.
+
+- [ ] **Escrever num campo do contato**
+  **Fazer:** fluxo que coleta um texto e grava com **Atualizar campo** em
+  `name`, usando `{{vars.…}}`.
+  **Esperar:** o contato aparece com o nome novo em `/contacts`.
+
+- [ ] **Campo não gravável não quebra o fluxo**
+  **Fazer:** apontar o campo para `phone` (fora da lista branca).
+  **Esperar:** o run **segue** para o nó seguinte, e o evento registra
+  `field phone not writable`.
+  **Por que assim:** o cliente não está esperando nada dessa escrita. Abandonar
+  alguém no meio de um menu por causa dela seria pior.
+
+- [ ] **Criar negócio**
+  **Fazer:** nó **Criar negócio** apontando para funil e etapa.
+  **Esperar:** o negócio aparece no funil, **na moeda da conta** — não em USD.
+
+- [ ] **Trocar o funil zera a etapa**
+  **Fazer:** no editor do nó, escolher um funil, depois outro.
+  **Esperar:** a etapa volta a vazio. Uma etapa do funil anterior não existe no
+  novo, e salvá-la criaria um negócio que o banco recusa.
+
+### C.3 · Fila e humano (R-8)
+
+- [ ] **⚡ 🔴 Fluxo encaminha para a fila e PARA**
+  **Fazer:** fluxo com **Encaminhar para fila** → `FINANCEIRO`. Disparar.
+  **Esperar:** a conversa aparece na fila; o run termina como `handed_off`; e
+  **nenhuma** mensagem do fluxo chega depois disso.
+  **Não pode:** o fluxo continuar. Falar por cima de uma pessoa atendendo é o
+  pior desfecho possível.
+
+- [ ] **Fila apagada não prende o contato**
+  **Fazer:** apontar o nó para uma fila, desativá-la, e disparar.
+  **Esperar:** o run termina (`queue_not_available` nos eventos) e o contato
+  fica livre para entrar em outro fluxo.
+  **Por que importa:** um run preso segura o índice de um run ativo por contato
+  e bloqueia todo gatilho futuro daquele contato.
+
+- [ ] **🔴 Automação encaminha para fila**
+  **Fazer:** automação com o passo **Encaminhar para fila**.
+  **Esperar:** mesma coisa, pelo lado da automação.
+
+- [ ] **🔴 Automação passa para humano**
+  **Fazer:** automação com o passo **Passar para humano**, sem escolher
+  atendente.
+  **Esperar:** a conversa fica pausada para o robô e cai na **fila
+  compartilhada**; a resposta automática da IA para de responder nela.
+
+- [ ] **Nunca rouba conversa que já tem dono**
+  **Fazer:** atribuir a conversa a alguém à mão, e então disparar o
+  encaminhamento.
+  **Esperar:** o dono atual **não** é trocado.
+  **Por que está aqui:** é uma garantia de `handOffConversation`, e agora três
+  caminhos diferentes chegam nela.
+
+### C.4 · Regressão do que foi mexido por baixo
+
+- [ ] **⚡ Automação de campo personalizado continua gravando**
+  **Fazer:** automação com **Atualizar campo do contato** num campo
+  personalizado (`custom:<id>`).
+  **Esperar:** grava, e reexecutar **sobrescreve** em vez de duplicar.
+  **Por que está aqui:** os cinco passos de CRM da automação passaram a chamar
+  `src/lib/actions/crm.ts`. Se a extração quebrou algo, quebrou aqui.
+
+- [ ] **Automação de template continua mandando**
+  **Fazer:** automação com **Enviar modelo**, com variáveis.
+  **Esperar:** igual a antes — a ordenação posicional agora é compartilhada com
+  o fluxo.
+
+- [ ] **⚡ O agente ainda encaminha para fila**
+  **Fazer:** conversa em que a IA decide encaminhar.
+  **Esperar:** igual a antes. A ferramenta passou a chamar
+  `src/lib/actions/queue-routing.ts`.

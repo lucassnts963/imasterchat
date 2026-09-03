@@ -3,7 +3,8 @@ import type { SchedulingContext } from '@/lib/actions/scheduling'
 import { resolveSchedulingContext } from '@/lib/actions/scheduling'
 import { requestHumanTool } from './handoff'
 import { buildSchedulingTools } from './scheduling'
-import { buildQueueTools, type QueueOption } from './queues'
+import { buildQueueTools } from './queues'
+import { loadRoutableQueues } from '@/lib/actions/queue-routing'
 import { buildTagTools, type TagOption } from './tags'
 import { buildStartFlowTools, type StartableFlow } from './start-flow'
 import type { AgentTool } from './types'
@@ -76,53 +77,6 @@ export interface BuildToolsArgs {
   /** Pre-loaded deny list, so a caller that already has it does not
    *  make the query twice. */
   disabled?: Set<string>
-}
-
-/**
- * As filas para as quais o agente pode encaminhar.
- *
- * Só as HUMANAS: mandar para a fila do robô seria encaminhar para si
- * mesmo. Só as ativas, e nunca a padrão — a conversa já está nela.
- */
-async function loadRoutableQueues(
-  db: SupabaseClient,
-  accountId: string,
-): Promise<QueueOption[]> {
-  try {
-    const { data } = await db
-      .from('queues')
-      .select('id, name, description, responsible_user_id, auto_assign, distribution')
-      .eq('account_id', accountId)
-      .eq('active', true)
-      .eq('attended_by', 'humans')
-      .order('position')
-    // `Array.isArray`, e não `data ?? []`: uma resposta malformada não é
-    // nula, é um objeto — e o `.map` logo abaixo estouraria FORA do
-    // try/catch, derrubando a montagem inteira do catálogo por causa de
-    // uma consulta acessória.
-    if (!Array.isArray(data)) return []
-    return ((data ?? []) as Array<{
-      id: string
-      name: string
-      description: string | null
-      responsible_user_id: string | null
-      auto_assign: boolean
-      distribution: string
-    }>).map((q) => ({
-      id: q.id,
-      name: q.name,
-      description: q.description,
-      responsibleUserId: q.responsible_user_id,
-      autoAssign: q.auto_assign,
-      distribution: q.distribution ?? 'responsible',
-    }))
-  } catch (err) {
-    // Falhar ABERTO seria oferecer encaminhamento que não funciona.
-    // Sem a lista, a ferramenta não entra no catálogo e o agente cai no
-    // `request_human`, que é o comportamento anterior a esta onda.
-    console.error('[ai tools] filas indisponíveis:', err)
-    return []
-  }
 }
 
 /**

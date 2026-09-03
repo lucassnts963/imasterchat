@@ -37,6 +37,9 @@ import {
   CalendarPlus,
   CalendarClock,
   CalendarX,
+  Image as ImageIcon,
+  Users,
+  UserPlus,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -119,6 +122,9 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   book_appointment: { label: "book_appointment", icon: CalendarPlus, border: "border-l-emerald-500" },
   reschedule_appointment: { label: "reschedule_appointment", icon: CalendarClock, border: "border-l-emerald-500" },
   cancel_appointment: { label: "cancel_appointment", icon: CalendarX, border: "border-l-emerald-500" },
+  send_media: { label: "send_media", icon: ImageIcon, border: "border-l-primary" },
+  route_to_queue: { label: "route_to_queue", icon: Users, border: "border-l-amber-500" },
+  handoff: { label: "handoff", icon: UserPlus, border: "border-l-amber-500" },
 }
 
 const ADDABLE_STEPS: AutomationStepType[] = [
@@ -139,6 +145,9 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "book_appointment",
   "reschedule_appointment",
   "cancel_appointment",
+  "send_media",
+  "route_to_queue",
+  "handoff",
 ]
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType }[] = [
@@ -226,6 +235,9 @@ interface AutomationResources {
    *  so offering a draft here would build an automation that always
    *  reports a refusal. */
   flows: FlowOption[]
+  /** Só filas HUMANAS e ativas — mandar para a fila do robô seria
+   *  encaminhar de volta para quem está encaminhando. */
+  queues: QueueRecord[]
 }
 
 interface PipelineOption {
@@ -234,6 +246,11 @@ interface PipelineOption {
 }
 
 interface FlowOption {
+  id: string
+  name: string
+}
+
+interface QueueRecord {
   id: string
   name: string
 }
@@ -253,6 +270,7 @@ const ResourcesContext = createContext<AutomationResources>({
   pipelines: [],
   stages: [],
   flows: [],
+  queues: [],
 })
 
 function useResources(): AutomationResources {
@@ -267,6 +285,7 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
   const [pipelines, setPipelines] = useState<PipelineOption[]>([])
   const [stages, setStages] = useState<PipelineStageOption[]>([])
   const [flows, setFlows] = useState<FlowOption[]>([])
+  const [queues, setQueues] = useState<QueueRecord[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -284,6 +303,7 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
         pipelinesRes,
         stagesRes,
         flowsRes,
+        queuesRes,
       ] =
         await Promise.all([
           supabase.from("tags").select("*").order("name"),
@@ -303,6 +323,12 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
             .select("id, name")
             .eq("status", "active")
             .order("name"),
+          supabase
+            .from("queues")
+            .select("id, name")
+            .eq("active", true)
+            .eq("attended_by", "humans")
+            .order("position"),
         ])
       if (cancelled) return
       setTags((tagsRes.data as TagRecord[] | null) ?? [])
@@ -311,6 +337,7 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
       setPipelines((pipelinesRes.data as PipelineOption[] | null) ?? [])
       setStages((stagesRes.data as PipelineStageOption[] | null) ?? [])
       setFlows((flowsRes.data as FlowOption[] | null) ?? [])
+      setQueues((queuesRes.data as QueueRecord[] | null) ?? [])
     })()
 
     // Members go through the API so we inherit its email-visibility
@@ -334,7 +361,16 @@ function ResourcesProvider({ children }: { children: ReactNode }) {
 
   return (
     <ResourcesContext.Provider
-      value={{ tags, members, templates, customFields, pipelines, stages, flows }}
+      value={{
+        tags,
+        members,
+        templates,
+        customFields,
+        pipelines,
+        stages,
+        flows,
+        queues,
+      }}
     >
       {children}
     </ResourcesContext.Provider>
@@ -1516,6 +1552,87 @@ function StepEditor({
           </FieldBlock>
         </>
       )
+    case "send_media":
+      return (
+        <>
+          <FieldBlock label={t("config.mediaTypeLabel")}>
+            <select
+              value={(cfg.media_type as string) ?? "image"}
+              onChange={(e) => set({ media_type: e.target.value })}
+              className={SELECT_CLASS}
+            >
+              <option value="image">{t("config.mediaTypes.image")}</option>
+              <option value="video">{t("config.mediaTypes.video")}</option>
+              <option value="document">{t("config.mediaTypes.document")}</option>
+            </select>
+          </FieldBlock>
+          <FieldBlock label={t("config.mediaUrlLabel")}>
+            <Input
+              value={(cfg.media_url as string) ?? ""}
+              onChange={(e) => set({ media_url: e.target.value })}
+              placeholder="https://…"
+              className="bg-muted font-mono text-xs text-foreground"
+            />
+          </FieldBlock>
+          <FieldBlock label={t("config.captionLabel")}>
+            <Input
+              value={(cfg.caption as string) ?? ""}
+              onChange={(e) => set({ caption: e.target.value })}
+              className="bg-muted text-foreground"
+            />
+          </FieldBlock>
+          {cfg.media_type === "document" && (
+            <FieldBlock label={t("config.filenameLabel")}>
+              <Input
+                value={(cfg.filename as string) ?? ""}
+                onChange={(e) => set({ filename: e.target.value })}
+                className="bg-muted text-foreground"
+              />
+            </FieldBlock>
+          )}
+        </>
+      )
+    case "route_to_queue":
+      return (
+        <>
+          <FieldBlock label={t("config.queueLabel")}>
+            <QueueSelect
+              value={(cfg.queue_id as string) ?? ""}
+              onChange={(v) => set({ queue_id: v })}
+              t={t}
+            />
+          </FieldBlock>
+          <FieldBlock label={t("config.routeReasonLabel")}>
+            <Input
+              value={(cfg.reason as string) ?? ""}
+              onChange={(e) => set({ reason: e.target.value })}
+              className="bg-muted text-foreground"
+            />
+          </FieldBlock>
+        </>
+      )
+    case "handoff":
+      return (
+        <>
+          <FieldBlock label={t("config.handoffNoteLabel")}>
+            <Input
+              value={(cfg.note as string) ?? ""}
+              onChange={(e) => set({ note: e.target.value })}
+              className="bg-muted text-foreground"
+            />
+          </FieldBlock>
+          <FieldBlock label={t("config.agentLabel")}>
+            <AgentSelect
+              value={(cfg.assign_to as string) ?? ""}
+              onChange={(v) => set({ assign_to: v })}
+              t={t}
+            />
+          </FieldBlock>
+          <p className="text-xs text-muted-foreground">
+            {t("config.handoffHint")}
+          </p>
+        </>
+      )
     case "book_appointment":
     case "reschedule_appointment":
       return (
@@ -1589,6 +1706,45 @@ function StepEditor({
     default:
       return null
   }
+}
+
+function QueueSelect({
+  value,
+  onChange,
+  t,
+}: {
+  value: string
+  onChange: (v: string) => void
+  t: ReturnType<typeof useTranslations>
+}) {
+  const { queues } = useResources()
+  if (queues.length === 0) {
+    return (
+      <Input
+        placeholder={t("config.queuePlaceholder")}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-muted text-foreground"
+      />
+    )
+  }
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={SELECT_CLASS}
+    >
+      <option value="">{t("config.queueSelect")}</option>
+      {queues.map((q) => (
+        <option key={q.id} value={q.id}>
+          {q.name}
+        </option>
+      ))}
+      {value && !queues.some((q) => q.id === value) && (
+        <option value={value}>{value}</option>
+      )}
+    </select>
+  )
 }
 
 /**

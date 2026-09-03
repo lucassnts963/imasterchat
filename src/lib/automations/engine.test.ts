@@ -19,6 +19,9 @@ const h = vi.hoisted(() => ({
   bookForContact: vi.fn(),
   rescheduleForContact: vi.fn(),
   cancelForContact: vi.fn(),
+  loadQueue: vi.fn(),
+  routeConversationToQueue: vi.fn(),
+  handOffConversation: vi.fn(),
 }));
 
 vi.mock("./admin-client", () => {
@@ -115,6 +118,15 @@ vi.mock("@/lib/flows/engine", async () => {
   };
 });
 
+vi.mock("@/lib/actions/queue-routing", () => ({
+  loadQueue: h.loadQueue,
+  routeConversationToQueue: h.routeConversationToQueue,
+}));
+
+vi.mock("@/lib/conversations/handoff", () => ({
+  handOffConversation: h.handOffConversation,
+}));
+
 vi.mock("@/lib/actions/scheduling", () => ({
   resolveSchedulingContext: h.resolveSchedulingContext,
   bookForContact: h.bookForContact,
@@ -157,6 +169,22 @@ beforeEach(() => {
   });
   h.bookForContact.mockResolvedValue({ ok: true, data: {} });
   h.cancelForContact.mockResolvedValue({ ok: true, data: {} });
+  h.loadQueue.mockReset();
+  h.routeConversationToQueue.mockReset();
+  h.handOffConversation.mockReset();
+  h.loadQueue.mockResolvedValue({
+    id: "q-1",
+    name: "Financeiro",
+    description: null,
+    responsibleUserId: null,
+    autoAssign: false,
+    distribution: "none",
+  });
+  h.routeConversationToQueue.mockResolvedValue({
+    ok: true,
+    message: 'routed to "Financeiro"',
+  });
+  h.handOffConversation.mockResolvedValue({ ok: true });
   h.startFlowRun.mockReset();
   h.startFlowRun.mockResolvedValue({
     started: true,
@@ -701,6 +729,47 @@ describe("scheduling steps", () => {
     expect(JSON.stringify(steps)).toContain("no appointment booked");
     expect(h.state.logUpdates).toContainEqual(
       expect.objectContaining({ status: "success" }),
+    );
+  });
+});
+
+// ------------------------------------------------------------
+// Encaminhar e transferir — fase 1, R-8. Antes disto a automação
+// atribuía a um atendente, mas não sabia mandar para uma FILA nem
+// pausar o robô, que é o que "passar para humano" significa.
+// ------------------------------------------------------------
+
+describe("routing steps", () => {
+  it("routes to the configured queue", async () => {
+    await runSchedulingStep("route_to_queue", {
+      queue_id: "q-1",
+      reason: "quer negociar",
+    });
+
+    expect(h.routeConversationToQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: "quer negociar" }),
+    );
+  });
+
+  // Fila apagada, desativada, ou trocada para atendimento por robô.
+  // Encaminhar para o nada seria pior que dizer que não deu.
+  it("says so instead of routing into nothing", async () => {
+    h.loadQueue.mockResolvedValue(null);
+    await runSchedulingStep("route_to_queue", { queue_id: "q-x" });
+
+    expect(h.routeConversationToQueue).not.toHaveBeenCalled();
+    const steps = h.state.logUpdates
+      .map((u) => u.steps_executed)
+      .filter(Boolean)
+      .flat() as unknown[];
+    expect(JSON.stringify(steps)).toContain("queue not available");
+  });
+
+  it("hands off to a person, leaving the shared queue when no agent is named", async () => {
+    await runSchedulingStep("handoff", { note: "cliente irritado" });
+
+    expect(h.handOffConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: "cliente irritado", assignTo: null }),
     );
   });
 });

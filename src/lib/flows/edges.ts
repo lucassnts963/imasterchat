@@ -116,7 +116,12 @@ export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
       case "send_message":
       case "send_media":
       case "collect_input":
-      case "set_tag": {
+      case "set_tag":
+      case "send_template":
+      case "update_contact_field":
+      case "create_deal":
+      case "assign_conversation":
+      case "close_conversation": {
         const next = (cfg as { next_node_key?: string }).next_node_key;
         if (next && knownKeys.has(next)) {
           edges.push({
@@ -206,6 +211,7 @@ export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
         break;
       }
 
+      case "route_to_queue":
       case "handoff":
       case "end":
         // Terminal nodes — no outgoing edges.
@@ -253,6 +259,11 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
     case "send_media":
     case "collect_input":
     case "set_tag":
+    case "send_template":
+    case "update_contact_field":
+    case "create_deal":
+    case "assign_conversation":
+    case "close_conversation":
       return [{ id: "next", label: "Next" }];
 
     case "condition":
@@ -308,6 +319,7 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
       // compilador continuar cobrando exaustividade dos outros.
       return [];
 
+    case "route_to_queue":
     case "handoff":
     case "end":
       return [];
@@ -341,6 +353,11 @@ export function applyEdgeConnection(
     case "send_media":
     case "collect_input":
     case "set_tag":
+    case "send_template":
+    case "update_contact_field":
+    case "create_deal":
+    case "assign_conversation":
+    case "close_conversation":
       if (sourceHandle === "next") return { next_node_key: targetKey };
       return null;
 
@@ -404,6 +421,7 @@ export function applyEdgeConnection(
     case "cancel_appointment":
       return null;
 
+    case "route_to_queue":
     case "handoff":
     case "end":
       return null;
@@ -449,7 +467,12 @@ function patchedConfigWithoutKey(
     case "send_message":
     case "send_media":
     case "collect_input":
-    case "set_tag": {
+    case "set_tag":
+    case "send_template":
+    case "update_contact_field":
+    case "create_deal":
+    case "assign_conversation":
+    case "close_conversation": {
       const next = (cfg as { next_node_key?: string }).next_node_key;
       if (next !== deletedKey) return null;
       return { ...cfg, next_node_key: "" };
@@ -513,6 +536,7 @@ function patchedConfigWithoutKey(
     case "cancel_appointment":
       return null;
 
+    case "route_to_queue":
     case "handoff":
     case "end":
       return null;

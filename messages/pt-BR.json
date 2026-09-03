@@ -954,7 +954,27 @@
         "onMoved": "Remarcado →",
         "onCancelled": "Cancelado →",
         "onSlotTaken": "Horário tomado nesse meio →",
-        "onNothingBooked": "Não tem agendamento →"
+        "onNothingBooked": "Não tem agendamento →",
+        "templateLabel": "Modelo aprovado",
+        "templatePlaceholder": "Nome do modelo",
+        "templateVariables": "Variáveis do modelo",
+        "addVariable": "Adicionar variável",
+        "removeVariable": "Remover variável",
+        "pipelineLabel": "Funil",
+        "pipelinePlaceholder": "ID do funil",
+        "stageLabel": "Etapa",
+        "stagePlaceholder": "ID da etapa",
+        "dealTitleLabel": "Título do negócio",
+        "dealValueLabel": "Valor",
+        "assignModeLabel": "Atribuir para",
+        "assignAnyMember": "Qualquer pessoa da equipe",
+        "assignSpecific": "Um atendente específico",
+        "agentLabel": "Atendente",
+        "agentPlaceholder": "ID do atendente",
+        "queueLabel": "Fila",
+        "queuePlaceholder": "ID da fila",
+        "routeReasonLabel": "Nota para quem for atender",
+        "routeToQueueHint": "O run TERMINA aqui — a conversa passa a ter dono, e um fluxo que continuasse falando por cima de uma pessoa é o pior desfecho possível."
       },
       "categories": {
         "messaging": "Mensagens",
@@ -993,6 +1013,30 @@
         "set_tag": {
           "label": "Etiquetar contato",
           "blurb": "Adiciona ou remove uma etiqueta do contato"
+        },
+        "send_template": {
+          "label": "Enviar modelo",
+          "blurb": "Manda um template aprovado — funciona fora da janela de 24h"
+        },
+        "update_contact_field": {
+          "label": "Atualizar campo",
+          "blurb": "Escreve um valor no contato"
+        },
+        "create_deal": {
+          "label": "Criar negócio",
+          "blurb": "Abre um negócio no funil"
+        },
+        "assign_conversation": {
+          "label": "Atribuir",
+          "blurb": "Põe a conversa na mão de alguém"
+        },
+        "close_conversation": {
+          "label": "Fechar conversa",
+          "blurb": "Marca a conversa como fechada"
+        },
+        "route_to_queue": {
+          "label": "Encaminhar para fila",
+          "blurb": "Entrega a conversa a um time e encerra o run"
         },
         "offer_slots": {
           "label": "Oferecer horários",
@@ -1140,7 +1184,10 @@
         "start_flow": "Iniciar fluxo",
         "book_appointment": "Agendar",
         "reschedule_appointment": "Remarcar",
-        "cancel_appointment": "Cancelar agendamento"
+        "cancel_appointment": "Cancelar agendamento",
+        "send_media": "Enviar mídia",
+        "route_to_queue": "Encaminhar para fila",
+        "handoff": "Passar para humano"
       },
       "triggers": {
         "new_message_received": {
@@ -1287,7 +1334,22 @@
         "endsAtLabel": "Fim (ISO 8601)",
         "cancelReasonLabel": "Motivo (opcional)",
         "appointmentTimeHint": "A automação não pergunta nada, então o horário precisa vir de fora — normalmente de uma variável que um fluxo coletou e entregou. Expediente, antecedência mínima e colisão continuam sendo conferidos antes de gravar.",
-        "cancelAppointmentHint": "Cancela o único agendamento vivo do cliente e libera o horário. Se ele não tiver nenhum, o passo registra isso e a automação segue."
+        "cancelAppointmentHint": "Cancela o único agendamento vivo do cliente e libera o horário. Se ele não tiver nenhum, o passo registra isso e a automação segue.",
+        "mediaTypeLabel": "Tipo",
+        "mediaUrlLabel": "URL do arquivo",
+        "captionLabel": "Legenda",
+        "filenameLabel": "Nome do arquivo que o cliente vê",
+        "mediaTypes": {
+          "image": "Imagem",
+          "video": "Vídeo",
+          "document": "Documento"
+        },
+        "queueLabel": "Fila",
+        "queueSelect": "Escolha uma fila…",
+        "queuePlaceholder": "ID da fila",
+        "routeReasonLabel": "Nota para quem for atender",
+        "handoffNoteLabel": "Nota interna",
+        "handoffHint": "Pausa o robô nesta conversa e deixa para uma pessoa. Sem atendente escolhido, cai na fila compartilhada."
       },
       "delete": "Excluir"
     }

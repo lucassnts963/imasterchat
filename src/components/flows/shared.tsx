@@ -20,6 +20,12 @@ import {
   Flag,
   GitFork,
   Inbox,
+  FileText,
+  PencilLine,
+  Users,
+  CircleSlash,
+  UserCheck,
+  Briefcase,
   CalendarSearch,
   CalendarPlus,
   CalendarClock,
@@ -53,6 +59,12 @@ export type NodeType =
   | 'collect_input'
   | 'condition'
   | 'set_tag'
+  | 'send_template'
+  | 'update_contact_field'
+  | 'create_deal'
+  | 'assign_conversation'
+  | 'close_conversation'
+  | 'route_to_queue'
   | 'offer_slots'
   | 'book_appointment'
   | 'reschedule_appointment'
@@ -160,6 +172,48 @@ export const NODE_META: Record<
     blurb: 'Adds or removes a contact tag',
     category: 'logic',
   },
+  send_template: {
+    label: 'Send template',
+    icon: FileText,
+    color: 'text-violet-400',
+    blurb: 'Sends an approved template — works outside the 24h window',
+    category: 'messaging',
+  },
+  update_contact_field: {
+    label: 'Update field',
+    icon: PencilLine,
+    color: 'text-pink-400',
+    blurb: 'Writes a value onto the contact',
+    category: 'logic',
+  },
+  create_deal: {
+    label: 'Create deal',
+    icon: Briefcase,
+    color: 'text-pink-400',
+    blurb: 'Opens a deal in the pipeline',
+    category: 'logic',
+  },
+  assign_conversation: {
+    label: 'Assign',
+    icon: UserCheck,
+    color: 'text-pink-400',
+    blurb: 'Puts the conversation with someone',
+    category: 'flow',
+  },
+  close_conversation: {
+    label: 'Close conversation',
+    icon: CircleSlash,
+    color: 'text-muted-foreground',
+    blurb: 'Marks the conversation closed',
+    category: 'flow',
+  },
+  route_to_queue: {
+    label: 'Route to queue',
+    icon: Users,
+    color: 'text-amber-400',
+    blurb: 'Hands the conversation to a team and ends the run',
+    category: 'flow',
+  },
   offer_slots: {
     label: 'Offer times',
     icon: CalendarSearch,
@@ -243,6 +297,12 @@ const NODE_HUE: Record<NodeType, { l: number; c: number; h: number }> = {
   set_tag: { l: 0.65, c: 0.15, h: 350 }, // pink
   // Os quatro de agendamento dividem o verde: na tela eles são um
   // assunto só, e o operador acha o bloco pela cor antes de ler o nome.
+  send_template: { l: 0.6, c: 0.18, h: 293 }, // violeta — é uma mensagem
+  update_contact_field: { l: 0.65, c: 0.15, h: 350 }, // rosa — mexe no CRM
+  create_deal: { l: 0.65, c: 0.15, h: 350 },
+  assign_conversation: { l: 0.65, c: 0.17, h: 16 }, // rosé — entrega a gente
+  close_conversation: { l: 0.55, c: 0.01, h: 260 }, // neutro — encerra
+  route_to_queue: { l: 0.65, c: 0.17, h: 16 },
   offer_slots: { l: 0.68, c: 0.13, h: 150 },
   book_appointment: { l: 0.62, c: 0.14, h: 150 },
   reschedule_appointment: { l: 0.62, c: 0.14, h: 150 },
@@ -356,6 +416,28 @@ export function summarizeNode(
     case 'start':
     case 'end':
       return null;
+    case 'send_template': {
+      const name = typeof cfg.template_name === 'string' ? cfg.template_name : '';
+      return name ? truncate(name, 50) : null;
+    }
+    case 'update_contact_field': {
+      const field = typeof cfg.field === 'string' ? cfg.field : '';
+      const value = typeof cfg.value === 'string' ? cfg.value : '';
+      if (!field) return null;
+      return value ? `${field} ← ${truncate(value, 30)}` : field;
+    }
+    case 'create_deal': {
+      const title = typeof cfg.title === 'string' ? cfg.title : '';
+      return title ? truncate(title, 50) : null;
+    }
+    case 'assign_conversation':
+      return cfg.mode === 'specific' ? 'Para um atendente' : 'Para a equipe';
+    case 'close_conversation':
+      return null;
+    case 'route_to_queue': {
+      const reason = typeof cfg.reason === 'string' ? cfg.reason : '';
+      return reason ? truncate(reason, 50) : 'Encaminha e encerra o run';
+    }
     case 'offer_slots': {
       const max = typeof cfg.max_options === 'number' ? cfg.max_options : 5;
       const text = typeof cfg.text === 'string' ? cfg.text : '';

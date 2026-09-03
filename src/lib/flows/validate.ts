@@ -701,6 +701,116 @@ function validateNode(
       break;
     }
 
+    case "send_template": {
+      const cfg = node.config as { template_name?: string };
+      if (!cfg.template_name?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "template_name",
+          message: "Send-template needs an approved template.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Send-template");
+      break;
+    }
+
+    case "update_contact_field": {
+      const cfg = node.config as { field?: string; value?: string };
+      if (!cfg.field?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "field",
+          message: "Update-field needs a field to write.",
+        });
+      }
+      if (cfg.value === undefined || cfg.value === "") {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "value",
+          message: "Update-field needs a value.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Update-field");
+      break;
+    }
+
+    case "create_deal": {
+      const cfg = node.config as {
+        pipeline_id?: string;
+        stage_id?: string;
+        title?: string;
+      };
+      if (!cfg.pipeline_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "pipeline_id",
+          message: "Create-deal needs a pipeline.",
+        });
+      }
+      if (!cfg.stage_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "stage_id",
+          message: "Create-deal needs a stage.",
+        });
+      }
+      if (!cfg.title?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "title",
+          message: "Create-deal needs a title.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Create-deal");
+      break;
+    }
+
+    case "assign_conversation": {
+      const cfg = node.config as { mode?: string; agent_id?: string };
+      if (cfg.mode === "specific" && !cfg.agent_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "agent_id",
+          message: "Pick the agent to assign to.",
+        });
+      }
+      validateSingleNext(node, knownKeys, issues, "Assign");
+      break;
+    }
+
+    case "close_conversation":
+      validateSingleNext(node, knownKeys, issues, "Close-conversation");
+      break;
+
+    case "route_to_queue": {
+      const cfg = node.config as { queue_id?: string };
+      if (!cfg.queue_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "queue_id",
+          message: "Route-to-queue needs a queue.",
+        });
+      }
+      // Terminal: a conversa passa a ter dono, e o run acaba aqui.
+      break;
+    }
+
     case "offer_slots": {
       const cfg = node.config as {
         text?: string;
@@ -801,7 +911,12 @@ function outgoingEdges(node: NodeInput): string[] {
     case "send_message":
     case "send_media":
     case "collect_input":
-    case "set_tag": {
+    case "set_tag":
+    case "send_template":
+    case "update_contact_field":
+    case "create_deal":
+    case "assign_conversation":
+    case "close_conversation": {
       const cfg = node.config as { next_node_key?: string };
       return cfg.next_node_key ? [cfg.next_node_key] : [];
     }
@@ -842,6 +957,7 @@ function outgoingEdges(node: NodeInput): string[] {
       return schedulingEdgeKeys(node.node_type)
         .map((key) => (node.config as Record<string, unknown>)[key])
         .filter((k): k is string => typeof k === "string" && k.length > 0);
+    case "route_to_queue":
     case "handoff":
     case "end":
     default:
@@ -881,6 +997,34 @@ const SCHEDULING_EDGE_KEYS: Record<string, string[]> = {
 
 function schedulingEdgeKeys(nodeType: string): string[] {
   return SCHEDULING_EDGE_KEYS[nodeType] ?? [];
+}
+
+function validateSingleNext(
+  node: NodeInput,
+  knownKeys: Set<string>,
+  issues: ValidationIssue[],
+  label: string,
+): void {
+  const next = (node.config as { next_node_key?: string }).next_node_key;
+  if (!next) {
+    issues.push({
+      severity: "error",
+      scope: "node",
+      node_key: node.node_key,
+      field: "next_node_key",
+      message: `${label} must point to a next node.`,
+    });
+    return;
+  }
+  if (!knownKeys.has(next)) {
+    issues.push({
+      severity: "error",
+      scope: "node",
+      node_key: node.node_key,
+      field: "next_node_key",
+      message: `${label} points to non-existent node "${next}".`,
+    });
+  }
 }
 
 function validateSchedulingEdges(

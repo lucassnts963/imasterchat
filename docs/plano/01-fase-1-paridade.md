@@ -32,18 +32,18 @@ Duas consequências que justificam a fase sozinha:
 | Enviar texto | ✅ | ✅ | ✅ |
 | Enviar botões | ❌ | ✅ | ✅ |
 | Enviar lista | ❌ | ✅ | ✅ |
-| Enviar mídia | ❌ | ✅ | ❌ |
-| **Enviar template** | ❌ | ❌ | ✅ |
+| Enviar mídia | ❌ | ✅ | ✅ |
+| **Enviar template** | ❌ | ✅ | ✅ |
 | **Coletar entrada livre** | ✅ | ✅ | ❌ |
 | Condição / ramificação | ✅ | ✅ | ✅ |
 | Adicionar tag | ✅ | ✅ | ✅ |
-| Remover tag | ❌ | ❌ | ✅ |
-| Atualizar campo do contato | ❌ | ❌ | ✅ |
-| Criar negócio | ❌ | ❌ | ✅ |
-| Atribuir conversa | ❌ | ❌ | ✅ |
-| Encerrar conversa | ❌ | ❌ | ✅ |
-| Passar para humano | ✅ | ✅ | ❌ |
-| **Rotear para fila** | ✅ | ❌ | ❌ |
+| Remover tag | ❌ | ✅ | ✅ |
+| Atualizar campo do contato | ❌ | ✅ | ✅ |
+| Criar negócio | ❌ | ✅ | ✅ |
+| Atribuir conversa | ❌ | ✅ | ✅ |
+| Encerrar conversa | ❌ | ✅ | ✅ |
+| Passar para humano | ✅ | ✅ | ✅ |
+| **Rotear para fila** | ✅ | ✅ | ✅ |
 | Webhook de saída | ❌ | ❌ | ✅ |
 | Esperar (relógio) | ❌ | ❌ | ✅ |
 | **Consultar disponibilidade** | ✅ | ✅ | ➖ |
@@ -229,19 +229,44 @@ sempre prometeu.
 
 ### Bloco C — Encher a matriz
 
-#### R-6 · Ações de CRM no fluxo — `M`
+#### R-6 · Ações de CRM no fluxo — `M` — **feito**
 - **F1** Nós: `remover_tag`, `atualizar_campo`, `criar_negocio`,
   `atribuir_conversa`, `encerrar_conversa`.
 - **F2** Todos sobre `src/lib/actions/`, compartilhados com a automação.
 
-#### R-7 · Template e mídia — `M`
+#### R-7 · Template e mídia — `M` — **feito**
 - **G1** Nó `enviar_template` no fluxo — **destrava o GA dos fluxos e a régua de
   cobrança**.
 - **G2** Passo `enviar_midia` na automação.
 
-#### R-8 · Fila e humano — `P`
+#### R-8 · Fila e humano — `P` — **feito**
 - **H1** `rotear_para_fila` como nó de fluxo e passo de automação.
 - **H2** `passar_para_humano` como passo de automação.
+
+**Como ficou o bloco C.** Três módulos de domínio novos, e nenhuma regra de
+negócio escrita duas vezes:
+
+| Módulo | O que saiu de dentro de um motor |
+|---|---|
+| `src/lib/actions/crm.ts` | atualizar campo, criar negócio, atribuir e fechar conversa — cinco blocos que moravam no motor de automações e nada tinham de automação |
+| `src/lib/actions/queue-routing.ts` | escolher quem recebe e encaminhar; saiu da ferramenta do agente, porque encaminhar não é decisão de modelo |
+| `src/lib/whatsapp/template-params.ts` | a ordem posicional das variáveis de template, que estava copiada e é a origem de um defeito silencioso |
+
+Duas escolhas de forma:
+
+- **`route_to_queue` é TERMINAL no fluxo**, como o `handoff`. A partir dali a
+  conversa tem dono, e um fluxo que continuasse mandando mensagem por cima de
+  uma pessoa atendendo é o pior desfecho possível. Fila apagada encerra o run
+  como transferência mesmo assim: a decisão de parar de falar continua valendo,
+  e um run preso segura o índice de um run ativo por contato.
+- **Falha de template mata o run; falha de CRM não.** O template É a mensagem —
+  seguir adiante deixaria o cliente esperando um texto que nunca chegou. Uma
+  etiqueta que não gravou o cliente nem percebe, e abandonar alguém no meio de um
+  menu por causa disso seria pior.
+
+O envio de template mora em `automations/meta-send` e é usado pelos dois, do
+mesmo jeito que o envio interativo mora em `flows/meta-send` e é usado lá. Uma
+implementação por formato de envio, dois motores — que já era o padrão da casa.
 
 #### R-9 · Espera e webhook no fluxo — `P`
 - **I1** Nó `esperar` (relógio), distinto de suspender aguardando resposta.

@@ -490,7 +490,12 @@ export type AutomationStepType =
    *  esperar a escolha, que é fluxo. */
   | 'book_appointment'
   | 'reschedule_appointment'
-  | 'cancel_appointment';
+  | 'cancel_appointment'
+  /** Mídia e encaminhamento: o que o fluxo já sabia fazer e a automação
+   *  não, fechado na fase 1 (R-7, R-8). */
+  | 'send_media'
+  | 'route_to_queue'
+  | 'handoff';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
 
@@ -620,6 +625,28 @@ export interface CancelAppointmentStepConfig {
   reason?: string;
 }
 
+export interface SendMediaStepConfig {
+  media_type: 'image' | 'video' | 'document';
+  /** URL pública que a Meta busca no envio. */
+  media_url: string;
+  caption?: string;
+  /** Só documentos; a Meta ignora para imagem e vídeo. */
+  filename?: string;
+}
+
+export interface RouteToQueueStepConfig {
+  queue_id: string;
+  /** A nota que quem pegar vai ler; interpola `{{ vars.X }}`. */
+  reason?: string;
+}
+
+export interface HandoffStepConfig {
+  /** Nota interna para quem assumir. */
+  note?: string;
+  /** Atendente específico; vazio deixa na fila compartilhada. */
+  assign_to?: string;
+}
+
 export interface StartFlowStepConfig {
   /** Which flow to start. Must be active and in the same account. */
   flow_id: string;
@@ -647,6 +674,9 @@ export type AutomationStepConfig =
   | BookAppointmentStepConfig
   | RescheduleAppointmentStepConfig
   | CancelAppointmentStepConfig
+  | SendMediaStepConfig
+  | RouteToQueueStepConfig
+  | HandoffStepConfig
   | Record<string, never>
   | Record<string, unknown>;
 

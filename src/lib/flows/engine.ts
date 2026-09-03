@@ -43,6 +43,18 @@ import { decideFallback, resolveFallbackPolicy } from "./fallback";
 import { MAX_FLOW_CHAIN_DEPTH } from "./chain";
 import { addContactTagAndDispatch } from "@/lib/contacts/tag-events";
 import {
+  assignConversation,
+  closeConversation,
+  createDeal,
+  updateContactField,
+} from "@/lib/actions/crm";
+import { loadQueue, routeConversationToQueue } from "@/lib/actions/queue-routing";
+import { templateParams } from "@/lib/whatsapp/template-params";
+// O template mora no módulo de automações e é usado pelos dois, do mesmo
+// jeito que o envio interativo mora aqui e é usado lá — uma
+// implementação por formato de envio, dois motores.
+import { engineSendTemplate } from "@/lib/automations/meta-send";
+import {
   bookForContact,
   cancelForContact,
   listAvailability,
@@ -73,6 +85,12 @@ import {
   type SendMediaNodeConfig,
   type SendMessageNodeConfig,
   type SetTagNodeConfig,
+  type SendTemplateNodeConfig,
+  type UpdateContactFieldNodeConfig,
+  type CreateDealNodeConfig,
+  type AssignConversationNodeConfig,
+  type CloseConversationNodeConfig,
+  type RouteToQueueNodeConfig,
   type OfferSlotsNodeConfig,
   type BookAppointmentNodeConfig,
   type RescheduleAppointmentNodeConfig,
@@ -140,6 +158,11 @@ export function isAutoAdvancing(node_type: string): boolean {
     node_type === "send_media" ||
     node_type === "condition" ||
     node_type === "set_tag" ||
+    node_type === "send_template" ||
+    node_type === "update_contact_field" ||
+    node_type === "create_deal" ||
+    node_type === "assign_conversation" ||
+    node_type === "close_conversation" ||
     node_type === "book_appointment" ||
     node_type === "reschedule_appointment" ||
     node_type === "cancel_appointment"
@@ -158,7 +181,11 @@ export function isSuspending(node_type: string): boolean {
 
 /** Nodes that end the run. */
 export function isTerminal(node_type: string): boolean {
-  return node_type === "handoff" || node_type === "end";
+  return (
+    node_type === "handoff" ||
+    node_type === "route_to_queue" ||
+    node_type === "end"
+  );
 }
 
 /**
@@ -957,6 +984,140 @@ async function advanceFromNodeKey(
       }
       currentKey = cfg.next_node_key;
       continue;
+    }
+    if (node.node_type === "send_template") {
+      const cfg = node.config as unknown as SendTemplateNodeConfig;
+      try {
+        const { whatsapp_message_id } = await engineSendTemplate({
+          accountId: run.account_id,
+          userId: run.user_id,
+          conversationId: run.conversation_id!,
+          contactId: run.contact_id!,
+          templateName: cfg.template_name,
+          language: cfg.language,
+          params: templateParams(cfg.variables, (v) =>
+            interpolateVars(v, run.vars),
+          ),
+        });
+        await logEvent(db, run.id, "message_sent", node.node_key, {
+          node_type: "send_template",
+          template_name: cfg.template_name,
+          whatsapp_message_id,
+        });
+      } catch (err) {
+        // Falha de template é fatal para o run, ao contrário de uma
+        // etiqueta que não gravou: o template É a mensagem, e seguir
+        // adiante deixaria o cliente esperando um texto que não chegou.
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: "send_template_failed",
+          detail: err instanceof Error ? err.message : String(err),
+        });
+        await endRun(db, run.id, "failed", "send_template_failed");
+        return { outcome: "completed" };
+      }
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "update_contact_field") {
+      const cfg = node.config as unknown as UpdateContactFieldNodeConfig;
+      const result = await updateContactField({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id!,
+        field: cfg.field,
+        value: interpolateVars(cfg.value, run.vars),
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "update_contact_field",
+        ok: result.ok,
+        detail: result.message,
+      });
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "create_deal") {
+      const cfg = node.config as unknown as CreateDealNodeConfig;
+      const result = await createDeal({
+        db,
+        accountId: run.account_id,
+        userId: run.user_id,
+        pipelineId: cfg.pipeline_id,
+        stageId: cfg.stage_id,
+        contactId: run.contact_id,
+        title: interpolateVars(cfg.title, run.vars),
+        value: cfg.value,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "create_deal",
+        ok: result.ok,
+        detail: result.message,
+      });
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "assign_conversation") {
+      const cfg = node.config as unknown as AssignConversationNodeConfig;
+      const result = await assignConversation({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id!,
+        mode: cfg.mode,
+        agentId: cfg.agent_id,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "assign_conversation",
+        ok: result.ok,
+        detail: result.message,
+      });
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "close_conversation") {
+      const cfg = node.config as unknown as CloseConversationNodeConfig;
+      const result = await closeConversation({
+        db,
+        accountId: run.account_id,
+        contactId: run.contact_id!,
+      });
+      await logEvent(db, run.id, "node_entered", node.node_key, {
+        node_type: "close_conversation",
+        ok: result.ok,
+        detail: result.message,
+      });
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "route_to_queue") {
+      const cfg = node.config as unknown as RouteToQueueNodeConfig;
+      const queue = await loadQueue(db, run.account_id, cfg.queue_id);
+      if (!queue) {
+        // Fila apagada, desativada, ou trocada para atendimento por
+        // robô. Encerra como transferência mesmo assim: a decisão de
+        // parar de falar continua valendo, e o run não pode ficar preso.
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: "queue_not_available",
+          queue_id: cfg.queue_id,
+        });
+        await endRun(db, run.id, "handed_off", "queue_not_available");
+        return { outcome: "handed_off" };
+      }
+      const result = await routeConversationToQueue({
+        db,
+        accountId: run.account_id,
+        conversationId: run.conversation_id!,
+        queue,
+        summary: cfg.reason
+          ? interpolateVars(cfg.reason, run.vars)
+          : `🤖 ${queue.name}`,
+      });
+      await logEvent(db, run.id, "handoff", node.node_key, {
+        node_type: "route_to_queue",
+        queue_id: queue.id,
+        ok: result.ok,
+        assigned_to: result.assignedTo ?? null,
+      });
+      await endRun(db, run.id, "handed_off", "routed_to_queue");
+      return { outcome: "handed_off" };
     }
     if (node.node_type === "offer_slots") {
       const outcome = await offerSlots(

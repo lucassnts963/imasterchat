@@ -871,7 +871,10 @@
         "start_flow": "플로우 시작",
         "book_appointment": "예약 잡기",
         "reschedule_appointment": "예약 변경",
-        "cancel_appointment": "예약 취소"
+        "cancel_appointment": "예약 취소",
+        "send_media": "미디어 보내기",
+        "route_to_queue": "대기열로 전달",
+        "handoff": "사람에게 넘기기"
       },
       "triggers": {
         "new_message_received": {
@@ -1018,7 +1021,22 @@
         "endsAtLabel": "종료 (ISO 8601)",
         "cancelReasonLabel": "사유 (선택)",
         "appointmentTimeHint": "자동화는 질문을 하지 않으므로 시간은 다른 곳에서 와야 합니다 — 보통 플로우가 수집해 넘겨준 변수입니다. 영업시간, 최소 예약 간격, 중복 여부는 저장 전에 여전히 확인됩니다.",
-        "cancelAppointmentHint": "고객의 유일한 예약을 취소하고 시간대를 비웁니다. 예약이 없으면 그렇게 기록하고 자동화는 계속 진행됩니다."
+        "cancelAppointmentHint": "고객의 유일한 예약을 취소하고 시간대를 비웁니다. 예약이 없으면 그렇게 기록하고 자동화는 계속 진행됩니다.",
+        "mediaTypeLabel": "유형",
+        "mediaUrlLabel": "파일 URL",
+        "captionLabel": "설명",
+        "filenameLabel": "고객에게 보이는 파일명",
+        "mediaTypes": {
+          "image": "이미지",
+          "video": "동영상",
+          "document": "문서"
+        },
+        "queueLabel": "대기열",
+        "queueSelect": "대기열 선택…",
+        "queuePlaceholder": "대기열 ID",
+        "routeReasonLabel": "담당자를 위한 메모",
+        "handoffNoteLabel": "내부 메모",
+        "handoffHint": "이 대화에서 봇을 멈추고 사람에게 넘깁니다. 담당자를 비워두면 공용 대기열로 들어갑니다."
       },
       "delete": "삭제"
     }
@@ -1178,7 +1196,27 @@
         "onMoved": "변경됨 →",
         "onCancelled": "취소됨 →",
         "onSlotTaken": "그 사이 시간이 찼음 →",
-        "onNothingBooked": "예약 없음 →"
+        "onNothingBooked": "예약 없음 →",
+        "templateLabel": "승인된 템플릿",
+        "templatePlaceholder": "템플릿 이름",
+        "templateVariables": "템플릿 변수",
+        "addVariable": "변수 추가",
+        "removeVariable": "변수 제거",
+        "pipelineLabel": "파이프라인",
+        "pipelinePlaceholder": "파이프라인 ID",
+        "stageLabel": "단계",
+        "stagePlaceholder": "단계 ID",
+        "dealTitleLabel": "딜 제목",
+        "dealValueLabel": "금액",
+        "assignModeLabel": "지정 대상",
+        "assignAnyMember": "팀의 아무나",
+        "assignSpecific": "특정 담당자",
+        "agentLabel": "담당자",
+        "agentPlaceholder": "담당자 사용자 ID",
+        "queueLabel": "대기열",
+        "queuePlaceholder": "대기열 ID",
+        "routeReasonLabel": "담당자를 위한 메모",
+        "routeToQueueHint": "여기서 실행이 끝납니다 — 대화에 담당자가 생겼고, 사람이 응대하는 위로 플로우가 계속 말하는 것이 최악입니다."
       },
       "categories": {
         "messaging": "메시징",
@@ -1217,6 +1255,30 @@
         "set_tag": {
           "label": "연락처 태그 지정",
           "blurb": "연락처 태그를 추가하거나 제거합니다"
+        },
+        "send_template": {
+          "label": "템플릿 보내기",
+          "blurb": "승인된 템플릿을 보냅니다 — 24시간 창 밖에서도 동작"
+        },
+        "update_contact_field": {
+          "label": "필드 업데이트",
+          "blurb": "연락처에 값을 씁니다"
+        },
+        "create_deal": {
+          "label": "딜 생성",
+          "blurb": "파이프라인에 딜을 엽니다"
+        },
+        "assign_conversation": {
+          "label": "담당자 지정",
+          "blurb": "대화를 누군가에게 맡깁니다"
+        },
+        "close_conversation": {
+          "label": "대화 닫기",
+          "blurb": "대화를 닫힘으로 표시합니다"
+        },
+        "route_to_queue": {
+          "label": "대기열로 전달",
+          "blurb": "팀에 넘기고 실행을 종료합니다"
         },
         "offer_slots": {
           "label": "시간 제안",

@@ -241,6 +241,61 @@ export interface CancelAppointmentNodeConfig {
   on_error_next: string;
 }
 
+/**
+ * Envia um template aprovado da Meta e avança.
+ *
+ * É o nó que tira o fluxo da dependência da janela de 24 horas: sem
+ * ele, um fluxo só sabe REAGIR — fora da janela ele não fala. Com ele,
+ * cada degrau de uma régua de cobrança é um fluxo, e a resposta do
+ * cliente cai num menu.
+ */
+export interface SendTemplateNodeConfig {
+  template_name: string;
+  language?: string;
+  /** Valores posicionais `{{1}}`, `{{2}}`, … Interpolam `{{vars.X}}`. */
+  variables?: Record<string, string>;
+  next_node_key: string;
+}
+
+export interface UpdateContactFieldNodeConfig {
+  /** Coluna nativa (`name` | `email` | `company`) ou `custom:<id>`. */
+  field: string;
+  /** Interpola `{{vars.X}}`. */
+  value: string;
+  next_node_key: string;
+}
+
+export interface CreateDealNodeConfig {
+  pipeline_id: string;
+  stage_id: string;
+  title: string;
+  value?: number;
+  next_node_key: string;
+}
+
+export interface AssignConversationNodeConfig {
+  mode: "specific" | "round_robin";
+  agent_id?: string;
+  next_node_key: string;
+}
+
+export interface CloseConversationNodeConfig {
+  next_node_key: string;
+}
+
+/**
+ * Encaminha para uma fila humana e TERMINA o run.
+ *
+ * Terminal como o `handoff`, e pela mesma razão: a partir daqui a
+ * conversa tem dono. Um fluxo que continuasse mandando mensagem por cima
+ * de uma pessoa atendendo é o pior desfecho possível.
+ */
+export interface RouteToQueueNodeConfig {
+  queue_id: string;
+  /** A nota que quem pegar vai ler; interpola `{{vars.X}}`. */
+  reason?: string;
+}
+
 export interface SetTagNodeConfig {
   mode: "add" | "remove";
   /** Tag UUID. The builder picks from the user's existing tags. */
@@ -268,6 +323,21 @@ export type FlowNodeConfig =
   | { node_type: "collect_input"; config: CollectInputNodeConfig }
   | { node_type: "condition"; config: ConditionNodeConfig }
   | { node_type: "set_tag"; config: SetTagNodeConfig }
+  | { node_type: "send_template"; config: SendTemplateNodeConfig }
+  | {
+      node_type: "update_contact_field";
+      config: UpdateContactFieldNodeConfig;
+    }
+  | { node_type: "create_deal"; config: CreateDealNodeConfig }
+  | {
+      node_type: "assign_conversation";
+      config: AssignConversationNodeConfig;
+    }
+  | {
+      node_type: "close_conversation";
+      config: CloseConversationNodeConfig;
+    }
+  | { node_type: "route_to_queue"; config: RouteToQueueNodeConfig }
   | { node_type: "offer_slots"; config: OfferSlotsNodeConfig }
   | { node_type: "book_appointment"; config: BookAppointmentNodeConfig }
   | {
