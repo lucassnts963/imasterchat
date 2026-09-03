@@ -138,8 +138,14 @@ dia, sem integração nenhuma. É o que tira o produto da dependência de tercei
   índice parcial de "um run ativo por contato" não travar o contato para sempre
 - Runs e eventos gravados para auditoria
 
-O beta é ligado por perfil, via array `beta_features` em `profiles` — trocar por
-GA é remover a checagem em 7 arquivos.
+~~O beta é ligado por perfil, via array `beta_features` em `profiles` — trocar por
+GA é remover a checagem em 7 arquivos.~~
+
+> **Correção (03/09/2026).** Isto estava desatualizado. O gate por conta **já foi
+> removido** — o PR #134 levou fluxos a soft-GA, e as rotas (`/api/flows`,
+> `/api/flows/[id]`) e a página estão abertas a qualquer usuário autenticado. O
+> que resta de "beta" são dois chips na interface (`sidebar.tsx:102` e a lista de
+> fluxos). Ver [`plano/02-fase-2-fluxos-ga.md`](./plano/02-fase-2-fluxos-ga.md) §2.
 
 ### 4.2 O que realmente falta
 

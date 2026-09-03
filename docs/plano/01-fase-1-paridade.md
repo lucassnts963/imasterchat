@@ -89,7 +89,7 @@ produto, e a necessidade é atendida por composição.
 > motor. Muda **como**: por composição explícita em vez de três motores
 > reimplementando uns aos outros.
 
-**Este é o ponto que precisa do seu aval** (decisão 4.3 do plano geral).
+**Aprovado em 03/09** (decisão 4.3 do plano geral).
 
 ---
 
@@ -182,7 +182,7 @@ Registrado para não virar escopo por engano:
 | **Regressão no que está em produção** | R-3 exige que os testes de agendamento passem sem alteração; R-2 mantém o padrão atual |
 | **Laço entre motores** | fluxo → automação → fluxo. R-1 A4 e R-2 B1 tratam, e o teste tem de cobrir o ciclo, não só o caminho feliz |
 | **Explosão da matriz** | é o que o §3 existe para evitar. Se os requisitos forem implementados sem `src/lib/actions/`, a fase entrega o pedido e cria um problema maior |
-| **Fluxo e automação viram a mesma coisa** | decisão 4.1 do plano geral, a ser tomada antes de R-6 |
+| **Fluxo e automação viram a mesma coisa** | resolvido: decisão 4.1 do plano geral fixou **dois motores que se compõem**. A automação continua sendo reação sem estado; o fluxo, conversa com estado. Nenhum requisito desta fase dá memória à automação |
 
 ---
 
