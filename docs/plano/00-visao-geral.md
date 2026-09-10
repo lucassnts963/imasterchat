@@ -123,16 +123,31 @@ duplicação. Aprovado em 03/09.
 
 ---
 
-## 5. Decisões que continuam abertas
+## 5. Estado das seis fases
 
-Não bloqueiam a fase 1. Cada uma bloqueia a sua fase.
+Todas implementadas entre 03 e 10/09/2026. O roteiro de verificação manual está
+em [`checklist-fase-1.md`](./checklist-fase-1.md), que cresceu para cobrir as
+seis.
 
-| # | Pergunta | Bloqueia | Onde está detalhada |
-|---|---|---|---|
-| **D-1** | Qual o seletor de agenda: por profissional, por serviço, ou disponibilidade agregada? | fase 6 inteira — muda o schema | [`06-fase-6-multiplas-agendas.md`](./06-fase-6-multiplas-agendas.md) §2 |
-| **D-2** | O Clube de Associados tem API? Como autentica? Empurra ou a gente puxa? | só o adaptador do Clube — **não** o núcleo da régua | [`05-fase-5-integracoes.md`](./05-fase-5-integracoes.md) §5 |
-| **D-3** | Qual o ticket e o volume da carteira do cliente? | o desenho de agrupamento e de horário de disparo da régua | [`04-fase-4-cobranca.md`](./04-fase-4-cobranca.md) §8 |
-| **D-4** | A tarifa exata de serviço da Meta (prometida para 1º/09) | a precificação da régua, não a construção | [`03-fase-3-custo-mensagem.md`](./03-fase-3-custo-mensagem.md) §6 |
+| Fase | Estado | O que ficou de fora, e por quê |
+|---|---|---|
+| 1 · Paridade | **completa** | quatro células da matriz seguem vazias no agente, todas por decisão (4.3) |
+| 2 · Fluxos GA | **completa** | — |
+| 3 · Custo | **quase** | marcar a conversa vinda de anúncio na inbox (R-17 D3) é trabalho de tela e não bloqueia nada |
+| 4 · Cobrança | **núcleo completo** | tela de promessa, pré-visualização do texto e tela de métrica; a API de métrica existe |
+| 5 · Integrações | **item 1 completo** | Asaas e Clube de Associados — o primeiro é trabalho, o segundo espera D-2 |
+| 6 · Agendas | **completa** | expediente POR agenda tem schema mas não tem tela |
+| 7 · Grupos | **planejada** | frente nova, com bloqueio técnico próprio |
+
+### Decisões que continuam abertas
+
+| # | Pergunta | O que ela ainda bloqueia |
+|---|---|---|
+| ~~**D-1**~~ | ~~seletor de agenda~~ | **decidida em 10/09: por profissional.** Implementada |
+| **D-2** | O Clube de Associados tem API? Como autentica? Empurra ou a gente puxa? | só o adaptador dele. O cliente é atendido **hoje** pela planilha |
+| **D-3** | Qual o ticket e o volume da carteira do cliente? | o ajuste fino do agrupamento e do horário. A régua roda sem isso |
+| **D-4** | A tarifa exata de serviço da Meta | o número da tabela de preços, não o desenho |
+| **D-5** | A construtora aceita o risco da fonte não oficial de grupos? | a fase 7 inteira. É decisão dela, e por escrito |
 
 ---
 
