@@ -808,3 +808,69 @@ início → Oferecer horários ─── escolheu ──→ Agendar ─── ag
   como **Em breve**.
   **Por que assim:** o catálogo é argumento comercial antes de ser recurso
   técnico. Esconder o roteiro transforma-o num segredo interno.
+
+---
+
+## Fase 6 — múltiplas agendas
+
+**Preparação adicional**
+
+- [ ] `bash deploy/apply-migrations.sh` — a **082** precisa ter aplicado.
+- [ ] **Antes de conectar a segunda agenda**, confirme que a primeira continua
+      funcionando (F6.1). A migração promove a conexão existente a padrão; se
+      isso falhar, uma conta que agendava para de agendar.
+
+### F6.1 · Quem tem uma agenda não sente nada
+
+- [ ] **⚡ 🌐 Agendar continua funcionando**
+  **Fazer:** com **uma** agenda conectada, agendar pela IA e por um fluxo.
+  **Esperar:** igual a antes.
+
+- [ ] **A conexão existente virou padrão**
+  **Fazer:** `select rotulo, is_default from google_calendar_connections;`
+  **Esperar:** `is_default = true`.
+
+- [ ] **A ferramenta NÃO ganhou o campo de agenda**
+  **Fazer:** Configurações → ferramentas do agente, ou o Playground.
+  **Esperar:** `check_availability` **sem** o argumento `agenda`.
+  **Por que:** um campo com uma opção é ruído que custa tokens em toda chamada.
+
+### F6.2 · Duas agendas
+
+- [ ] **🌐 Conectar a segunda**
+  **Fazer:** repetir o fluxo de conexão do Google com outra conta.
+  **Esperar:** duas linhas em `google_calendar_connections`, uma padrão.
+
+- [ ] **Rotular** (SQL por enquanto)
+  **Fazer:** `update google_calendar_connections set rotulo = 'Dra. Ana' …`
+  **Esperar:** os rótulos aparecem no seletor do nó **Oferecer horários**.
+
+- [ ] **⚡ 🔴 🌐 Uma reserva não bloqueia a outra agenda** — *o teste da fase*
+  **Fazer:** marcar quinta às 14h com a Dra. Ana. Pedir quinta às 14h com o
+  Dr. Bruno.
+  **Esperar:** **disponível**.
+  **Não pode:** aparecer ocupado. Era o defeito que a fase existe para evitar —
+  o consultório perderia metade da agenda sem entender por quê.
+
+- [ ] **A IA pergunta com quem**
+  **Fazer:** pedir um horário sem dizer o profissional.
+  **Esperar:** o modelo pergunta, e depois consulta **a agenda escolhida**.
+
+- [ ] **A confirmação diz com quem**
+  **Esperar:** "quinta 14h com Dra. Ana", não só o horário.
+  **Por que importa:** o cliente escolheu a pessoa, não só o horário.
+
+- [ ] **⚡ 🔴 O fluxo escolhe pela aresta**
+  **Fazer:** fluxo com menu "Dra. Ana / Dr. Bruno", cada botão levando a um
+  **Oferecer horários** com a agenda respectiva.
+  **Esperar:** os horários oferecidos são os daquela agenda, e a reserva cai
+  nela — confira no Google.
+
+- [ ] **❓ Compromisso antigo conta para a padrão**
+  **Fazer:** um agendamento criado ANTES da migração (com `connection_id` nulo).
+  **Esperar:** ele bloqueia o horário na agenda **padrão**, e não na outra.
+
+- [ ] **Uma agenda fora do ar não derruba a outra**
+  **Fazer:** revogar o acesso de uma das contas do Google.
+  **Esperar:** a outra continua agendando; o log traz "agenda inutilizável,
+  seguindo sem ela".

@@ -1250,7 +1250,9 @@
         "handoffModePause": "Pause — someone can hand it back",
         "onHandedBack": "When handed back →",
         "pauseTimeoutHours": "Give up after (hours)",
-        "handoffPauseHint": "The run stays alive, waiting for someone to hand the conversation back. If nobody does within the deadline it ends, so the contact is not held forever."
+        "handoffPauseHint": "The run stays alive, waiting for someone to hand the conversation back. If nobody does within the deadline it ends, so the contact is not held forever.",
+        "calendarLabel": "Diary",
+        "calendarDefault": "Account default"
       },
       "categories": {
         "messaging": "Messaging",

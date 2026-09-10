@@ -45,10 +45,14 @@ export interface Appointment {
   notes: string | null
   googleEventId: string | null
   createdVia: string
+  /** Em qual agenda ele está. Null nos anteriores à migração 082 e nos
+   *  marcados sem agenda conectada — os dois casos significam "a
+   *  padrão da conta". */
+  connectionId?: string | null
 }
 
 const APPOINTMENT_COLUMNS =
-  'id, contact_id, conversation_id, starts_at, ends_at, status, title, notes, google_event_id, created_via'
+  'id, contact_id, conversation_id, starts_at, ends_at, status, title, notes, google_event_id, created_via, connection_id'
 
 interface AppointmentRow {
   id: string
@@ -61,6 +65,7 @@ interface AppointmentRow {
   notes: string | null
   google_event_id: string | null
   created_via: string
+  connection_id?: string | null
 }
 
 function toAppointment(row: AppointmentRow): Appointment {
@@ -75,6 +80,7 @@ function toAppointment(row: AppointmentRow): Appointment {
     notes: row.notes,
     googleEventId: row.google_event_id,
     createdVia: row.created_via,
+    connectionId: row.connection_id ?? null,
   }
 }
 
@@ -147,6 +153,10 @@ export async function bookAppointment(args: BookArgs): Promise<SchedulingResult>
       title: args.title ?? null,
       notes: args.notes ?? null,
       created_via: args.createdVia,
+      // EM QUAL agenda. Sem isto, remarcar e cancelar não sabem para
+      // qual calendário do Google falar, e a confirmação não sabe dizer
+      // com quem é o compromisso — que é metade da informação.
+      connection_id: connection?.id ?? null,
     })
     .select(APPOINTMENT_COLUMNS)
     .single<AppointmentRow>()
@@ -362,13 +372,29 @@ export async function loadBusyIntervals(
     }
   }
 
-  const { data, error } = await db
+  // Qual agenda este compromisso ocupa.
+  //
+  // Com mais de uma agenda (migração 082), a reserva da Dra. Ana não
+  // pode bloquear o Dr. Bruno — era o que acontecia quando a conta tinha
+  // uma agenda só e todo compromisso da conta contava.
+  //
+  // `connection_id IS NULL` é compromisso anterior à 082, ou marcado sem
+  // agenda: conta para a agenda PADRÃO, que é onde ele de fato está.
+  let query = db
     .from('appointments')
     .select('starts_at, ends_at')
     .eq('account_id', accountId)
     .eq('status', 'scheduled')
     .lt('starts_at', to.toISOString())
     .gt('ends_at', from.toISOString())
+
+  if (connection) {
+    query = connection.isDefault
+      ? query.or(`connection_id.eq.${connection.id},connection_id.is.null`)
+      : query.eq('connection_id', connection.id)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('[scheduling] busy lookup failed:', error)
@@ -385,11 +411,14 @@ export async function loadBusyIntervals(
 export function describeAppointment(
   appointment: Appointment,
   timezone: string,
+  /** Com quem é. Numa conta com duas agendas, uma confirmação que não
+   *  diz o profissional está pela metade — o cliente escolheu a pessoa,
+   *  não só o horário. Omitido quando a conta tem uma agenda só. */
+  comQuem?: string | null,
 ): string {
-  return `${appointment.title?.trim() || 'Appointment'} on ${formatInZone(
-    new Date(appointment.startsAt),
-    timezone,
-  )} (${timezone})`
+  const quando = formatInZone(new Date(appointment.startsAt), timezone)
+  const base = `${appointment.title?.trim() || 'Appointment'} on ${quando} (${timezone})`
+  return comQuem?.trim() ? `${base} with ${comQuem.trim()}` : base
 }
 
 /**

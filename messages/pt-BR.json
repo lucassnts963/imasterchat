@@ -1006,7 +1006,9 @@
         "handoffModePause": "Pausar — alguém pode devolver",
         "onHandedBack": "Quando devolverem →",
         "pauseTimeoutHours": "Desistir depois de (horas)",
-        "handoffPauseHint": "O run continua vivo, esperando alguém devolver a conversa. Se ninguém devolver no prazo ele encerra, para não segurar o contato para sempre."
+        "handoffPauseHint": "O run continua vivo, esperando alguém devolver a conversa. Se ninguém devolver no prazo ele encerra, para não segurar o contato para sempre.",
+        "calendarLabel": "Agenda",
+        "calendarDefault": "Padrão da conta"
       },
       "categories": {
         "messaging": "Mensagens",

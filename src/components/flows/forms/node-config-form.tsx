@@ -1385,6 +1385,7 @@ function SendMediaForm({
 // ============================================================
 
 interface OfferSlotsCfg {
+  connection_id?: string;
   timeout_minutes?: number;
   on_timeout_next?: string;
   text?: string;
@@ -1409,8 +1410,22 @@ function OfferSlotsForm({
   onUpdateConfig: (patch: Record<string, unknown>) => void;
   t: ReturnType<typeof useTranslations>;
 }) {
+  const agendas = useAgendas();
+
   return (
     <>
+      {/* O seletor só aparece quando existe escolha. Numa conta com uma
+          agenda ele seria um campo com uma opção — ruído que o operador
+          precisa entender para ignorar. */}
+      {agendas.length > 1 && (
+        <PickerRow
+          label={t("calendarLabel")}
+          value={cfg.connection_id ?? ""}
+          options={agendas.map((a) => ({ value: a.id, label: a.label }))}
+          placeholder={t("calendarDefault")}
+          onChange={(v) => onUpdateConfig({ connection_id: v })}
+        />
+      )}
       <TextRow
         label={t("textToCustomer")}
         value={cfg.text ?? ""}
@@ -1532,6 +1547,41 @@ function SchedulingEdges({
 
 interface ApprovedTemplate {
   name: string;
+}
+
+interface AgendaOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * As agendas conectadas.
+ *
+ * Vem da rota e não do banco direto porque o rótulo tem um desempate —
+ * rótulo, depois e-mail, depois genérico — e ele precisa ser o MESMO que
+ * o motor usa. Duas implementações do mesmo rótulo dariam nomes
+ * diferentes na tela e na conversa.
+ */
+function useAgendas(): AgendaOption[] {
+  const [agendas, setAgendas] = useState<AgendaOption[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/agendas", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { agendas?: AgendaOption[] };
+        if (!cancelled) setAgendas(json.agendas ?? []);
+      } catch {
+        // Sem a rota, o nó usa a agenda padrão — que é o que ele fazia
+        // antes de existir mais de uma.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return agendas;
 }
 
 function useApprovedTemplates(): ApprovedTemplate[] {

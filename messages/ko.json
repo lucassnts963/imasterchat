@@ -1250,7 +1250,9 @@
         "handoffModePause": "일시정지 — 누군가 돌려줄 수 있음",
         "onHandedBack": "돌려받으면 →",
         "pauseTimeoutHours": "포기까지 (시간)",
-        "handoffPauseHint": "실행이 살아 있는 채로 누군가 대화를 돌려주기를 기다립니다. 기한 내에 아무도 돌려주지 않으면 종료되어 연락처를 영원히 붙잡지 않습니다."
+        "handoffPauseHint": "실행이 살아 있는 채로 누군가 대화를 돌려주기를 기다립니다. 기한 내에 아무도 돌려주지 않으면 종료되어 연락처를 영원히 붙잡지 않습니다.",
+        "calendarLabel": "캘린더",
+        "calendarDefault": "계정 기본값"
       },
       "categories": {
         "messaging": "메시징",

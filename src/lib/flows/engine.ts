@@ -56,6 +56,7 @@ import { isDeliverableUrl } from "@/lib/webhooks/ssrf";
 // implementação por formato de envio, dois motores.
 import { engineSendTemplate } from "@/lib/automations/meta-send";
 import {
+  pickConnection,
   bookForContact,
   cancelForContact,
   listAvailability,
@@ -803,7 +804,8 @@ async function offerSlots(
     return { kind: "advance", to: cfg.on_error_next };
   }
 
-  const { settings, connection } = scheduling;
+  const { settings } = scheduling;
+  const connection = pickConnection(scheduling, cfg.connection_id);
   const now = new Date();
   const days = cfg.lookahead_days ?? settings.lookaheadDays ?? 7;
   const result = await listAvailability({
@@ -844,7 +846,14 @@ async function offerSlots(
     starts_at: slot.startsAt.toISOString(),
     ends_at: slot.endsAt.toISOString(),
   }));
-  const newVars = { ...run.vars, _offered_slots: offered };
+  // A agenda vai junto: o nó que marca precisa saber em QUAL calendário
+  // os horários estavam livres, senão ele reserva na agenda errada e o
+  // profissional certo continua com o horário aberto.
+  const newVars = {
+    ...run.vars,
+    _offered_slots: offered,
+    _offered_agenda: connection?.id ?? null,
+  };
   const { error: varsErr } = await db
     .from("flow_runs")
     .update({ vars: newVars })
@@ -1341,7 +1350,13 @@ async function advanceFromNodeKey(
         contactId: run.contact_id,
         conversationId: run.conversation_id,
         settings: ctx.settings,
-        connection: ctx.connection,
+        connection: pickConnection(
+          ctx,
+          cfg.connection_id ??
+            (typeof run.vars._offered_agenda === "string"
+              ? run.vars._offered_agenda
+              : null),
+        ),
         startsAt: chosen.starts_at,
         endsAt: chosen.ends_at,
         title: cfg.title ? interpolateVars(cfg.title, run.vars) : null,
@@ -1375,7 +1390,12 @@ async function advanceFromNodeKey(
         accountId: run.account_id,
         contactId: run.contact_id,
         settings: ctx.settings,
-        connection: ctx.connection,
+        connection: pickConnection(
+          ctx,
+          typeof run.vars._offered_agenda === "string"
+            ? run.vars._offered_agenda
+            : null,
+        ),
         startsAt: chosen.starts_at,
         endsAt: chosen.ends_at,
       });

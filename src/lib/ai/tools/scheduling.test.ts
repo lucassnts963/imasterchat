@@ -18,6 +18,10 @@ vi.mock('@/lib/actions/scheduling', async () => {
   return {
     parseDayStart: actual.parseDayStart,
     parseDayEnd: actual.parseDayEnd,
+    // Puras, e são a regra sob teste quando a conta tem mais de uma
+    // agenda — trocá-las por duplos testaria os duplos.
+    pickConnection: actual.pickConnection,
+    rotuloDaAgenda: actual.rotuloDaAgenda,
     listAvailability: h.listAvailability,
     bookForContact: h.bookForContact,
     rescheduleForContact: h.rescheduleForContact,
@@ -57,7 +61,8 @@ const APPOINTMENT = {
   createdVia: 'native',
 }
 
-const tools = () => buildSchedulingTools({ settings: SETTINGS, connection: null })
+const tools = () =>
+  buildSchedulingTools({ settings: SETTINGS, connection: null, connections: [] })
 const tool = (name: string) => tools().find((t) => t.name === name)!
 
 function ctx(over: Partial<ToolContext> = {}): ToolContext {
@@ -203,5 +208,74 @@ describe('check_availability', () => {
     const out = await tool('book_appointment').execute(SLOT, ctx({ contactId: null }))
     expect(h.bookForContact).not.toHaveBeenCalled()
     expect(out.isError).toBe(true)
+  })
+})
+
+// ============================================================
+// Mais de uma agenda — fase 6.
+//
+// O seletor é POR PROFISSIONAL: o cliente escolhe com quem quer ser
+// atendido, e é isso que decide em qual calendário o horário é lido e
+// reservado.
+// ============================================================
+
+const AGENDAS = [
+  { id: 'cal-ana', rotulo: 'Dra. Ana', googleEmail: 'ana@clinica.com', isDefault: true },
+  { id: 'cal-bruno', rotulo: 'Dr. Bruno', googleEmail: 'bruno@clinica.com', isDefault: false },
+] as never[]
+
+const comAgendas = () =>
+  buildSchedulingTools({
+    settings: SETTINGS,
+    connection: AGENDAS[0],
+    connections: AGENDAS,
+  })
+
+describe('quando a conta tem duas agendas', () => {
+  it('oferece a escolha ao modelo, pelo nome que o cliente usa', () => {
+    const params = comAgendas().find((t) => t.name === 'check_availability')!
+      .parameters as { properties: { agenda?: { enum: string[] } } }
+    expect(params.properties.agenda?.enum).toEqual(['Dra. Ana', 'Dr. Bruno'])
+  })
+
+  it('lê os horários da agenda escolhida', async () => {
+    const tool = comAgendas().find((t) => t.name === 'check_availability')!
+    await tool.execute({ agenda: 'Dr. Bruno' }, ctx())
+    expect(h.listAvailability.mock.calls[0][0].connection).toMatchObject({
+      id: 'cal-bruno',
+    })
+  })
+
+  it('reserva na agenda escolhida', async () => {
+    const tool = comAgendas().find((t) => t.name === 'book_appointment')!
+    await tool.execute({ ...SLOT, agenda: 'Dr. Bruno' }, ctx())
+    expect(h.bookForContact.mock.calls[0][0].connection).toMatchObject({
+      id: 'cal-bruno',
+    })
+  })
+
+  // Um modelo pode alucinar um nome. Cair na padrão é melhor que falhar:
+  // o pior caso é o comportamento de antes de existirem duas agendas.
+  it('cai na padrão quando o nome não existe', async () => {
+    const tool = comAgendas().find((t) => t.name === 'check_availability')!
+    await tool.execute({ agenda: 'Dr. Ninguém' }, ctx())
+    expect(h.listAvailability.mock.calls[0][0].connection).toMatchObject({
+      id: 'cal-ana',
+    })
+  })
+})
+
+// Um argumento com uma opção é ruído no schema, custa tokens em toda
+// chamada, e é mais uma chance de o modelo preencher errado.
+describe('quando a conta tem uma agenda só', () => {
+  it('não ganha o campo de escolha', () => {
+    const params = buildSchedulingTools({
+      settings: SETTINGS,
+      connection: AGENDAS[0],
+      connections: [AGENDAS[0]],
+    }).find((t) => t.name === 'check_availability')!.parameters as {
+      properties: Record<string, unknown>
+    }
+    expect(params.properties.agenda).toBeUndefined()
   })
 })

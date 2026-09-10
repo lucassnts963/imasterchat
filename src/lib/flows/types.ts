@@ -220,6 +220,15 @@ export interface ConditionNodeConfig {
  * mesma ordem dos `reply_id`. O runner casa a resposta por índice.
  */
 export interface OfferSlotsNodeConfig extends NodeTimeoutConfig {
+  /**
+   * De qual agenda oferecer. Ausente = a padrão da conta.
+   *
+   * Fixo no nó, e não escolhido em tempo de execução, porque o seletor é
+   * POR PROFISSIONAL: o roteiro pergunta "com quem?" num menu comum e
+   * cada resposta leva a um `offer_slots` próprio. Um nó que perguntasse
+   * sozinho seria um segundo jeito de fazer menu.
+   */
+  connection_id?: string;
   /** Texto acima da lista. */
   text: string;
   /** Rótulo do botão que abre a lista. */
@@ -246,6 +255,9 @@ export interface OfferSlotsNodeConfig extends NodeTimeoutConfig {
  * desviar quando isso acontece.
  */
 export interface BookAppointmentNodeConfig {
+  /** Ausente = a agenda em que os horários foram oferecidos, que é o que
+   *  o `offer_slots` anterior guardou no run. */
+  connection_id?: string;
   /** Descrição do compromisso; interpola `{{vars.X}}`. */
   title?: string;
   /** Marcado. */

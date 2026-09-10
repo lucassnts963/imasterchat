@@ -4,8 +4,8 @@
 >
 > Fundamentação em [`../avaliacao-agendas-e-cobranca.md`](../avaliacao-agendas-e-cobranca.md) §1.
 >
-> **Bloqueada pela decisão D-1** (§2). Independente das outras fases — entra
-> quando o cliente pedir.
+> **D-1 decidida em 10/09/2026: seletor POR PROFISSIONAL/RECURSO** — o palpite
+> que este documento já registrava. Implementada.
 
 ---
 
@@ -49,14 +49,24 @@ documentado para múltiplos agentes em
 nome e agenda vinculada; "por serviço" pede um mapa serviço → agenda; agregada
 não pede nenhuma das duas.
 
-> Enquanto D-1 não for respondida, esta fase não começa. Não é falta de plano —
-> é que três planos diferentes dependem da resposta.
+### Decidido: por profissional/recurso
+
+E com um desvio do que o parágrafo acima previa: **não precisou de tabela de
+recursos**. O recurso é a própria conexão, com um rótulo — "Dra. Ana",
+"Sala 2" — e é ele que aparece no menu. Uma tabela separada só ganharia
+sentido se um recurso pudesse existir sem agenda, e não pode: um profissional
+sem calendário não tem horário para oferecer.
+
+As outras duas continuam construíveis por cima disto, sem outra migração: "por
+serviço" é um mapa de serviço → `connection_id`, e "disponibilidade agregada" é
+consultar as N e ordenar. Nenhuma das duas foi feita, porque nenhum cliente
+pediu.
 
 ---
 
 ## 3. O que muda em qualquer cenário
 
-### R-33 · Conexões 1:N — `M`
+### R-33 · Conexões 1:N — `M` — **feito**
 
 - **A1** `google_calendar_connections` perde o `UNIQUE`, ganha `rotulo` e
   `is_active`.
@@ -67,7 +77,7 @@ não pede nenhuma das duas.
 - **A4** OAuth não muda: conectar a segunda agenda é repetir o fluxo que já
   existe.
 
-### R-34 · Configuração por agenda — `M`
+### R-34 · Configuração por agenda — `M` — **parcial**
 
 - **B1** `ai_scheduling_settings` vira 1:N — **horário de funcionamento por
   profissional é o caso comum**, e uma agenda com horário global é mentira em
@@ -78,7 +88,7 @@ não pede nenhuma das duas.
 - **B3** Conta sem configuração por agenda cai na configuração da conta — o
   comportamento de hoje.
 
-### R-35 · Disponibilidade multi-agenda — `M`
+### R-35 · Disponibilidade multi-agenda — `M` — **feito**
 
 - **C1** `availability.ts` hoje consulta um `freebusy`; passa a consultar N e a
   **saber de qual veio cada slot**. Slot sem procedência é o que torna a tela
@@ -88,7 +98,7 @@ não pede nenhuma das duas.
 - **C3** Teto de agendas consultadas por chamada, para uma conta com vinte
   agendas não estourar a cota do Google numa pergunta.
 
-### R-36 · O seletor nos três motores — `M`
+### R-36 · O seletor nos três motores — `M` — **feito**
 
 Depende de D-1. Em qualquer cenário:
 
@@ -139,3 +149,44 @@ Depende de D-1. Em qualquer cenário:
 | R-36 seletor nos três motores | ~4 dias |
 
 **Total ~2 semanas**, e depende inteiramente de D-1 estar decidida.
+
+---
+
+## 7. Como ficou
+
+### O achado que a implementação trouxe
+
+O documento previa mexer em `availability.ts` para consultar N `freebusy`. O
+problema real era outro, e mais grave: **`loadBusyIntervals` contava TODOS os
+compromissos da conta como ocupados**, independentemente da agenda. Isso estava
+certo enquanto havia uma agenda; com duas, a reserva da Dra. Ana bloquearia o
+horário do Dr. Bruno — e o consultório perderia metade da agenda sem entender
+por quê.
+
+A correção é uma cláusula: compromisso com `connection_id` da agenda consultada
+sempre conta; `connection_id IS NULL` — anterior à migração 082, ou marcado sem
+agenda — conta só para a **padrão**, que é onde ele de fato está.
+
+### O seletor, motor a motor
+
+| Motor | Como escolhe |
+|---|---|
+| **Agente** | argumento `agenda` nas quatro ferramentas, com os rótulos como enum — e **só** quando a conta tem duas ou mais. Um argumento com uma opção é ruído no schema, custa tokens em toda chamada e é mais uma chance de o modelo preencher errado |
+| **Fluxo** | `connection_id` fixo no nó `offer_slots`. O roteiro pergunta "com quem?" num `send_buttons` comum, e cada resposta leva a um `offer_slots` próprio — um nó que perguntasse sozinho seria um segundo jeito de fazer menu |
+| **Automação** | a agenda é parâmetro do passo. Automação não pergunta |
+
+O nó que oferece guarda a agenda em `vars._offered_agenda`, e o nó que marca lê
+de lá. Sem isso o fluxo reservaria na agenda errada e o profissional certo
+continuaria com o horário aberto.
+
+### O que ficou parcial
+
+**R-34** (horário de funcionamento por agenda): o schema aceita — a linha de
+`ai_scheduling_settings` com `connection_id` é a da agenda, e a com nulo é a da
+conta. O que falta é a **tela** para editar por agenda; hoje as duas agendas
+compartilham o expediente da conta. É o próximo passo natural, e a única coisa
+que ainda torna "Dra. Ana de manhã, Dr. Bruno à tarde" indizível.
+
+**A tela de conexões** ainda conecta uma agenda e a marca como padrão. Conectar
+a segunda funciona (o fluxo de OAuth não mudou), mas rotular e escolher a padrão
+é SQL por enquanto.

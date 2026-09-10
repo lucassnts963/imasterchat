@@ -4,6 +4,8 @@ import { describeSlots } from '@/lib/scheduling/availability'
 import type { SchedulingSettings } from '@/lib/scheduling/settings'
 import { describeAppointment } from '@/lib/scheduling/store'
 import {
+  pickConnection,
+  rotuloDaAgenda,
   bookForContact,
   cancelForContact,
   checkSlotFree,
@@ -12,6 +14,7 @@ import {
   parseDayEnd,
   parseDayStart,
   rescheduleForContact,
+  type SchedulingContext,
   type SchedulingFailure,
 } from '@/lib/actions/scheduling'
 import type { AgentTool, ToolContext, ToolOutcome } from './types'
@@ -40,11 +43,42 @@ import type { AgentTool, ToolContext, ToolOutcome } from './types'
 // `lookahead_days` em Agentes → Regras.
 const DEFAULT_LOOKAHEAD_DAYS = 7
 
-export interface SchedulingToolDeps {
+export interface SchedulingToolDeps extends SchedulingContext {
   settings: SchedulingSettings
   /** Null when no calendar is connected: bookings still record, but
    *  availability is then based only on our own table. */
   connection: GoogleConnection | null
+}
+
+/**
+ * O argumento de agenda, e SÓ quando ele significa alguma coisa.
+ *
+ * Uma conta com uma agenda não ganha o campo: um argumento com uma opção
+ * é ruído no schema, custa tokens em toda chamada, e é mais uma chance
+ * de o modelo preencher errado. Com duas ou mais, ele é obrigatório na
+ * prática — sem ele o bot marca com quem calhar.
+ */
+function agendaParam(deps: SchedulingToolDeps): Record<string, unknown> {
+  if (deps.connections.length < 2) return {}
+  return {
+    agenda: {
+      type: 'string',
+      enum: deps.connections.map(rotuloDaAgenda),
+      description:
+        'Which diary to use. Ask the customer who they want to see if they have not said.',
+    },
+  }
+}
+
+/** Do rótulo que o modelo escolheu para a conexão. */
+function agendaEscolhida(
+  deps: SchedulingToolDeps,
+  args: Record<string, unknown>,
+): GoogleConnection | null {
+  const rotulo = typeof args.agenda === 'string' ? args.agenda.trim() : ''
+  if (!rotulo) return deps.connection
+  const achada = deps.connections.find((c) => rotuloDaAgenda(c) === rotulo)
+  return achada ? pickConnection(deps, achada.id) : deps.connection
 }
 
 export function buildSchedulingTools(deps: SchedulingToolDeps): AgentTool[] {
@@ -108,6 +142,7 @@ function checkAvailabilityTool(deps: SchedulingToolDeps): AgentTool {
           type: 'string',
           description: `Last day to look at, as YYYY-MM-DD. Defaults to ${settings.lookaheadDays || DEFAULT_LOOKAHEAD_DAYS} days after date_from.`,
         },
+        ...agendaParam(deps),
       },
       additionalProperties: false,
     },
@@ -126,7 +161,7 @@ function checkAvailabilityTool(deps: SchedulingToolDeps): AgentTool {
         db: ctx.db,
         accountId: ctx.accountId,
         settings,
-        connection,
+        connection: agendaEscolhida(deps, args),
         from,
         to,
         now,
@@ -172,6 +207,7 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
           description:
             'Short description of what the appointment is for, in the customer’s words.',
         },
+        ...agendaParam(deps),
       },
       required: ['starts_at', 'ends_at'],
       additionalProperties: false,
@@ -192,7 +228,12 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
       // agenda da loja.
       if (ctx.dryRun) {
         const check = await checkSlotFree(
-          { db: ctx.db, accountId: ctx.accountId, settings, connection },
+          {
+            db: ctx.db,
+            accountId: ctx.accountId,
+            settings,
+            connection: agendaEscolhida(deps, args),
+          },
           args.starts_at,
           args.ends_at,
         )
@@ -211,7 +252,7 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
         contactId: ctx.contactId,
         conversationId: ctx.conversationId,
         settings,
-        connection,
+        connection: agendaEscolhida(deps, args),
         startsAt: args.starts_at,
         endsAt: args.ends_at,
         title: typeof args.title === 'string' ? args.title : null,
@@ -220,8 +261,13 @@ function bookAppointmentTool(deps: SchedulingToolDeps): AgentTool {
 
       if (!result.ok) return toolOutcomeFor(result)
 
+      const agenda = agendaEscolhida(deps, args)
       return {
-        content: `Booked: ${describeAppointment(result.data, settings.timezone)}. Confirm it to the customer.`,
+        content: `Booked: ${describeAppointment(
+          result.data,
+          settings.timezone,
+          deps.connections.length > 1 && agenda ? rotuloDaAgenda(agenda) : null,
+        )}. Confirm it to the customer.`,
       }
     },
   }
@@ -243,6 +289,7 @@ function rescheduleAppointmentTool(deps: SchedulingToolDeps): AgentTool {
       properties: {
         starts_at: { type: 'string', description: 'New ISO 8601 start instant.' },
         ends_at: { type: 'string', description: 'New ISO 8601 end instant.' },
+        ...agendaParam(deps),
       },
       required: ['starts_at', 'ends_at'],
       additionalProperties: false,
@@ -259,7 +306,12 @@ function rescheduleAppointmentTool(deps: SchedulingToolDeps): AgentTool {
           ctx.contactId!,
         )
         const check = await checkSlotFree(
-          { db: ctx.db, accountId: ctx.accountId, settings, connection },
+          {
+            db: ctx.db,
+            accountId: ctx.accountId,
+            settings,
+            connection: agendaEscolhida(deps, args),
+          },
           args.starts_at,
           args.ends_at,
           existing?.id,
@@ -277,7 +329,7 @@ function rescheduleAppointmentTool(deps: SchedulingToolDeps): AgentTool {
         accountId: ctx.accountId,
         contactId: ctx.contactId,
         settings,
-        connection,
+        connection: agendaEscolhida(deps, args),
         startsAt: args.starts_at,
         endsAt: args.ends_at,
       })
@@ -293,8 +345,15 @@ function rescheduleAppointmentTool(deps: SchedulingToolDeps): AgentTool {
         return toolOutcomeFor(result)
       }
 
+      const agendaMovida = agendaEscolhida(deps, args)
       return {
-        content: `Moved to ${describeAppointment(result.data, settings.timezone)}. Confirm it to the customer.`,
+        content: `Moved to ${describeAppointment(
+          result.data,
+          settings.timezone,
+          deps.connections.length > 1 && agendaMovida
+            ? rotuloDaAgenda(agendaMovida)
+            : null,
+        )}. Confirm it to the customer.`,
       }
     },
   }

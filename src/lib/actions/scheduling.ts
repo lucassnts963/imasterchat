@@ -6,7 +6,10 @@ import { zonedParts, zonedTimeToUtc } from '@/lib/time/zone'
 import { computeAvailableSlots, type Slot } from '@/lib/scheduling/availability'
 import type { SchedulingSettings } from '@/lib/scheduling/settings'
 import { classifyRefusal, describeRefusal } from '@/lib/scheduling/refusal'
-import { loadGoogleConnection } from '@/lib/google/connection'
+import {
+  loadGoogleConnection,
+  loadGoogleConnections,
+} from '@/lib/google/connection'
 import {
   loadSchedulingSettings,
 } from '@/lib/scheduling/settings'
@@ -93,9 +96,36 @@ export type SchedulingResult<T> = { ok: true; data: T } | SchedulingFailure
 /** Tudo que agendar precisa, resolvido uma vez por execução. */
 export interface SchedulingContext {
   settings: SchedulingSettings
-  /** Null quando não há agenda conectada — a reserva ainda é gravada,
-   *  só não sai da nossa própria tabela. */
+  /** A agenda PADRÃO. Null quando não há nenhuma conectada — a reserva
+   *  ainda é gravada, só não sai da nossa própria tabela. Continua
+   *  existindo depois da migração 082 porque é o que uma conta com uma
+   *  agenda só sempre usou, e é o padrão de quem não escolhe. */
   connection: GoogleConnection | null
+  /** Todas as ativas. Uma conta com uma agenda tem uma; quem tem duas
+   *  precisa que o cliente ESCOLHA, e é esta lista que vira o menu. */
+  connections: GoogleConnection[]
+}
+
+/** Escolhe a agenda pedida, caindo na padrão quando ninguém pediu. */
+export function pickConnection(
+  ctx: SchedulingContext,
+  connectionId?: string | null,
+): GoogleConnection | null {
+  if (!connectionId) return ctx.connection
+  return (
+    ctx.connections.find((c) => c.id === connectionId) ?? ctx.connection
+  )
+}
+
+/**
+ * O rótulo de uma agenda, como o cliente a chama.
+ *
+ * Cai no e-mail do Google, e depois num genérico: uma conta que conectou
+ * duas agendas e não rotulou nenhuma ainda precisa oferecer duas opções
+ * distinguíveis, e "agenda@clinica.com" distingue melhor que "Agenda 2".
+ */
+export function rotuloDaAgenda(connection: GoogleConnection): string {
+  return connection.rotulo?.trim() || connection.googleEmail || 'Agenda'
 }
 
 /**
@@ -117,7 +147,10 @@ export async function resolveSchedulingContext(
   // Produto pior — o dia bloqueado à mão pelo ótico fica invisível — mas
   // coerente, e mantém a funcionalidade demonstrável antes do OAuth.
   try {
-    return { settings, connection: await loadGoogleConnection(db, accountId) }
+    const connections = await loadGoogleConnections(db, accountId)
+    // A padrão é a primeira: `loadGoogleConnections` já ordena por
+    // `is_default` e depois por antiguidade.
+    return { settings, connection: connections[0] ?? null, connections }
   } catch (err) {
     // As credenciais existem mas não servem; o operador precisa
     // reconectar. Oferecer as ferramentas assim mesmo faria o bot

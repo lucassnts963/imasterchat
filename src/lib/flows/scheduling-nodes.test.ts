@@ -77,13 +77,21 @@ vi.mock("./meta-send", () => ({
   engineSendInteractiveList: h.sendList,
 }));
 
-vi.mock("@/lib/actions/scheduling", () => ({
+vi.mock("@/lib/actions/scheduling", async () => {
+  // `pickConnection` é pura e é a regra sob teste em "usa a agenda
+  // certa" — trocá-la por um duplo testaria o duplo.
+  const actual = await vi.importActual<
+    typeof import("@/lib/actions/scheduling")
+  >("@/lib/actions/scheduling");
+  return {
+  pickConnection: actual.pickConnection,
   listAvailability: h.listAvailability,
   bookForContact: h.bookForContact,
   rescheduleForContact: h.rescheduleForContact,
   cancelForContact: h.cancelForContact,
   resolveSchedulingContext: h.resolveSchedulingContext,
-}));
+  };
+});
 
 import { startFlowRun } from "./engine";
 
@@ -149,6 +157,7 @@ beforeEach(() => {
   h.resolveSchedulingContext.mockResolvedValue({
     settings: SETTINGS,
     connection: null,
+    connections: [],
   });
   h.listAvailability.mockResolvedValue({ ok: true, data: slots(3) });
   h.sendList.mockResolvedValue({ whatsapp_message_id: "wam-1" });
