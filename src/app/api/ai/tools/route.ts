@@ -92,6 +92,7 @@ export async function GET() {
           isActive: false,
         },
         connection: null,
+        connections: [],
       },
     )
 

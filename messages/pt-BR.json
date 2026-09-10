@@ -41,7 +41,8 @@
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
     "menuSignOut": "Sair",
-    "agenda": "Agenda"
+    "agenda": "Agenda",
+    "cobrancas": "Cobrança"
   },
   "Header": {
     "dashboard": "Painel",
@@ -79,16 +80,6 @@
       "vsYesterday": "vs ontem",
       "openDeals": "{count} {count, plural, =1 {negócio aberto} other {negócios abertos}}",
       "noChange": "Sem alteração {suffix}"
-    },
-    "aiCost": {
-      "title": "Custo de IA (mês atual)",
-      "estimatedBadge": "estimativa",
-      "ofBudget": "de {budget}",
-      "usedOfBudget": "{pct}% do orçamento mensal usado",
-      "nearBudget": "O saldo de IA está acabando — {pct}% do orçamento mensal usado",
-      "overBudget": "Orçamento mensal de IA estourado",
-      "noBudget": "Nenhum orçamento mensal definido — configure um em Agentes de IA → Configurar para ser avisado antes de o saldo acabar.",
-      "manage": "Gerenciar IA"
     },
     "quickActions": {
       "newContact": "Novo contato",
@@ -140,6 +131,27 @@
     },
     "emptyState": {
       "title": "Ainda não há dados suficientes"
+    },
+    "cost": {
+      "title": "Custo deste mês",
+      "manage": "Gerenciar",
+      "ai": "IA (tokens)",
+      "whatsapp": "WhatsApp ({count} mensagens)",
+      "ofBudget": "de {budget}",
+      "forecast": "Pelas regras de outubro, este mês custaria {value}.",
+      "byOrigin": "O que mais pesa:",
+      "blocked": "{count} mensagem(ns) barrada(s) pelo orçamento.",
+      "fallbackPrices": "Preços da tabela interna — nenhum override configurado.",
+      "origins": {
+        "ai": "Respostas da IA",
+        "inbox": "Inbox",
+        "automation": "Automações",
+        "flow": "Fluxos",
+        "broadcast": "Broadcasts",
+        "api": "API pública",
+        "unknown": "Desconhecida",
+        "cobranca": "Cobrança"
+      }
     }
   },
   "Inbox": {
@@ -940,7 +952,63 @@
         "filenamePlaceholder": "fatura.pdf",
         "advanceAfterSending": "Depois de enviar, avançar para",
         "pickNextNode": "Escolha um próximo nó…",
-        "none": "— Nenhum —"
+        "none": "— Nenhum —",
+        "listButtonLabel": "Botão que abre a lista",
+        "maxOptions": "Quantos horários oferecer",
+        "lookaheadDays": "Dias à frente",
+        "lookaheadDaysPlaceholder": "padrão da conta",
+        "appointmentTitle": "Para que é o agendamento",
+        "cancelReason": "Motivo registrado no agendamento",
+        "onSlotChosen": "Cliente escolheu um horário →",
+        "onNoSlots": "Sem horário livre →",
+        "onCalendarError": "Não deu para ler a agenda →",
+        "onBooked": "Agendado →",
+        "onMoved": "Remarcado →",
+        "onCancelled": "Cancelado →",
+        "onSlotTaken": "Horário tomado nesse meio →",
+        "onNothingBooked": "Não tem agendamento →",
+        "templateLabel": "Modelo aprovado",
+        "templatePlaceholder": "Nome do modelo",
+        "templateVariables": "Variáveis do modelo",
+        "addVariable": "Adicionar variável",
+        "removeVariable": "Remover variável",
+        "pipelineLabel": "Funil",
+        "pipelinePlaceholder": "ID do funil",
+        "stageLabel": "Etapa",
+        "stagePlaceholder": "ID da etapa",
+        "dealTitleLabel": "Título do negócio",
+        "dealValueLabel": "Valor",
+        "assignModeLabel": "Atribuir para",
+        "assignAnyMember": "Qualquer pessoa da equipe",
+        "assignSpecific": "Um atendente específico",
+        "agentLabel": "Atendente",
+        "agentPlaceholder": "ID do atendente",
+        "queueLabel": "Fila",
+        "queuePlaceholder": "ID da fila",
+        "routeReasonLabel": "Nota para quem for atender",
+        "routeToQueueHint": "O run TERMINA aqui — a conversa passa a ter dono, e um fluxo que continuasse falando por cima de uma pessoa é o pior desfecho possível.",
+        "waitAmount": "Esperar",
+        "waitUnit": "Unidade",
+        "unitMinutes": "minutos",
+        "unitHours": "horas",
+        "unitDays": "dias",
+        "waitHint": "Enquanto espera, o fluxo não escuta — uma mensagem que chegue nesse meio é do agente e das automações, não dele.",
+        "webhookUrl": "URL",
+        "webhookBody": "Corpo (vazio manda as variáveis do run como JSON)",
+        "onWebhookOk": "Chamada deu certo →",
+        "onWebhookFailed": "Chamada falhou →",
+        "nodeTimeoutMinutes": "Desistir depois de (minutos)",
+        "nodeTimeoutPlaceholder": "sem prazo",
+        "onNoReply": "Sem resposta no prazo →",
+        "nodeTimeoutHint": "Este é o prazo DESTA pergunta. O prazo do fluxo inteiro continua valendo como teto — o menor dos dois vence.",
+        "handoffModeLabel": "O que acontece com o fluxo",
+        "handoffModeEnd": "Encerrar o fluxo aqui",
+        "handoffModePause": "Pausar — alguém pode devolver",
+        "onHandedBack": "Quando devolverem →",
+        "pauseTimeoutHours": "Desistir depois de (horas)",
+        "handoffPauseHint": "O run continua vivo, esperando alguém devolver a conversa. Se ninguém devolver no prazo ele encerra, para não segurar o contato para sempre.",
+        "calendarLabel": "Agenda",
+        "calendarDefault": "Padrão da conta"
       },
       "categories": {
         "messaging": "Mensagens",
@@ -979,6 +1047,54 @@
         "set_tag": {
           "label": "Etiquetar contato",
           "blurb": "Adiciona ou remove uma etiqueta do contato"
+        },
+        "send_template": {
+          "label": "Enviar modelo",
+          "blurb": "Manda um template aprovado — funciona fora da janela de 24h"
+        },
+        "update_contact_field": {
+          "label": "Atualizar campo",
+          "blurb": "Escreve um valor no contato"
+        },
+        "create_deal": {
+          "label": "Criar negócio",
+          "blurb": "Abre um negócio no funil"
+        },
+        "assign_conversation": {
+          "label": "Atribuir",
+          "blurb": "Põe a conversa na mão de alguém"
+        },
+        "close_conversation": {
+          "label": "Fechar conversa",
+          "blurb": "Marca a conversa como fechada"
+        },
+        "route_to_queue": {
+          "label": "Encaminhar para fila",
+          "blurb": "Entrega a conversa a um time e encerra o run"
+        },
+        "wait": {
+          "label": "Esperar",
+          "blurb": "Para o run por um tempo"
+        },
+        "send_webhook": {
+          "label": "Chamar webhook",
+          "blurb": "Faz um POST numa URL e desvia pelo resultado"
+        },
+        "offer_slots": {
+          "label": "Oferecer horários",
+          "blurb": "Lista os horários livres e espera a escolha"
+        },
+        "book_appointment": {
+          "label": "Agendar",
+          "blurb": "Marca o horário que o cliente escolheu"
+        },
+        "reschedule_appointment": {
+          "label": "Remarcar",
+          "blurb": "Move o agendamento existente"
+        },
+        "cancel_appointment": {
+          "label": "Cancelar agendamento",
+          "blurb": "Cancela e libera o horário"
         },
         "handoff": {
           "label": "Transferir para agente",
@@ -1106,7 +1222,15 @@
         "wait": "Espera",
         "condition": "Condição (Se/Senão)",
         "send_webhook": "Enviar webhook",
-        "close_conversation": "Fechar conversa"
+        "close_conversation": "Fechar conversa",
+        "start_flow": "Iniciar fluxo",
+        "book_appointment": "Agendar",
+        "reschedule_appointment": "Remarcar",
+        "cancel_appointment": "Cancelar agendamento",
+        "send_media": "Enviar mídia",
+        "route_to_queue": "Encaminhar para fila",
+        "handoff": "Passar para humano",
+        "resume_flow": "Retomar fluxo pausado"
       },
       "triggers": {
         "new_message_received": {
@@ -1243,7 +1367,33 @@
         "matchType": "Tipo de correspondência",
         "matchContains": "Contém",
         "matchExact": "Exata",
-        "closeConversationHint": "Define o status da conversa como \"fechada\". Nenhuma configuração necessária."
+        "closeConversationHint": "Define o status da conversa como \"fechada\". Nenhuma configuração necessária.",
+        "flowLabel": "Fluxo",
+        "flowSelect": "Escolha um fluxo…",
+        "flowPlaceholder": "ID do fluxo",
+        "flowUnknown": "Fluxo indisponível ({id})",
+        "startFlowHint": "Entrega o cliente a um fluxo, que sabe esperar uma resposta — a automação não sabe. Só um fluxo roda por contato de cada vez; se o cliente já estiver em um, este passo é recusado e o motivo fica no histórico.",
+        "startsAtLabel": "Início (ISO 8601)",
+        "endsAtLabel": "Fim (ISO 8601)",
+        "cancelReasonLabel": "Motivo (opcional)",
+        "appointmentTimeHint": "A automação não pergunta nada, então o horário precisa vir de fora — normalmente de uma variável que um fluxo coletou e entregou. Expediente, antecedência mínima e colisão continuam sendo conferidos antes de gravar.",
+        "cancelAppointmentHint": "Cancela o único agendamento vivo do cliente e libera o horário. Se ele não tiver nenhum, o passo registra isso e a automação segue.",
+        "mediaTypeLabel": "Tipo",
+        "mediaUrlLabel": "URL do arquivo",
+        "captionLabel": "Legenda",
+        "filenameLabel": "Nome do arquivo que o cliente vê",
+        "mediaTypes": {
+          "image": "Imagem",
+          "video": "Vídeo",
+          "document": "Documento"
+        },
+        "queueLabel": "Fila",
+        "queueSelect": "Escolha uma fila…",
+        "queuePlaceholder": "ID da fila",
+        "routeReasonLabel": "Nota para quem for atender",
+        "handoffNoteLabel": "Nota interna",
+        "handoffHint": "Pausa o robô nesta conversa e deixa para uma pessoa. Sem atendente escolhido, cai na fila compartilhada.",
+        "resumeFlowHint": "Devolve a conversa ao fluxo que a pausou num handoff. Não faz nada se o contato não tiver fluxo pausado."
       },
       "delete": "Excluir"
     }
@@ -1738,7 +1888,7 @@
       "autoReply": "Responder automaticamente a mensagens recebidas",
       "autoReplyDesc": "O bot responde automaticamente a novas mensagens recebidas (apenas quando nenhum fluxo as trata e nenhum atendente está atribuído). Passa para um humano quando não consegue ajudar.",
       "maxAutoReplies": "Máximo de respostas automáticas por conversa",
-      "maxAutoRepliesDesc": "Depois deste número de respostas do bot em uma conversa, o bot fica em silêncio.",
+      "maxAutoRepliesDesc": "Depois deste número de respostas do bot em uma conversa, o bot fica em silêncio. A partir de 1º/10/2026 cada uma delas é uma mensagem cobrada pela Meta, então este número passou a ser o principal controle de custo por conversa — três respostas dão cerca de US$ 0,02 por conversa no Brasil.",
       "handoffTo": "Passar para",
       "handoffToDesc": "Quando o bot não consegue ajudar — ou atinge o limite de respostas — ele pausa e encaminha a conversa para cá, com uma breve nota sobre o que aconteceu.",
       "handoffQueue": "Fila sem atribuição (qualquer atendente pode assumir)",
@@ -1762,7 +1912,7 @@
       "contextTimestamps": "Datas nas mensagens do contexto",
       "contextTimestampsDesc": "Marca cada mensagem com quando foi dita, para o agente distinguir ontem de hoje. Sem isso ele lê um \"amanhã\" dito ontem como ainda sendo amanhã. Custa ~100–160 tokens por resposta — desligue se você não usa agendamento.",
       "handoffNotice": "Avisar o cliente ao transferir",
-      "handoffNoticeDesc": "Quando a conversa for passada para uma pessoa, o bot manda uma mensagem antes de silenciar. Desligado, ele apenas para de responder — que é como funcionava até agora.",
+      "handoffNoticeDesc": "Quando a conversa for passada para uma pessoa, o bot manda uma mensagem antes de silenciar. Desligado, ele apenas para de responder — que é como funcionava até agora. Repare que ligar custa UMA MENSAGEM COBRADA A MAIS por transferência.",
       "handoffNoticeTextLabel": "Mensagem do aviso",
       "handoffNoticePlaceholder": "Vou encaminhar seu atendimento para o setor responsável. Em breve alguém entra em contato por aqui.",
       "handoffNoticeTextHint": "Vazio usa o texto acima. Evite dizer \"vou chamar um humano\": o cliente não precisa saber com quem falava, e prometer alguém \"agora\" cria uma expectativa que a fila não sustenta.",
@@ -1772,7 +1922,9 @@
       "embeddingsHintOtherProvider": "A {provider} não tem endpoint de embeddings, então a busca semântica precisa de uma chave de um provedor que tenha — a OpenRouter serve baai/bge-m3. Deixe em branco para usar busca por palavra-chave.",
       "embeddingsEndpoint": "Endpoint de embeddings",
       "embeddingsModel": "Modelo de embeddings",
-      "embeddingsDimensionHint": "O modelo precisa devolver vetores de {dimensions} dimensões, que é o que a sua base de conhecimento guarda. Isso é conferido ao salvar."
+      "embeddingsDimensionHint": "O modelo precisa devolver vetores de {dimensions} dimensões, que é o que a sua base de conhecimento guarda. Isso é conferido ao salvar.",
+      "whatsappBudget": "Orçamento do WhatsApp",
+      "whatsappBudgetDesc": "Teto mensal de gasto com mensagens da Meta, em dólares. Independente do orçamento de IA — a partir de outubro uma conversa custa em duas moedas. Estourar cala automações, fluxos, broadcasts e respostas da IA; nunca cala o atendente na inbox."
     },
     "aiKnowledge": {
       "loadFailed": "Falha ao carregar a base de conhecimento",
@@ -2554,5 +2706,48 @@
       "never": "Não exibir novamente",
       "close": "Fechar"
     }
+  },
+  "Cobrancas": {
+    "title": "Cobrança",
+    "description": "A régua que persegue o que venceu, a carteira em que ela trabalha, e por onde os dados entram.",
+    "ruler": "A régua",
+    "rulerHint": "Um degrau por momento de contato, em dias a partir do vencimento. Negativo avisa ANTES de vencer — costuma ser o degrau que mais recupera.",
+    "active": "Ativa",
+    "legalWindow": "Imposto pelo worker, não sugerido aqui: seg–sex 08h–20h, sáb 08h–14h, sem domingo e sem feriado, no máximo {max} contatos por título a cada {dias} dias.",
+    "offsetLabel": "Dias do vencimento",
+    "daysFromDue": "dias do vencimento",
+    "templatePlaceholder": "Nome do template aprovado",
+    "addStep": "Adicionar degrau",
+    "noSteps": "Nenhum degrau ainda. Uma régua sem degrau não manda nada.",
+    "save": "Salvar",
+    "saved": "Régua salva.",
+    "wallet": "Carteira ({count})",
+    "searchPlaceholder": "Buscar…",
+    "orphans": "{count} cobrança(s) não casaram com nenhum contato, então nada é enviado para elas.",
+    "unmatched": "sem contato",
+    "colWho": "Quem",
+    "colDescription": "Descrição",
+    "colValue": "Valor",
+    "colDue": "Vencimento",
+    "colStatus": "Situação",
+    "emptyWallet": "Nada aqui ainda. Importe uma planilha ou empurre pelo webhook.",
+    "status": {
+      "aberta": "Em aberto",
+      "paga": "Paga",
+      "cancelada": "Cancelada",
+      "negociando": "Negociando"
+    },
+    "import": "Importar planilha",
+    "importHint": "Cole o CSV com a linha de cabeçalho. Sempre confere antes de gravar — meia carteira importada é pior que nenhuma.",
+    "checkFirst": "Conferir antes",
+    "importNow": "Importar",
+    "imported": "{count} cobrança(s) importada(s).",
+    "previewSummary": "{validas} prontas · {rejeitadas} recusadas · {duplicadas} repetidas no arquivo",
+    "csvEmpty": "Cole ao menos o cabeçalho e uma linha.",
+    "integrations": "Integrações",
+    "integrationsHint": "De onde a carteira vem. O webhook genérico e a planilha funcionam com qualquer sistema.",
+    "connected": "Conectada",
+    "available": "Disponível",
+    "soon": "Em breve"
   }
 }

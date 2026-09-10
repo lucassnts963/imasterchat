@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Radio,
   Settings,
+  Receipt,
   Shield,
   User,
   UserCog,
@@ -99,8 +100,9 @@ const navItems: NavItem[] = [
   { href: "/pipelines", labelKey: "pipelines", icon: GitBranch },
   { href: "/broadcasts", labelKey: "broadcasts", icon: Radio },
   { href: "/automations", labelKey: "automations", icon: Zap },
-  { href: "/flows", labelKey: "flows", icon: Workflow, beta: true },
+  { href: "/flows", labelKey: "flows", icon: Workflow },
   { href: "/agenda", labelKey: "agenda", icon: CalendarDays },
+  { href: "/cobrancas", labelKey: "cobrancas", icon: Receipt },
   { href: "/agents", labelKey: "aiAgents", icon: Bot },
 ];
 

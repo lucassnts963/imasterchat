@@ -92,6 +92,7 @@ describe('runAgent without tools', () => {
       text: 'Olá!',
       handoff: false,
       handoffSource: null,
+      yielded: false,
       usage: { promptTokens: 5, completionTokens: 3, totalTokens: 8 },
       steps: [],
     })
@@ -366,5 +367,67 @@ describe('runAgent with tools', () => {
 
     expect(seen).toEqual([{ d: 1 }, { d: 2 }])
     expect(res.steps.map((s) => s.result)).toEqual(['slot 1', 'slot 2'])
+  })
+})
+
+describe('a tool that yields the turn', () => {
+  // `yieldTurn` and `handoff` both stop the loop and mean opposite
+  // things: one leaves the customer talking to a flow, the other calls
+  // a person. Conflating them would have auto-reply paging an attendant
+  // every time a flow started.
+  it('stops the loop without calling a human', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(toolCallResponse('start_flow', '{"flow":"Planos"}'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await runAgent({
+      config: config(),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'quero ver os planos' }],
+      tools: [
+        tool({
+          name: 'start_flow',
+          execute: async () => ({ content: 'started', yieldTurn: true }),
+        }),
+      ],
+      ctx,
+    })
+
+    expect(res.yielded).toBe(true)
+    expect(res.handoff).toBe(false)
+    expect(res.handoffSource).toBeNull()
+    // One call: the loop must not go back to the model for a closing
+    // line, which would cost a round trip to produce text we discard.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  // The flow has already sent its first node. Anything the model wrote
+  // alongside the call would land on top of it and the customer would
+  // answer the wrong message.
+  it('drops whatever the model wrote alongside the call', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        toolCallResponse('start_flow', '{"flow":"Planos"}', {
+          text: 'Claro, vou te mostrar!',
+        }),
+      ),
+    )
+
+    const res = await runAgent({
+      config: config(),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'planos' }],
+      tools: [
+        tool({
+          name: 'start_flow',
+          execute: async () => ({ content: 'started', yieldTurn: true }),
+        }),
+      ],
+      ctx,
+    })
+
+    expect(res.text).toBe('')
   })
 })

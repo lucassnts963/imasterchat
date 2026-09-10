@@ -41,7 +41,8 @@
     "menuProfile": "Profile",
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
-    "agenda": "Agenda"
+    "agenda": "Agenda",
+    "cobrancas": "Collections"
   },
   "Header": {
     "dashboard": "Dashboard",
@@ -79,16 +80,6 @@
       "vsYesterday": "vs yesterday",
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}"
-    },
-    "aiCost": {
-      "title": "AI cost (this month)",
-      "estimatedBadge": "estimate",
-      "ofBudget": "of {budget}",
-      "usedOfBudget": "{pct}% of the monthly budget used",
-      "nearBudget": "AI balance is running out — {pct}% of the monthly budget used",
-      "overBudget": "Monthly AI budget exceeded",
-      "noBudget": "No monthly budget set — define one in AI Agents → Set up to get a warning before the balance runs out.",
-      "manage": "Manage AI"
     },
     "quickActions": {
       "newContact": "New Contact",
@@ -140,6 +131,27 @@
     },
     "emptyState": {
       "title": "Not enough data yet"
+    },
+    "cost": {
+      "title": "Cost this month",
+      "manage": "Manage",
+      "ai": "AI (tokens)",
+      "whatsapp": "WhatsApp ({count} messages)",
+      "ofBudget": "of {budget}",
+      "forecast": "Under the October rules this month would cost {value}.",
+      "byOrigin": "Most expensive:",
+      "blocked": "{count} message(s) blocked by the budget.",
+      "fallbackPrices": "Prices from the built-in table — no override set.",
+      "origins": {
+        "ai": "AI replies",
+        "inbox": "Inbox",
+        "automation": "Automations",
+        "flow": "Flows",
+        "broadcast": "Broadcasts",
+        "api": "Public API",
+        "unknown": "Unknown",
+        "cobranca": "Collections"
+      }
     }
   },
   "Inbox": {
@@ -867,7 +879,15 @@
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
-        "close_conversation": "Close Conversation"
+        "close_conversation": "Close Conversation",
+        "start_flow": "Start Flow",
+        "book_appointment": "Book Appointment",
+        "reschedule_appointment": "Reschedule Appointment",
+        "cancel_appointment": "Cancel Appointment",
+        "send_media": "Send Media",
+        "route_to_queue": "Route to Queue",
+        "handoff": "Hand off to a Human",
+        "resume_flow": "Resume Paused Flow"
       },
       "triggers": {
         "new_message_received": {
@@ -1004,7 +1024,33 @@
         "matchType": "Match type",
         "matchContains": "Contains",
         "matchExact": "Exact",
-        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed.",
+        "flowLabel": "Flow",
+        "flowSelect": "Select a flow…",
+        "flowPlaceholder": "Flow ID",
+        "flowUnknown": "Unavailable flow ({id})",
+        "startFlowHint": "Hands the customer over to a flow, which can wait for an answer — an automation cannot. Only one flow runs per contact at a time; if the customer is already in one, this step is skipped and says so in the log.",
+        "startsAtLabel": "Start (ISO 8601)",
+        "endsAtLabel": "End (ISO 8601)",
+        "cancelReasonLabel": "Reason (optional)",
+        "appointmentTimeHint": "An automation never asks anything, so the time has to come from somewhere else — usually a variable a flow collected and handed over. Business hours, minimum notice and collisions are still checked before anything is written.",
+        "cancelAppointmentHint": "Cancels the customer’s single live appointment and frees the slot. If they have none, the step says so and the automation carries on.",
+        "mediaTypeLabel": "Type",
+        "mediaUrlLabel": "File URL",
+        "captionLabel": "Caption",
+        "filenameLabel": "Filename shown to the customer",
+        "mediaTypes": {
+          "image": "Image",
+          "video": "Video",
+          "document": "Document"
+        },
+        "queueLabel": "Queue",
+        "queueSelect": "Pick a queue…",
+        "queuePlaceholder": "Queue ID",
+        "routeReasonLabel": "Note for whoever picks it up",
+        "handoffNoteLabel": "Internal note",
+        "handoffHint": "Pauses the bot on this conversation and leaves it for a person. Leaving the agent empty drops it into the shared queue.",
+        "resumeFlowHint": "Hands a conversation back to the flow that paused it at a handoff. Does nothing if the contact has no paused flow."
       },
       "delete": "Delete"
     }
@@ -1150,7 +1196,63 @@
         "filenamePlaceholder": "invoice.pdf",
         "advanceAfterSending": "After sending, advance to",
         "pickNextNode": "Pick a next node…",
-        "none": "— None —"
+        "none": "— None —",
+        "listButtonLabel": "Button that opens the list",
+        "maxOptions": "How many times to offer",
+        "lookaheadDays": "Days ahead",
+        "lookaheadDaysPlaceholder": "account default",
+        "appointmentTitle": "What the appointment is for",
+        "cancelReason": "Reason recorded on the appointment",
+        "onSlotChosen": "Customer picked a time →",
+        "onNoSlots": "No free times →",
+        "onCalendarError": "Calendar could not be read →",
+        "onBooked": "Booked →",
+        "onMoved": "Moved →",
+        "onCancelled": "Cancelled →",
+        "onSlotTaken": "Time taken meanwhile →",
+        "onNothingBooked": "Nothing booked →",
+        "templateLabel": "Approved template",
+        "templatePlaceholder": "Template name",
+        "templateVariables": "Template variables",
+        "addVariable": "Add variable",
+        "removeVariable": "Remove variable",
+        "pipelineLabel": "Pipeline",
+        "pipelinePlaceholder": "Pipeline ID",
+        "stageLabel": "Stage",
+        "stagePlaceholder": "Stage ID",
+        "dealTitleLabel": "Deal title",
+        "dealValueLabel": "Value",
+        "assignModeLabel": "Assign to",
+        "assignAnyMember": "Anyone on the team",
+        "assignSpecific": "A specific agent",
+        "agentLabel": "Agent",
+        "agentPlaceholder": "Agent user id",
+        "queueLabel": "Queue",
+        "queuePlaceholder": "Queue ID",
+        "routeReasonLabel": "Note for whoever picks it up",
+        "routeToQueueHint": "The run ENDS here — the conversation now has an owner, and a flow that kept talking over a person is the worst outcome there is.",
+        "waitAmount": "Wait",
+        "waitUnit": "Unit",
+        "unitMinutes": "minutes",
+        "unitHours": "hours",
+        "unitDays": "days",
+        "waitHint": "The flow stops listening while it waits — a message that arrives meanwhile goes to the agent and the automations, not here.",
+        "webhookUrl": "URL",
+        "webhookBody": "Body (empty sends the run variables as JSON)",
+        "onWebhookOk": "Call succeeded →",
+        "onWebhookFailed": "Call failed →",
+        "nodeTimeoutMinutes": "Give up after (minutes)",
+        "nodeTimeoutPlaceholder": "no timeout",
+        "onNoReply": "No reply in time →",
+        "nodeTimeoutHint": "This is the deadline for THIS question. The flow-wide timeout still applies as a ceiling — whichever is shorter wins.",
+        "handoffModeLabel": "What happens to the flow",
+        "handoffModeEnd": "End the flow here",
+        "handoffModePause": "Pause — someone can hand it back",
+        "onHandedBack": "When handed back →",
+        "pauseTimeoutHours": "Give up after (hours)",
+        "handoffPauseHint": "The run stays alive, waiting for someone to hand the conversation back. If nobody does within the deadline it ends, so the contact is not held forever.",
+        "calendarLabel": "Diary",
+        "calendarDefault": "Account default"
       },
       "categories": {
         "messaging": "Messaging",
@@ -1189,6 +1291,54 @@
         "set_tag": {
           "label": "Tag contact",
           "blurb": "Adds or removes a contact tag"
+        },
+        "send_template": {
+          "label": "Send template",
+          "blurb": "Sends an approved template — works outside the 24h window"
+        },
+        "update_contact_field": {
+          "label": "Update field",
+          "blurb": "Writes a value onto the contact"
+        },
+        "create_deal": {
+          "label": "Create deal",
+          "blurb": "Opens a deal in the pipeline"
+        },
+        "assign_conversation": {
+          "label": "Assign",
+          "blurb": "Puts the conversation with someone"
+        },
+        "close_conversation": {
+          "label": "Close conversation",
+          "blurb": "Marks the conversation closed"
+        },
+        "route_to_queue": {
+          "label": "Route to queue",
+          "blurb": "Hands the conversation to a team and ends the run"
+        },
+        "wait": {
+          "label": "Wait",
+          "blurb": "Pauses the run for a set time"
+        },
+        "send_webhook": {
+          "label": "Call webhook",
+          "blurb": "Posts to a URL and branches on the result"
+        },
+        "offer_slots": {
+          "label": "Offer times",
+          "blurb": "Lists free slots and waits for the pick"
+        },
+        "book_appointment": {
+          "label": "Book",
+          "blurb": "Books the time the customer picked"
+        },
+        "reschedule_appointment": {
+          "label": "Reschedule",
+          "blurb": "Moves the existing appointment"
+        },
+        "cancel_appointment": {
+          "label": "Cancel appointment",
+          "blurb": "Cancels and frees the slot"
         },
         "handoff": {
           "label": "Handoff to agent",
@@ -1738,7 +1888,7 @@
       "autoReply": "Auto-reply to inbound messages",
       "autoReplyDesc": "The bot answers new inbound messages automatically (only when no flow handles them and no agent is assigned). Hands off to a human when it can’t help.",
       "maxAutoReplies": "Max auto-replies per conversation",
-      "maxAutoRepliesDesc": "After this many bot replies in one thread, the bot goes quiet.",
+      "maxAutoRepliesDesc": "After this many bot replies in one conversation, the bot goes quiet. From 1 October 2026 every one of these is a billed WhatsApp message, so this number is now the main per-conversation cost control — three replies is roughly US$ 0.02 per conversation in Brazil.",
       "handoffTo": "Hand off to",
       "handoffToDesc": "When the bot can’t help — or hits the reply cap — it pauses and routes the chat here, with a short note on what happened.",
       "handoffQueue": "Unassigned queue (any agent can pick it up)",
@@ -1769,10 +1919,12 @@
       "contextTimestamps": "Timestamps in the conversation context",
       "contextTimestampsDesc": "Marks each message with when it was said, so the agent can tell yesterday from today. Without it, a \"tomorrow\" said yesterday still reads as tomorrow. Costs ~100–160 tokens per reply — turn it off if you do not use scheduling.",
       "handoffNotice": "Tell the customer when transferring",
-      "handoffNoticeDesc": "When a conversation is passed to a person, the bot sends a message before going quiet. Off, it simply stops replying — how it worked until now.",
+      "handoffNoticeDesc": "When the conversation is handed to a person, the bot sends a message before going quiet. Off, it simply stops replying — which is how it worked until now. Note that turning it on costs ONE EXTRA billed message per handoff.",
       "handoffNoticeTextLabel": "Notice message",
       "handoffNoticePlaceholder": "I am passing your request to the responsible team. Someone will get back to you here shortly.",
-      "handoffNoticeTextHint": "Empty uses the text above. Avoid saying \"I will get a human\": the customer does not need to learn who they were talking to, and promising someone \"now\" sets an expectation the queue cannot keep."
+      "handoffNoticeTextHint": "Empty uses the text above. Avoid saying \"I will get a human\": the customer does not need to learn who they were talking to, and promising someone \"now\" sets an expectation the queue cannot keep.",
+      "whatsappBudget": "WhatsApp budget",
+      "whatsappBudgetDesc": "Monthly cap on Meta message spend, in USD. Separate from the AI budget — from October a conversation costs in two currencies. Reaching it silences automations, flows, broadcasts and AI replies; it never silences a human agent in the inbox."
     },
     "aiKnowledge": {
       "loadFailed": "Failed to load knowledge base",
@@ -2554,5 +2706,48 @@
       "never": "Don't show this again",
       "close": "Close"
     }
+  },
+  "Cobrancas": {
+    "title": "Collections",
+    "description": "The ruler that chases overdue invoices, the wallet it works from, and where the data comes in.",
+    "ruler": "The ruler",
+    "rulerHint": "One step per contact moment, as an offset in days from the due date. Negative warns before it falls due — usually the step that recovers most.",
+    "active": "Active",
+    "legalWindow": "Enforced by the worker, not suggested here: Mon–Fri 08:00–20:00, Sat 08:00–14:00, no Sundays or public holidays, max {max} contacts per invoice every {dias} days.",
+    "offsetLabel": "Days from due date",
+    "daysFromDue": "days from due",
+    "templatePlaceholder": "Approved template name",
+    "addStep": "Add step",
+    "noSteps": "No steps yet. A ruler with no steps sends nothing.",
+    "save": "Save",
+    "saved": "Ruler saved.",
+    "wallet": "Wallet ({count})",
+    "searchPlaceholder": "Search…",
+    "orphans": "{count} invoice(s) matched no contact, so nothing is sent for them.",
+    "unmatched": "no contact",
+    "colWho": "Who",
+    "colDescription": "Description",
+    "colValue": "Amount",
+    "colDue": "Due",
+    "colStatus": "Status",
+    "emptyWallet": "Nothing here yet. Import a spreadsheet or push through the webhook.",
+    "status": {
+      "aberta": "Open",
+      "paga": "Paid",
+      "cancelada": "Cancelled",
+      "negociando": "Negotiating"
+    },
+    "import": "Import a spreadsheet",
+    "importHint": "Paste the CSV with a header row. It always checks before writing — half a wallet imported is worse than none.",
+    "checkFirst": "Check first",
+    "importNow": "Import",
+    "imported": "{count} invoice(s) imported.",
+    "previewSummary": "{validas} ready · {rejeitadas} rejected · {duplicadas} repeated in the file",
+    "csvEmpty": "Paste at least a header row and one line.",
+    "integrations": "Integrations",
+    "integrationsHint": "Where the wallet comes from. The generic webhook and the spreadsheet work with any system.",
+    "connected": "Connected",
+    "available": "Available",
+    "soon": "Soon"
   }
 }

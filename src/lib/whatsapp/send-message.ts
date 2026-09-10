@@ -19,6 +19,7 @@
 // without duplicating ~250 lines of Meta plumbing.
 // ============================================================
 
+import type { MessageOrigin } from './message-origin';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
@@ -84,6 +85,10 @@ export interface SendMessageParams {
   /** Structured payload for `messageType === 'interactive'`. */
   interactivePayload?: InteractiveMessagePayload | null;
   replyToMessageId?: string | null;
+  /** Qual superfície mandou. `inbox` é o padrão porque este caminho é o
+   *  do atendente humano; a API pública passa `api`. Ver
+   *  `whatsapp/message-origin.ts`. */
+  origin?: MessageOrigin;
 }
 
 export interface SendMessageResult {
@@ -462,6 +467,7 @@ export async function sendMessageToConversation(
       message_id: waMessageId,
       status: 'sent',
       reply_to_message_id: replyToMessageId || null,
+      origin: params.origin ?? 'inbox',
     })
     .select()
     .single();

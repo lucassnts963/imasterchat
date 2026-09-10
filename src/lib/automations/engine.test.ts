@@ -14,6 +14,14 @@ const h = vi.hoisted(() => ({
     logInserts: [] as Record<string, unknown>[],
     logUpdates: [] as Record<string, unknown>[],
   },
+  startFlowRun: vi.fn(),
+  resolveSchedulingContext: vi.fn(),
+  bookForContact: vi.fn(),
+  rescheduleForContact: vi.fn(),
+  cancelForContact: vi.fn(),
+  loadQueue: vi.fn(),
+  routeConversationToQueue: vi.fn(),
+  handOffConversation: vi.fn(),
 }));
 
 vi.mock("./admin-client", () => {
@@ -98,6 +106,34 @@ vi.mock("./admin-client", () => {
   };
 });
 
+vi.mock("@/lib/flows/engine", async () => {
+  // The refusal sentences are the shared vocabulary between this step's
+  // log detail and the agent's tool result — keep the real ones.
+  const actual = await vi.importActual<typeof import("@/lib/flows/engine")>(
+    "@/lib/flows/engine",
+  );
+  return {
+    describeStartFlowRefusal: actual.describeStartFlowRefusal,
+    startFlowRun: h.startFlowRun,
+  };
+});
+
+vi.mock("@/lib/actions/queue-routing", () => ({
+  loadQueue: h.loadQueue,
+  routeConversationToQueue: h.routeConversationToQueue,
+}));
+
+vi.mock("@/lib/conversations/handoff", () => ({
+  handOffConversation: h.handOffConversation,
+}));
+
+vi.mock("@/lib/actions/scheduling", () => ({
+  resolveSchedulingContext: h.resolveSchedulingContext,
+  bookForContact: h.bookForContact,
+  rescheduleForContact: h.rescheduleForContact,
+  cancelForContact: h.cancelForContact,
+}));
+
 vi.mock("./meta-send", () => ({
   engineSendText: vi.fn(async () => ({ whatsapp_message_id: "m1" })),
   engineSendTemplate: vi.fn(async () => ({ whatsapp_message_id: "m1" })),
@@ -119,6 +155,42 @@ beforeEach(() => {
   h.state.upsertCalls = [];
   h.state.logInserts = [];
   h.state.logUpdates = [];
+  for (const fn of [
+    h.resolveSchedulingContext,
+    h.bookForContact,
+    h.rescheduleForContact,
+    h.cancelForContact,
+  ]) {
+    fn.mockReset();
+  }
+  h.resolveSchedulingContext.mockResolvedValue({
+    settings: { timezone: "America/Sao_Paulo" },
+    connection: null,
+  });
+  h.bookForContact.mockResolvedValue({ ok: true, data: {} });
+  h.cancelForContact.mockResolvedValue({ ok: true, data: {} });
+  h.loadQueue.mockReset();
+  h.routeConversationToQueue.mockReset();
+  h.handOffConversation.mockReset();
+  h.loadQueue.mockResolvedValue({
+    id: "q-1",
+    name: "Financeiro",
+    description: null,
+    responsibleUserId: null,
+    autoAssign: false,
+    distribution: "none",
+  });
+  h.routeConversationToQueue.mockResolvedValue({
+    ok: true,
+    message: 'routed to "Financeiro"',
+  });
+  h.handOffConversation.mockResolvedValue({ ok: true });
+  h.startFlowRun.mockReset();
+  h.startFlowRun.mockResolvedValue({
+    started: true,
+    flowRunId: "run-1",
+    outcome: "advanced",
+  });
 });
 
 describe("runAutomationsForTrigger — tenant isolation", () => {
@@ -448,5 +520,256 @@ describe("tag_added — conversation policy", () => {
       status: "failed",
       error_message: "tag_added automation cannot send: contact has no existing conversation",
     }));
+  });
+});
+
+// ------------------------------------------------------------
+// The bridge: an automation has no memory, so anything that must WAIT
+// for the customer belongs on the flow side of this step.
+// ------------------------------------------------------------
+
+function startFlowAutomation() {
+  return {
+    id: "a1",
+    account_id: ACCOUNT,
+    user_id: "u1",
+    trigger_type: "tag_added",
+    trigger_config: { tag_id: "tag-inadimplente" },
+    is_active: true,
+  };
+}
+
+function startFlowStep(config: Record<string, unknown> = {}) {
+  return {
+    id: "s1",
+    automation_id: "a1",
+    step_type: "start_flow",
+    position: 0,
+    parent_step_id: null,
+    step_config: { flow_id: "flow-cobranca", ...config },
+  };
+}
+
+async function runStartFlow(context: Record<string, unknown> = {}) {
+  h.state.owned = { id: "c1" };
+  h.state.automations = [startFlowAutomation()];
+  h.state.steps = [startFlowStep(context.step_config as Record<string, unknown>)];
+  await runAutomationsForTrigger({
+    accountId: ACCOUNT,
+    triggerType: "tag_added",
+    contactId: "c1",
+    context: {
+      tag_id: "tag-inadimplente",
+      conversation_id: "conv-1",
+      ...(context.context as Record<string, unknown>),
+    },
+  });
+}
+
+describe("start_flow step", () => {
+  it("hands the contact to the flow on the automation's own thread", async () => {
+    await runStartFlow();
+
+    expect(h.startFlowRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: ACCOUNT,
+        contactId: "c1",
+        flowId: "flow-cobranca",
+        startedBy: "automation",
+        conversationId: "conv-1",
+        chainDepth: 0,
+      }),
+    );
+  });
+
+  it("interpolates the vars it seeds into the run", async () => {
+    await runStartFlow({
+      step_config: { vars: { valor: "{{ vars.valor }}" } },
+      context: { vars: { valor: "80,00" } },
+    });
+
+    const seeded = h.startFlowRun.mock.calls[0][0].vars as Record<string, unknown>;
+    expect(seeded.valor).toBe("80,00");
+  });
+
+  // The counter crosses the bridge in the automation context, which is
+  // where the flow's own set_tag node put it. Without this, flow →
+  // tag → automation → flow has nothing counting the laps.
+  it("carries the chain depth across the bridge", async () => {
+    await runStartFlow({ context: { vars: { _flow_chain_depth: 2 } } });
+    expect(h.startFlowRun.mock.calls[0][0].chainDepth).toBe(2);
+  });
+
+  // A customer already mid-menu is the ordinary case, not a broken
+  // automation. Throwing would mark the whole run failed and stop every
+  // step after this one.
+  it("records a refusal without failing the run", async () => {
+    h.startFlowRun.mockResolvedValue({
+      started: false,
+      reason: "active_run_exists",
+      flowRunId: "run-old",
+    });
+
+    await runStartFlow();
+
+    expect(h.state.logUpdates).toContainEqual(
+      expect.objectContaining({ status: "success" }),
+    );
+    const steps = h.state.logUpdates
+      .map((u) => u.steps_executed)
+      .filter(Boolean)
+      .flat() as { detail?: string }[];
+    expect(JSON.stringify(steps)).toContain("already in a flow");
+  });
+});
+
+// ------------------------------------------------------------
+// Agendamento na automação — fase 1, R-5.
+// ------------------------------------------------------------
+
+async function runSchedulingStep(
+  stepType: string,
+  stepConfig: Record<string, unknown>,
+  context: Record<string, unknown> = {},
+) {
+  h.state.owned = { id: "c1" };
+  h.state.automations = [
+    {
+      id: "a1",
+      account_id: ACCOUNT,
+      user_id: "u1",
+      trigger_type: "tag_added",
+      trigger_config: { tag_id: "tag-x" },
+      is_active: true,
+    },
+  ];
+  h.state.steps = [
+    {
+      id: "s1",
+      automation_id: "a1",
+      step_type: stepType,
+      position: 0,
+      parent_step_id: null,
+      step_config: stepConfig,
+    },
+  ];
+  await runAutomationsForTrigger({
+    accountId: ACCOUNT,
+    triggerType: "tag_added",
+    contactId: "c1",
+    context: { tag_id: "tag-x", conversation_id: "conv-1", ...context },
+  });
+}
+
+describe("scheduling steps", () => {
+  it("books the time it was given", async () => {
+    await runSchedulingStep("book_appointment", {
+      starts_at: "2026-09-10T13:00:00.000Z",
+      ends_at: "2026-09-10T14:00:00.000Z",
+      title: "Corte",
+    });
+
+    expect(h.bookForContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contactId: "c1",
+        startsAt: "2026-09-10T13:00:00.000Z",
+        endsAt: "2026-09-10T14:00:00.000Z",
+        title: "Corte",
+      }),
+    );
+  });
+
+  // Uma automação não pergunta nada, então o horário vem de fora —
+  // normalmente de uma variável que um fluxo coletou e entregou.
+  it("interpolates the time out of the context", async () => {
+    await runSchedulingStep(
+      "book_appointment",
+      { starts_at: "{{ vars.inicio }}", ends_at: "{{ vars.fim }}" },
+      { vars: { inicio: "2026-09-10T13:00:00.000Z", fim: "2026-09-10T14:00:00.000Z" } },
+    );
+
+    expect(h.bookForContact.mock.calls[0][0].startsAt).toBe(
+      "2026-09-10T13:00:00.000Z",
+    );
+  });
+
+  it("cancels the contact's live appointment", async () => {
+    await runSchedulingStep("cancel_appointment", { reason: "pediu" });
+    expect(h.cancelForContact).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: "c1", reason: "pediu" }),
+    );
+  });
+
+  // Conta com agendamento desligado não é automação quebrada. Lançar
+  // marcaria a execução como falha e mataria os passos seguintes.
+  it("does not fail the run when the account has no scheduling", async () => {
+    h.resolveSchedulingContext.mockResolvedValue(null);
+    await runSchedulingStep("cancel_appointment", {});
+
+    expect(h.cancelForContact).not.toHaveBeenCalled();
+    expect(h.state.logUpdates).toContainEqual(
+      expect.objectContaining({ status: "success" }),
+    );
+  });
+
+  // Idem para uma recusa da própria ação: o motivo vai para o log do
+  // passo, e a automação segue.
+  it("records a refusal without failing the run", async () => {
+    h.cancelForContact.mockResolvedValue({
+      ok: false,
+      reason: "no_appointment",
+      message: "This customer has no appointment booked.",
+    });
+    await runSchedulingStep("cancel_appointment", {});
+
+    const steps = h.state.logUpdates
+      .map((u) => u.steps_executed)
+      .filter(Boolean)
+      .flat() as unknown[];
+    expect(JSON.stringify(steps)).toContain("no appointment booked");
+    expect(h.state.logUpdates).toContainEqual(
+      expect.objectContaining({ status: "success" }),
+    );
+  });
+});
+
+// ------------------------------------------------------------
+// Encaminhar e transferir — fase 1, R-8. Antes disto a automação
+// atribuía a um atendente, mas não sabia mandar para uma FILA nem
+// pausar o robô, que é o que "passar para humano" significa.
+// ------------------------------------------------------------
+
+describe("routing steps", () => {
+  it("routes to the configured queue", async () => {
+    await runSchedulingStep("route_to_queue", {
+      queue_id: "q-1",
+      reason: "quer negociar",
+    });
+
+    expect(h.routeConversationToQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: "quer negociar" }),
+    );
+  });
+
+  // Fila apagada, desativada, ou trocada para atendimento por robô.
+  // Encaminhar para o nada seria pior que dizer que não deu.
+  it("says so instead of routing into nothing", async () => {
+    h.loadQueue.mockResolvedValue(null);
+    await runSchedulingStep("route_to_queue", { queue_id: "q-x" });
+
+    expect(h.routeConversationToQueue).not.toHaveBeenCalled();
+    const steps = h.state.logUpdates
+      .map((u) => u.steps_executed)
+      .filter(Boolean)
+      .flat() as unknown[];
+    expect(JSON.stringify(steps)).toContain("queue not available");
+  });
+
+  it("hands off to a person, leaving the shared queue when no agent is named", async () => {
+    await runSchedulingStep("handoff", { note: "cliente irritado" });
+
+    expect(h.handOffConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: "cliente irritado", assignTo: null }),
+    );
   });
 });

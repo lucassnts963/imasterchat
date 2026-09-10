@@ -1,4 +1,7 @@
-import { handOffConversation } from '@/lib/conversations/handoff'
+import {
+  routeConversationToQueue,
+  type RoutableQueue,
+} from '@/lib/actions/queue-routing'
 import type { AgentTool } from './types'
 
 // ============================================================
@@ -20,16 +23,10 @@ import type { AgentTool } from './types'
 // descrição.
 // ============================================================
 
-export interface QueueOption {
-  id: string
-  name: string
-  description: string | null
-  /** Quem recebe a conversa ao chegar, quando a fila tem responsável. */
-  responsibleUserId: string | null
-  autoAssign: boolean
-  /** 'responsible' | 'none' | 'round_robin' | 'least_busy' */
-  distribution: string
-}
+/** Uma fila, como o catálogo do agente a enxerga. Mesma forma da ação
+ *  de domínio — o alias existe só para não trocar o nome em meia dúzia
+ *  de chamadores. */
+export type QueueOption = RoutableQueue
 
 /**
  * Monta a ferramenta a partir das filas HUMANAS da conta.
@@ -112,49 +109,17 @@ function routeToQueueTool(queues: QueueOption[]): AgentTool {
         }
       }
 
-      // Quem recebe depende do modo da fila.
-      //
-      // No rodízio quem escolhe é o BANCO (`next_queue_assignee`), e não
-      // este código: o avanço do cursor lá é a trava que impede duas
-      // mensagens simultâneas de caírem na mesma pessoa. Escolher aqui
-      // seria escolher fora da trava.
-      //
-      // `null` é uma resposta legítima — ninguém disponível. A conversa
-      // fica NA FILA, visível, e o relógio do SLA cobra. Atribuir para
-      // quem foi embora esconderia o problema.
-      let assignTo: string | null = null
-      if (queue.autoAssign) {
-        if (
-          queue.distribution === 'round_robin' ||
-          queue.distribution === 'least_busy'
-        ) {
-          const { data, error } = await ctx.db.rpc('next_queue_assignee', {
-            p_queue_id: queue.id,
-          })
-          if (error) {
-            console.error('[ai tools] next_queue_assignee falhou:', error)
-          }
-          assignTo = (data as string | null) ?? null
-        } else if (queue.distribution === 'responsible') {
-          assignTo = queue.responsibleUserId
-        }
-      }
-
-      const result = await handOffConversation({
+      // Para MESMO se a escrita falhar: o motivo de encaminhar não
+      // desaparece porque o UPDATE não foi, e um bot que continua
+      // falando depois de decidir encaminhar é pior que um que fica
+      // quieto. A ação já registra o erro.
+      await routeConversationToQueue({
         db: ctx.db,
         accountId: ctx.accountId,
         conversationId: ctx.conversationId,
+        queue,
         summary: `🤖 ${queue.name}: ${reason}`,
-        assignTo,
-        queueId: queue.id,
       })
-
-      if (!result.ok) {
-        // Para mesmo assim: a escrita ter falhado não faz o motivo de
-        // parar desaparecer, e um bot que continua falando depois de
-        // decidir encaminhar é pior que um que fica quieto.
-        console.error('[ai tools] route_to_queue falhou ao gravar:', result.message)
-      }
 
       return {
         content: `Routed to "${queue.name}". Say nothing further.`,

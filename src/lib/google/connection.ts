@@ -18,25 +18,35 @@ import {
 // ============================================================
 
 export interface GoogleConnection {
+  /** A linha em `google_calendar_connections`. Desde a migração 082 uma
+   *  conta tem N; é isto que diz de qual estamos falando. */
+  id: string
   accountId: string
   refreshToken: string
   calendarId: string
   googleEmail: string | null
+  /** Como o cliente chama esta agenda — "Dra. Ana", "Sala 2". Null nas
+   *  conexões anteriores à 082, e aí a conta tem uma agenda só. */
+  rotulo: string | null
+  isDefault: boolean
   /** Cached access token, already checked for freshness. */
   accessToken: string
   env: GoogleOAuthEnv
 }
 
 interface ConnectionRow {
+  id: string
   refresh_token: string
   access_token: string | null
   access_token_expires_at: string | null
   calendar_id: string
   google_email: string | null
+  rotulo: string | null
+  is_default: boolean
 }
 
 const CONNECTION_COLUMNS =
-  'refresh_token, access_token, access_token_expires_at, calendar_id, google_email'
+  'id, refresh_token, access_token, access_token_expires_at, calendar_id, google_email, rotulo, is_default'
 
 /**
  * Is a calendar connected? Cheap enough for the tool catalog, which
@@ -71,22 +81,91 @@ export async function hasGoogleConnection(
 export async function loadGoogleConnection(
   db: SupabaseClient,
   accountId: string,
+  /** Qual agenda. Ausente = a padrão da conta, que é exatamente o que a
+   *  única conexão respondia antes da migração 082. */
+  connectionId?: string | null,
 ): Promise<GoogleConnection | null> {
   const env = googleOAuthEnv()
   if (!env) return null
 
-  const { data, error } = await db
+  let query = db
     .from('google_calendar_connections')
     .select(CONNECTION_COLUMNS)
     .eq('account_id', accountId)
-    .maybeSingle<ConnectionRow>()
+    .eq('is_active', true)
+
+  if (connectionId) query = query.eq('id', connectionId)
+  // Sem agenda pedida: a padrão primeiro. `is_default` desc põe a padrão
+  // no topo, e a mais antiga desempata — para uma conta que nunca marcou
+  // padrão continuar respondendo a mesma coisa a cada chamada.
+  const { data, error } = await query
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: true })
+    .limit(1)
 
   if (error) {
     console.error('[google connection] lookup failed:', error)
     return null
   }
-  if (!data) return null
+  const row = ((data as ConnectionRow[] | null) ?? [])[0]
+  if (!row) return null
 
+  return hydrate(db, accountId, row, env)
+}
+
+/**
+ * Todas as agendas ativas da conta.
+ *
+ * Usada por quem precisa OFERECER a escolha — o menu do fluxo, o
+ * argumento da ferramenta da IA, a tela de configuração. Cada uma vem
+ * com o token já renovado, porque quem lista costuma consultar em
+ * seguida.
+ */
+export async function loadGoogleConnections(
+  db: SupabaseClient,
+  accountId: string,
+): Promise<GoogleConnection[]> {
+  const env = googleOAuthEnv()
+  if (!env) return []
+
+  const { data, error } = await db
+    .from('google_calendar_connections')
+    .select(CONNECTION_COLUMNS)
+    .eq('account_id', accountId)
+    .eq('is_active', true)
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: true })
+    .limit(50)
+
+  if (error) {
+    console.error('[google connection] list failed:', error)
+    return []
+  }
+
+  const out: GoogleConnection[] = []
+  for (const row of (data as ConnectionRow[] | null) ?? []) {
+    try {
+      out.push(await hydrate(db, accountId, row, env))
+    } catch (err) {
+      // Uma agenda que não abre não pode derrubar as outras: o
+      // consultório com dois médicos continua agendando com um deles
+      // enquanto o outro reconecta.
+      console.error(
+        '[google connection] agenda inutilizável, seguindo sem ela:',
+        row.id,
+        err instanceof Error ? err.message : err,
+      )
+    }
+  }
+  return out
+}
+
+async function hydrate(
+  db: SupabaseClient,
+  accountId: string,
+  data: ConnectionRow,
+  env: GoogleOAuthEnv,
+): Promise<GoogleConnection> {
   let refreshToken: string
   try {
     refreshToken = decrypt(data.refresh_token)
@@ -102,17 +181,19 @@ export async function loadGoogleConnection(
     )
   }
 
-  const cached = readCachedToken(data)
-  if (cached) {
-    return {
-      accountId,
-      refreshToken,
-      calendarId: data.calendar_id,
-      googleEmail: data.google_email,
-      accessToken: cached,
-      env,
-    }
+  const base = {
+    id: data.id,
+    accountId,
+    refreshToken,
+    calendarId: data.calendar_id,
+    googleEmail: data.google_email,
+    rotulo: data.rotulo,
+    isDefault: data.is_default,
+    env,
   }
+
+  const cached = readCachedToken(data)
+  if (cached) return { ...base, accessToken: cached }
 
   const { accessToken, expiresAt } = await refreshAccessToken(env, refreshToken)
 
@@ -124,22 +205,14 @@ export async function loadGoogleConnection(
       access_token: encrypt(accessToken),
       access_token_expires_at: expiresAt.toISOString(),
     })
-    .eq('account_id', accountId)
+    .eq('id', data.id)
   if (upErr) {
     console.error('[google connection] could not cache the access token:', upErr)
   }
 
-  return {
-    accountId,
-    refreshToken,
-    calendarId: data.calendar_id,
-    googleEmail: data.google_email,
-    accessToken,
-    env,
-  }
+  return { ...base, accessToken }
 }
 
-/** The cached token, if it exists and is still comfortably valid. */
 function readCachedToken(row: ConnectionRow): string | null {
   if (!row.access_token || !row.access_token_expires_at) return null
   const expiresAt = Date.parse(row.access_token_expires_at)

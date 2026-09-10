@@ -22,6 +22,7 @@ import { applyAudioSideEffect } from '@/lib/audio/side-effect'
 import { isReopening, reopenPatch } from '@/lib/conversations/reopen'
 import { previewText, sendPushToAccount } from '@/lib/push/send'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
+import { parseMessagePricing, recordMessageCost } from '@/lib/whatsapp/message-cost'
 import { accountAllowsSideEffects } from '@/lib/billing/side-effects'
 import {
   handleTemplateWebhookChange,
@@ -95,6 +96,14 @@ interface WhatsAppWebhookEntry {
         status: string
         timestamp: string
         recipient_id: string
+        // Meta's own billing determination for this message. Optional:
+        // not every status carries it. See lib/whatsapp/message-cost.ts.
+        pricing?: {
+          billable?: boolean
+          pricing_model?: string
+          type?: string
+          category?: string
+        }
       }>
     }
     field: string
@@ -478,6 +487,12 @@ async function handleStatusUpdate(status: {
   status: string
   timestamp: string
   recipient_id: string
+  pricing?: {
+    billable?: boolean
+    pricing_model?: string
+    type?: string
+    category?: string
+  }
 }) {
   // 1) Mirror onto messages (legacy behavior) — Meta's status values
   //    already match the CHECK constraint on messages.status. No
@@ -543,9 +558,10 @@ async function handleStatusUpdate(status: {
     .limit(1)
     .maybeSingle()
 
+  let accountId: string | undefined
   if (msgRow) {
     const conv = msgRow.conversations as { account_id: string } | null
-    const accountId = conv?.account_id
+    accountId = conv?.account_id
     if (accountId) {
       await dispatchWebhookEvent(
         supabaseAdmin(),
@@ -557,6 +573,41 @@ async function handleStatusUpdate(status: {
           status: status.status,
         }
       )
+    }
+  }
+
+  // 4) Record what Meta billed for this message.
+  //
+  //    Only when a pricing block actually came — a missing one means
+  //    "nothing to record", never "free" (message-cost.ts explains why
+  //    that distinction is the whole point).
+  //
+  //    Broadcasts do not live in `messages`, so their account is
+  //    resolved through the recipient row instead. Skipping that would
+  //    silently drop marketing spend, which is the largest line.
+  const pricing = parseMessagePricing(status)
+  if (pricing) {
+    if (!accountId && recipient) {
+      const { data: bcast } = await supabaseAdmin()
+        .from('broadcast_recipients')
+        .select('broadcasts(account_id)')
+        .eq('id', recipient.id)
+        .maybeSingle()
+      const owner = bcast?.broadcasts as { account_id: string } | null
+      accountId = owner?.account_id
+    }
+
+    if (accountId) {
+      // Best-effort: bookkeeping must never cost a delivery receipt.
+      try {
+        await recordMessageCost(supabaseAdmin(), {
+          accountId,
+          messageId: status.id,
+          pricing,
+        })
+      } catch (costErr) {
+        console.error('[whatsapp cost] recording failed:', costErr)
+      }
     }
   }
 }

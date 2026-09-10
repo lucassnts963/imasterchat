@@ -140,6 +140,12 @@ services:
   # optional:
   #
   #   /api/automations/cron   automations with a wait never resume
+  #   /api/cobrancas/cron     the collections ruler never fires. Hourly
+  #                           rather than daily on purpose: a step whose
+  #                           hour falls outside the legal contact window
+  #                           is POSTPONED, and the next round is what
+  #                           picks it up — a single 3am run would send
+  #                           nothing, ever
   #   /api/flows/cron         an abandoned run holds
   #                           idx_one_active_run_per_contact forever and
   #                           blocks every future trigger for that contact
@@ -176,6 +182,12 @@ services:
       # (ela acusa "atrasado" depois de 2h). Na carona do keeper eram
       # 30 minutos, o dobro de sondagens do combinado.
       HEALTH_EVERY_TICKS: ${HEALTH_EVERY_TICKS:-12}
+      # A régua de cobrança. Com o padrão de 300s, 12 ticks = 1h, que é o
+      # intervalo em que a janela legal reabre com granularidade
+      # suficiente — e rodar mais vezes é inofensivo, porque a unicidade
+      # parcial de `regua_disparos` garante um envio por (cobrança,
+      # degrau).
+      COBRANCA_EVERY_TICKS: ${COBRANCA_EVERY_TICKS:-12}
     entrypoint: ['/bin/sh', '-c']
     command:
       - |
@@ -184,7 +196,7 @@ services:
           echo "[cron] Set it in .env and restart. Sleeping instead of spinning."
           while true; do sleep 3600; done
         fi
-        echo "[cron] every $${CRON_INTERVAL_SECONDS}s; keeper every $${KEEPER_EVERY_TICKS}; health every $${HEALTH_EVERY_TICKS}"
+        echo "[cron] every $${CRON_INTERVAL_SECONDS}s; keeper every $${KEEPER_EVERY_TICKS}; health every $${HEALTH_EVERY_TICKS}; cobranca every $${COBRANCA_EVERY_TICKS}"
         tick=0
         while true; do
           # `|| true` on every call: one endpoint failing must not kill
@@ -194,6 +206,10 @@ services:
           curl -fsS -m 120 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
             http://app:3000/api/flows/cron >/dev/null || echo "[cron] flows failed"
           tick=$$((tick + 1))
+          if [ $$((tick % $${COBRANCA_EVERY_TICKS})) -eq 0 ]; then
+            curl -fsS -m 120 -H "x-cron-secret: $$AUTOMATION_CRON_SECRET" \
+              http://app:3000/api/cobrancas/cron >/dev/null || echo "[cron] cobrancas failed"
+          fi
           if [ $$((tick % $${KEEPER_EVERY_TICKS})) -eq 0 ]; then
             # The dollar moves daily; refreshing beside the keeper is far
             # more often than needed and costs one request.

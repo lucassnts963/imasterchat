@@ -1,16 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { GoogleConnection } from '@/lib/google/connection'
-import { loadGoogleConnection } from '@/lib/google/connection'
-import {
-  loadSchedulingSettings,
-  type SchedulingSettings,
-} from '@/lib/scheduling/settings'
+import type { SchedulingContext } from '@/lib/actions/scheduling'
+import { resolveSchedulingContext } from '@/lib/actions/scheduling'
 import { requestHumanTool } from './handoff'
 import { buildSchedulingTools } from './scheduling'
-import { buildQueueTools, type QueueOption } from './queues'
+import { buildQueueTools } from './queues'
+import { loadRoutableQueues } from '@/lib/actions/queue-routing'
 import { buildTagTools, type TagOption } from './tags'
+import { buildStartFlowTools, type StartableFlow } from './start-flow'
 import type { AgentTool } from './types'
-import { recordEvent } from '@/lib/observability/events'
 
 // ============================================================
 // What tools an account's agent actually gets.
@@ -26,57 +23,15 @@ import { recordEvent } from '@/lib/observability/events'
 // it costs no prompt tokens.
 // ============================================================
 
-/** Everything scheduling needs, resolved once per run. */
-export interface SchedulingContext {
-  settings: SchedulingSettings
-  /** Null when no calendar is connected — bookings still record, they
-   *  just live only in the CRM. */
-  connection: GoogleConnection | null
-}
-
-/**
- * Is autonomous scheduling live for this account, and with what?
- *
- * Returns null when it is switched off, or on but unusable. Resolved
- * once by the caller and handed to both the tool catalog and the
- * environment block, so a single inbound message does not load the same
- * settings twice.
- */
-export async function resolveSchedulingContext(
-  db: SupabaseClient,
-  accountId: string,
-): Promise<SchedulingContext | null> {
-  const settings = await loadSchedulingSettings(db, accountId)
-  if (!settings?.isActive) return null
-
-  // A connection is not required: without one, bookings still land in
-  // `appointments` and availability comes from our own rows. Worse
-  // product — the optician's hand-blocked day is invisible — but a
-  // coherent one, and it keeps the feature demoable before OAuth is set
-  // up.
-  try {
-    return { settings, connection: await loadGoogleConnection(db, accountId) }
-  } catch (err) {
-    // Credentials exist but are unusable; the operator must reconnect.
-    // Offering the tools anyway would have the bot promising times it
-    // cannot verify.
-    // A tela de status responde "conectado" olhando se EXISTE linha,
-    // não se o token vale. Então o operador vê "conectado", o cliente
-    // acha que o bot está agendando, e as ferramentas simplesmente não
-    // entram no catálogo — o bot nem sabe que podia agendar.
-    void recordEvent({
-      accountId,
-      source: 'google',
-      code: err instanceof Error && 'code' in err ? String((err as { code: unknown }).code) : 'calendar_unusable',
-      severity: 'error',
-      message: `Agenda do Google inutilizável — as ferramentas de agendamento saíram do catálogo do agente: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      context: { hint: 'reconectar o Google em Configurações → Agendamento' },
-    })
-    return null
-  }
-}
+// `SchedulingContext` e `resolveSchedulingContext` mudaram para
+// `src/lib/actions/scheduling.ts` na fase 1 (R-3): quem precisa saber se
+// a conta agenda deixou de ser só o agente. Reexportados aqui porque
+// meia dúzia de rotas e a projeção de custo importam deste módulo, e
+// mover o import de todas elas seria ruído num diff que já é grande.
+export {
+  resolveSchedulingContext,
+  type SchedulingContext,
+} from '@/lib/actions/scheduling'
 
 /**
  * The one tool that cannot be switched off.
@@ -125,53 +80,6 @@ export interface BuildToolsArgs {
 }
 
 /**
- * As filas para as quais o agente pode encaminhar.
- *
- * Só as HUMANAS: mandar para a fila do robô seria encaminhar para si
- * mesmo. Só as ativas, e nunca a padrão — a conversa já está nela.
- */
-async function loadRoutableQueues(
-  db: SupabaseClient,
-  accountId: string,
-): Promise<QueueOption[]> {
-  try {
-    const { data } = await db
-      .from('queues')
-      .select('id, name, description, responsible_user_id, auto_assign, distribution')
-      .eq('account_id', accountId)
-      .eq('active', true)
-      .eq('attended_by', 'humans')
-      .order('position')
-    // `Array.isArray`, e não `data ?? []`: uma resposta malformada não é
-    // nula, é um objeto — e o `.map` logo abaixo estouraria FORA do
-    // try/catch, derrubando a montagem inteira do catálogo por causa de
-    // uma consulta acessória.
-    if (!Array.isArray(data)) return []
-    return ((data ?? []) as Array<{
-      id: string
-      name: string
-      description: string | null
-      responsible_user_id: string | null
-      auto_assign: boolean
-      distribution: string
-    }>).map((q) => ({
-      id: q.id,
-      name: q.name,
-      description: q.description,
-      responsibleUserId: q.responsible_user_id,
-      autoAssign: q.auto_assign,
-      distribution: q.distribution ?? 'responsible',
-    }))
-  } catch (err) {
-    // Falhar ABERTO seria oferecer encaminhamento que não funciona.
-    // Sem a lista, a ferramenta não entra no catálogo e o agente cai no
-    // `request_human`, que é o comportamento anterior a esta onda.
-    console.error('[ai tools] filas indisponíveis:', err)
-    return []
-  }
-}
-
-/**
  * As etiquetas que a conta autorizou o agente a aplicar.
  *
  * `ai_selectable` é padrão `false` (migração 067): a lista nasce vazia,
@@ -199,6 +107,39 @@ async function loadSelectableTags(
 }
 
 /**
+ * Os fluxos que o agente pode iniciar.
+ *
+ * Só `manual`, e só `active`. Um fluxo com gatilho de palavra-chave já
+ * tem quem o inicie — o cliente que digita a palavra — e deixar o modelo
+ * iniciá-lo também significaria que uma frase do cliente, interpretada,
+ * dispara o mesmo roteiro por um caminho que ninguém configurou. Fluxo
+ * `manual` é o que a conta marcou como "alguém de fora começa este".
+ *
+ * Lista vazia → a ferramenta não entra no catálogo, como todas as
+ * outras aqui: ausência é a permissão mais forte que existe.
+ */
+async function loadStartableFlows(
+  db: SupabaseClient,
+  accountId: string,
+): Promise<StartableFlow[]> {
+  try {
+    const { data } = await db
+      .from('flows')
+      .select('id, name, description')
+      .eq('account_id', accountId)
+      .eq('status', 'active')
+      .eq('trigger_type', 'manual')
+      .order('name')
+    // Mesmo cuidado das filas e das etiquetas: quem consome faz `.map`,
+    // e isso acontece fora deste try.
+    return Array.isArray(data) ? (data as StartableFlow[]) : []
+  } catch (err) {
+    console.error('[ai tools] fluxos indisponíveis:', err)
+    return []
+  }
+}
+
+/**
  * Resolve the tools available to this account right now.
  *
  * `request_human` is unconditional: any agent that can talk to a
@@ -220,14 +161,16 @@ export async function buildToolCatalog(
     tools.push(...buildSchedulingTools(scheduling))
   }
 
-  // Filas humanas e etiquetas liberadas, em paralelo: são duas consultas
-  // independentes e ambas entram em toda montagem do catálogo.
-  const [queues, tags] = await Promise.all([
+  // Filas humanas, etiquetas liberadas e fluxos manuais, em paralelo:
+  // consultas independentes, todas em toda montagem do catálogo.
+  const [queues, tags, flows] = await Promise.all([
     loadRoutableQueues(args.db, args.accountId),
     loadSelectableTags(args.db, args.accountId),
+    loadStartableFlows(args.db, args.accountId),
   ])
   tools.push(...buildQueueTools(queues))
   tools.push(...buildTagTools(tags))
+  tools.push(...buildStartFlowTools(flows))
 
   const disabled =
     args.disabled ?? (await loadDisabledTools(args.db, args.accountId))

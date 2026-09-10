@@ -183,6 +183,63 @@ export function defaultConfigFor(type: NodeType): Record<string, unknown> {
       };
     case "set_tag":
       return { mode: "add", tag_id: "", next_node_key: "" };
+    case "send_template":
+      return { template_name: "", language: "", variables: {}, next_node_key: "" };
+    case "update_contact_field":
+      return { field: "name", value: "", next_node_key: "" };
+    case "create_deal":
+      return {
+        pipeline_id: "",
+        stage_id: "",
+        title: "",
+        value: 0,
+        next_node_key: "",
+      };
+    case "assign_conversation":
+      return { mode: "round_robin", agent_id: "", next_node_key: "" };
+    case "close_conversation":
+      return { next_node_key: "" };
+    case "route_to_queue":
+      return { queue_id: "", reason: "" };
+    case "wait":
+      return { amount: 1, unit: "hours", next_node_key: "" };
+    case "send_webhook":
+      return {
+        url: "",
+        body_template: "",
+        next_node_key: "",
+        on_error_next: "",
+      };
+    case "offer_slots":
+      return {
+        text: "Estes são os horários livres:",
+        button_label: "Ver horários",
+        max_options: 5,
+        next_node_key: "",
+        no_slots_next: "",
+        on_error_next: "",
+      };
+    case "book_appointment":
+      return {
+        title: "",
+        next_node_key: "",
+        on_unavailable_next: "",
+        on_error_next: "",
+      };
+    case "reschedule_appointment":
+      return {
+        next_node_key: "",
+        on_unavailable_next: "",
+        on_no_appointment_next: "",
+        on_error_next: "",
+      };
+    case "cancel_appointment":
+      return {
+        reason: "",
+        next_node_key: "",
+        on_no_appointment_next: "",
+        on_error_next: "",
+      };
     case "handoff":
       return { note: "" };
     case "end":
