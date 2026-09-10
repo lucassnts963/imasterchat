@@ -80,16 +80,6 @@
       "openDeals": "{count} {count, plural, =1 {negócio aberto} other {negócios abertos}}",
       "noChange": "Sem alteração {suffix}"
     },
-    "aiCost": {
-      "title": "Custo de IA (mês atual)",
-      "estimatedBadge": "estimativa",
-      "ofBudget": "de {budget}",
-      "usedOfBudget": "{pct}% do orçamento mensal usado",
-      "nearBudget": "O saldo de IA está acabando — {pct}% do orçamento mensal usado",
-      "overBudget": "Orçamento mensal de IA estourado",
-      "noBudget": "Nenhum orçamento mensal definido — configure um em Agentes de IA → Configurar para ser avisado antes de o saldo acabar.",
-      "manage": "Gerenciar IA"
-    },
     "quickActions": {
       "newContact": "Novo contato",
       "newDeal": "Novo negócio",
@@ -140,6 +130,26 @@
     },
     "emptyState": {
       "title": "Ainda não há dados suficientes"
+    },
+    "cost": {
+      "title": "Custo deste mês",
+      "manage": "Gerenciar",
+      "ai": "IA (tokens)",
+      "whatsapp": "WhatsApp ({count} mensagens)",
+      "ofBudget": "de {budget}",
+      "forecast": "Pelas regras de outubro, este mês custaria {value}.",
+      "byOrigin": "O que mais pesa:",
+      "blocked": "{count} mensagem(ns) barrada(s) pelo orçamento.",
+      "fallbackPrices": "Preços da tabela interna — nenhum override configurado.",
+      "origins": {
+        "ai": "Respostas da IA",
+        "inbox": "Inbox",
+        "automation": "Automações",
+        "flow": "Fluxos",
+        "broadcast": "Broadcasts",
+        "api": "API pública",
+        "unknown": "Desconhecida"
+      }
     }
   },
   "Inbox": {
@@ -1874,7 +1884,7 @@
       "autoReply": "Responder automaticamente a mensagens recebidas",
       "autoReplyDesc": "O bot responde automaticamente a novas mensagens recebidas (apenas quando nenhum fluxo as trata e nenhum atendente está atribuído). Passa para um humano quando não consegue ajudar.",
       "maxAutoReplies": "Máximo de respostas automáticas por conversa",
-      "maxAutoRepliesDesc": "Depois deste número de respostas do bot em uma conversa, o bot fica em silêncio.",
+      "maxAutoRepliesDesc": "Depois deste número de respostas do bot em uma conversa, o bot fica em silêncio. A partir de 1º/10/2026 cada uma delas é uma mensagem cobrada pela Meta, então este número passou a ser o principal controle de custo por conversa — três respostas dão cerca de US$ 0,02 por conversa no Brasil.",
       "handoffTo": "Passar para",
       "handoffToDesc": "Quando o bot não consegue ajudar — ou atinge o limite de respostas — ele pausa e encaminha a conversa para cá, com uma breve nota sobre o que aconteceu.",
       "handoffQueue": "Fila sem atribuição (qualquer atendente pode assumir)",
@@ -1898,7 +1908,7 @@
       "contextTimestamps": "Datas nas mensagens do contexto",
       "contextTimestampsDesc": "Marca cada mensagem com quando foi dita, para o agente distinguir ontem de hoje. Sem isso ele lê um \"amanhã\" dito ontem como ainda sendo amanhã. Custa ~100–160 tokens por resposta — desligue se você não usa agendamento.",
       "handoffNotice": "Avisar o cliente ao transferir",
-      "handoffNoticeDesc": "Quando a conversa for passada para uma pessoa, o bot manda uma mensagem antes de silenciar. Desligado, ele apenas para de responder — que é como funcionava até agora.",
+      "handoffNoticeDesc": "Quando a conversa for passada para uma pessoa, o bot manda uma mensagem antes de silenciar. Desligado, ele apenas para de responder — que é como funcionava até agora. Repare que ligar custa UMA MENSAGEM COBRADA A MAIS por transferência.",
       "handoffNoticeTextLabel": "Mensagem do aviso",
       "handoffNoticePlaceholder": "Vou encaminhar seu atendimento para o setor responsável. Em breve alguém entra em contato por aqui.",
       "handoffNoticeTextHint": "Vazio usa o texto acima. Evite dizer \"vou chamar um humano\": o cliente não precisa saber com quem falava, e prometer alguém \"agora\" cria uma expectativa que a fila não sustenta.",
@@ -1908,7 +1918,9 @@
       "embeddingsHintOtherProvider": "A {provider} não tem endpoint de embeddings, então a busca semântica precisa de uma chave de um provedor que tenha — a OpenRouter serve baai/bge-m3. Deixe em branco para usar busca por palavra-chave.",
       "embeddingsEndpoint": "Endpoint de embeddings",
       "embeddingsModel": "Modelo de embeddings",
-      "embeddingsDimensionHint": "O modelo precisa devolver vetores de {dimensions} dimensões, que é o que a sua base de conhecimento guarda. Isso é conferido ao salvar."
+      "embeddingsDimensionHint": "O modelo precisa devolver vetores de {dimensions} dimensões, que é o que a sua base de conhecimento guarda. Isso é conferido ao salvar.",
+      "whatsappBudget": "Orçamento do WhatsApp",
+      "whatsappBudgetDesc": "Teto mensal de gasto com mensagens da Meta, em dólares. Independente do orçamento de IA — a partir de outubro uma conversa custa em duas moedas. Estourar cala automações, fluxos, broadcasts e respostas da IA; nunca cala o atendente na inbox."
     },
     "aiKnowledge": {
       "loadFailed": "Falha ao carregar a base de conhecimento",

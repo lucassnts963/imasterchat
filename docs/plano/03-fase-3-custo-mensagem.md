@@ -45,7 +45,7 @@ Esta fase fecha esse olho cego.
 
 ## 3. O que falta construir
 
-### R-14 · Tabela de preços do WhatsApp — `P`
+### R-14 · Tabela de preços do WhatsApp — `P` — **feito**
 
 O contador sabe **o que** a Meta cobrou; não sabe **quanto**.
 
@@ -61,7 +61,13 @@ O contador sabe **o que** a Meta cobrou; não sabe **quanto**.
 - **A4** Semente com a tarifa brasileira de utilidade (~US$ 0,0068). Trocar
   quando a Meta publicar a tabela definitiva (D-4).
 
-### R-15 · Os dois custos na mesma tela — `M`
+**Como ficou.** `src/lib/whatsapp/message-prices.ts`, no mesmo padrão de
+`ai/price-store.ts`: constantes no código com override do administrador por
+cima, e um teste que prova que a tela sobrevive à tabela ilegível. País
+específico vence o curinga `*`; vigência mais recente já iniciada vence as
+anteriores.
+
+### R-15 · Os dois custos na mesma tela — `M` — **feito**
 
 Hoje `/api/ai/costs` responde só o gasto de LLM, e o card do painel mostra só ele.
 
@@ -76,7 +82,20 @@ Hoje `/api/ai/costs` responde só o gasto de LLM, e o card do painel mostra só 
 - **B4** Quebra por superfície de origem (IA, inbox, automação, fluxo, broadcast,
   API pública) — sem isso o operador vê o total e não sabe o que cortar.
 
-### R-16 · Orçamento cobrindo os dois custos — `M`
+**Como ficou.** A origem é gravada em `messages.origin` **no envio**, por quem
+envia (migração 080). Não dava para descobrir depois: o webhook de status, que
+grava o custo, recebe um id da Meta e nada mais.
+
+O card do painel virou **um só**, com os dois custos e a soma. Dois cards
+distantes não resolveriam o problema, porque o que importa é a soma — e a soma
+só existe se as duas estiverem no mesmo lugar.
+
+Uma sutileza da previsão: `free_entry_point` **não** entra nela. A janela de 72
+horas por anúncio sobrevive a outubro intacta, e tratá-la como as outras
+gratuitas inflaria a previsão justamente para o cliente com tráfego pago — que é
+quem menos vai sentir a mudança.
+
+### R-16 · Orçamento cobrindo os dois custos — `M` — **feito**
 
 `monthly_budget_usd` e `budget_exceeded_action` protegem só o gasto de LLM.
 
@@ -90,7 +109,7 @@ Hoje `/api/ai/costs` responde só o gasto de LLM, e o card do painel mostra só 
 - **C4** O bloqueio é registrado com motivo, e aparece na tela. Mensagem que não
   saiu por orçamento nunca pode sumir em silêncio.
 
-### R-17 · Os controles que viraram controle de custo — `P`
+### R-17 · Os controles que viraram controle de custo — `P` — **parcial**
 
 Três configurações deixaram de ser só de UX e passaram a ser de dinheiro. A tela
 tem de dizer isso.
@@ -99,10 +118,12 @@ tem de dizer isso.
   por conversa ao lado do número.
 - **D2** `handoff_notice_enabled` — deixar explícito que ligar custa **uma
   mensagem a mais por transferência**.
-- **D3** Marcar as conversas que entraram por **Click-to-WhatsApp** (o
-  `type: free_entry_point` do webhook já identifica) e mostrar a janela de 72h
-  na conversa. É a única entrada que continua gratuita depois de outubro, e o
-  operador precisa saber que está dentro dela.
+- **D3** ~~Marcar as conversas que entraram por **Click-to-WhatsApp**~~ —
+  **adiado**. A contagem já aparece no card (`free_entry_point_count`), que é o
+  que responde "quanto do meu tráfego é de anúncio". O que falta é a marca **na
+  conversa**, e ela pede uma coluna em `conversations` mais um selo na inbox —
+  trabalho de tela que não bloqueia nada da fase 4 e entra junto com o próximo
+  ciclo de inbox.
 
 ---
 

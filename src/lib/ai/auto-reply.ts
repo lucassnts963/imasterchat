@@ -396,6 +396,7 @@ export async function dispatchInboundToAiReply(
         const notice = (config.handoffNoticeText ?? '').trim() || DEFAULT_HANDOFF_NOTICE
         try {
           await engineSendText({
+            origin: 'ai',
             accountId,
             userId: configOwnerUserId,
             conversationId,
@@ -443,6 +444,7 @@ export async function dispatchInboundToAiReply(
     if (claimed !== true) return // lost the per-conversation cap race
 
     await engineSendText({
+      origin: 'ai',
       accountId,
       userId: configOwnerUserId,
       conversationId,

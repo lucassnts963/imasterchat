@@ -84,6 +84,7 @@ export function AiConfig() {
   const [handoffAgentId, setHandoffAgentId] = useState('');
   // Free text so the admin can clear the field; '' = no budget (null).
   const [monthlyBudget, setMonthlyBudget] = useState('');
+  const [whatsappBudget, setWhatsappBudget] = useState('');
   const [members, setMembers] = useState<AccountMember[]>([]);
 
   // Guard keyed on the account (not a bare boolean) so an in-place
@@ -118,6 +119,11 @@ export function AiConfig() {
         setHandoffAgentId(data.handoff_agent_id ?? '');
         setMonthlyBudget(
           data.monthly_budget_usd != null ? String(data.monthly_budget_usd) : '',
+        );
+        setWhatsappBudget(
+          data.whatsapp_monthly_budget_usd != null
+            ? String(data.whatsapp_monthly_budget_usd)
+            : '',
         );
         setHasStoredKey(Boolean(data.has_key));
         setApiKey(data.has_key ? MASKED_KEY : '');
@@ -182,6 +188,9 @@ export function AiConfig() {
     handoff_notice_text: handoffNoticeText.trim() || null,
     auto_reply_max_per_conversation: maxPerConversation,
     handoff_agent_id: handoffAgentId || null,
+    whatsapp_monthly_budget_usd: whatsappBudget.trim()
+      ? Number(whatsappBudget.replace(',', '.'))
+      : null,
     monthly_budget_usd: monthlyBudget.trim()
       ? Number(monthlyBudget.replace(',', '.'))
       : null,
@@ -685,6 +694,28 @@ export function AiConfig() {
                 inputMode="decimal"
                 value={monthlyBudget}
                 onChange={(e) => setMonthlyBudget(e.target.value)}
+                placeholder={t('monthlyBudgetPlaceholder')}
+                disabled={disabled}
+                className="w-28"
+              />
+            </div>
+
+            {/* O segundo teto. A partir de 1º/10/2026 uma conversa custa
+                em duas moedas, e um teto que enxerga só os tokens deixa a
+                fatura da Meta crescer sem ninguém ver. */}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="wa-budget">{t('whatsappBudget')}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t('whatsappBudgetDesc')}
+                </p>
+              </div>
+              <Input
+                id="wa-budget"
+                type="text"
+                inputMode="decimal"
+                value={whatsappBudget}
+                onChange={(e) => setWhatsappBudget(e.target.value)}
                 placeholder={t('monthlyBudgetPlaceholder')}
                 disabled={disabled}
                 className="w-28"

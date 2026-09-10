@@ -546,3 +546,92 @@ início → Oferecer horários ─── escolheu ──→ Agendar ─── ag
 - [ ] **⚡ Nenhuma tela diz "beta"**
   **Fazer:** olhar a barra lateral e o cabeçalho de `/flows`.
   **Esperar:** sem chip. As rotas já estavam abertas desde o PR #134.
+
+---
+
+## Fase 3 — custo de mensagem (R-14 a R-17)
+
+**Preparação adicional**
+
+- [ ] `bash deploy/apply-migrations.sh` — a **080** precisa ter aplicado
+      (`messages.origin`, `whatsapp_message_prices`,
+      `ai_configs.whatsapp_monthly_budget_usd`, `whatsapp_blocked_sends`).
+- [ ] Pelo menos um dia de tráfego real depois do deploy: as telas leem do
+      **mês corrente**, e uma conta recém-migrada mostra zero com razão.
+
+### F3.1 · O card do painel
+
+- [ ] **⚡ O painel mostra os dois custos e a soma**
+  **Fazer:** entrar no painel como **admin**.
+  **Esperar:** um card com o total do mês, a linha de IA (tokens) e a linha de
+  WhatsApp (mensagens), com a contagem de mensagens.
+  **Não pode:** dois cards separados. O número que importa é a soma.
+
+- [ ] **Agente e visualizador não veem**
+  **Fazer:** entrar com um usuário de papel `agent`.
+  **Esperar:** o card não aparece. Gasto é classe de faturamento.
+
+- [ ] **⚡ A previsão de outubro aparece enquanto fizer sentido**
+  **Fazer:** olhar a linha "Pelas regras de outubro, este mês custaria…".
+  **Esperar:** um valor **maior** que o cobrado, enquanto ainda houver mensagem
+  chegando como `free_customer_service`. Depois da virada as duas convergem, e a
+  linha some — que é o comportamento certo.
+
+- [ ] **A quebra por origem diz o que cortar**
+  **Esperar:** "O que mais pesa: Respostas da IA … · Broadcasts …".
+  **Por que importa:** um total sem quebra informa que a conta subiu, não o que
+  fazer a respeito.
+
+- [ ] **Mensagens antigas ficam em "Desconhecida"**
+  **Esperar:** toda mensagem gravada **antes** da migração 080 cai nesse balde.
+  É esperado, e some sozinho com o tempo.
+
+### F3.2 · A origem é gravada no envio
+
+- [ ] **❓ Cada superfície se identifica**
+  **Fazer:** mandar uma mensagem por cada caminho — resposta da IA, atendente na
+  inbox, automação, fluxo, API pública — e conferir `messages.origin` no banco.
+  **Esperar:** `ai`, `inbox`, `automation`, `flow`, `api`.
+  **Por que testar:** a origem só pode ser gravada no envio. Se um caminho
+  esquecer, aquele custo vira "Desconhecida" para sempre.
+
+### F3.3 · O segundo teto (R-16)
+
+- [ ] **⚡ 🔴 O teto cala o robô**
+  **Fazer:** Configurações → IA → **Orçamento do WhatsApp** = `0,01`. Disparar
+  uma automação que manda mensagem.
+  **Esperar:** a mensagem **não** sai; o card mostra "1 mensagem barrada pelo
+  orçamento"; e `whatsapp_blocked_sends` tem a linha com o motivo.
+
+- [ ] **⚡ 🔴 O teto NÃO cala o atendente** — *o teste mais importante da fase*
+  **Fazer:** com o teto ainda estourado, responder pela inbox.
+  **Esperar:** a mensagem **sai normalmente**.
+  **Por que importa:** calar uma pessoa que está respondendo um cliente para
+  economizar quatro centavos é pior que a fatura que o teto existe para evitar.
+
+- [ ] **Sem teto configurado, nada é barrado**
+  **Fazer:** apagar o campo.
+  **Esperar:** tudo volta a sair, e a consulta do gasto nem chega a ser feita.
+
+- [ ] **❓ O teto falha aberto**
+  **Fazer:** (em ambiente de teste) derrubar o acesso à tabela de custos.
+  **Esperar:** as mensagens continuam saindo, com um erro no log.
+  **Por que assim:** um teto que derruba o atendimento quando o banco tosse
+  troca um problema de conta por um problema de cliente.
+
+### F3.4 · Preço e cópia
+
+- [ ] **A tabela interna avisa que é a interna**
+  **Esperar:** sem nenhuma linha em `whatsapp_message_prices`, o card diz
+  "Preços da tabela interna — nenhum override configurado".
+
+- [ ] **Um override manda no cálculo**
+  **Fazer:** inserir uma linha em `whatsapp_message_prices` (`BR`, `service`,
+  preço, vigência de hoje).
+  **Esperar:** o valor da tela muda, e o aviso da tabela interna some.
+
+- [ ] **Os dois controles de custo se explicam**
+  **Fazer:** ler os textos de **Máximo de respostas automáticas** e **Avisar o
+  cliente ao transferir**.
+  **Esperar:** os dois dizem, com todas as letras, quanto custam. O aviso de
+  transferência é **uma mensagem cobrada a mais** por transferência.

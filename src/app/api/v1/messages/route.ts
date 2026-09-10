@@ -109,6 +109,10 @@ export async function POST(request: Request) {
       ctx.supabase,
       ctx.accountId,
       {
+        // A API pública é uma superfície de custo própria: quando a
+        // fatura sobe, "foi a integração do cliente" e "foi a resposta
+        // automática" pedem decisões opostas.
+        origin: 'api',
         conversationId: resolved.conversationId,
         messageType: type,
         contentText: typeof body.text === 'string' ? body.text : null,

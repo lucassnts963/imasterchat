@@ -12,6 +12,12 @@ import {
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils'
 import { supabaseAdmin } from './admin-client'
+import type { MessageOrigin } from '@/lib/whatsapp/message-origin'
+import {
+  checkWhatsappBudget,
+  recordBlockedSend,
+  WhatsappBudgetError,
+} from '@/lib/whatsapp/budget-gate'
 
 // ------------------------------------------------------------
 // Automation-side Meta sender.
@@ -25,6 +31,8 @@ import { supabaseAdmin } from './admin-client'
 // ------------------------------------------------------------
 
 interface SendTextArgs {
+  /** Qual superfície está mandando — ver `whatsapp/message-origin.ts`. */
+  origin?: MessageOrigin
   /** Account-level tenancy key. Drives contact + whatsapp_config
    *  lookups so an automation authored by user A still sends through
    *  the WhatsApp number user B saved on the same account. */
@@ -39,6 +47,7 @@ interface SendTextArgs {
 }
 
 interface SendTemplateArgs {
+  origin?: MessageOrigin
   accountId: string
   userId: string
   conversationId: string
@@ -59,6 +68,7 @@ export async function engineSendTemplate(
 }
 
 interface SendInteractiveArgs {
+  origin?: MessageOrigin
   accountId: string
   userId: string
   conversationId: string
@@ -81,7 +91,13 @@ export async function engineSendInteractive(
   args: SendInteractiveArgs,
 ): Promise<{ whatsapp_message_id: string }> {
   const { payload, accountId, userId, conversationId, contactId } = args
-  const common = { accountId, userId, conversationId, contactId }
+  const common = {
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    origin: args.origin ?? 'automation',
+  }
   if (payload.kind === 'buttons') {
     return engineSendInteractiveButtons({
       ...common,
@@ -107,6 +123,25 @@ type SendInput =
 
 async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
+
+  // Mesmo teto do módulo de fluxos, aplicado no último ponto antes da
+  // Meta. Um template de cobrança é exatamente o tipo de envio que uma
+  // régua mal configurada multiplica sem ninguém ver.
+  const verdict = await checkWhatsappBudget({
+    db,
+    accountId: input.accountId,
+    origin: input.origin ?? 'automation',
+  })
+  if (!verdict.allowed) {
+    await recordBlockedSend({
+      db,
+      accountId: input.accountId,
+      conversationId: input.conversationId,
+      origin: input.origin ?? 'automation',
+      reason: 'whatsapp_budget_exceeded',
+    })
+    throw new WhatsappBudgetError(verdict.spentUsd, verdict.budgetUsd ?? 0)
+  }
 
   // Scope the contact + config lookups by account_id, not user_id.
   // The engine uses the service-role client (bypassing RLS); without
@@ -203,6 +238,7 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
     template_name,
     message_id: waMessageId,
     status: 'sent',
+    origin: input.origin ?? 'automation',
   })
   if (msgErr) {
     // Meta already has the message; record the DB error but don't pretend

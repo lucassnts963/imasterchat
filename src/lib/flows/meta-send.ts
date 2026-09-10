@@ -1,3 +1,9 @@
+import type { MessageOrigin } from '@/lib/whatsapp/message-origin'
+import {
+  checkWhatsappBudget,
+  recordBlockedSend,
+  WhatsappBudgetError,
+} from '@/lib/whatsapp/budget-gate'
 import {
   sendInteractiveButtons,
   sendInteractiveList,
@@ -33,6 +39,10 @@ import { supabaseAdmin } from './admin-client'
 // ------------------------------------------------------------
 
 interface SendTextEngineArgs {
+  /** Qual superfície está mandando — ver `whatsapp/message-origin.ts`.
+   *  Gravado em `messages.origin`, e é o que a tela de custo usa para
+   *  dizer o que cortar. */
+  origin?: MessageOrigin
   /** Account-level tenancy key. Drives contact + whatsapp_config
    *  lookups so a flow authored by user A still sends through the
    *  WhatsApp number user B saved on the same account. */
@@ -66,6 +76,7 @@ export async function engineSendText(
   args: SendTextEngineArgs,
 ): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
+  await assertBudget(db, args.accountId, args.origin ?? 'flow', args.conversationId)
 
   const { data: contact, error: contactErr } = await db
     .from('contacts')
@@ -133,6 +144,7 @@ export async function engineSendText(
     message_id: waMessageId,
     status: 'sent',
     ai_generated: args.aiGenerated ?? false,
+    origin: args.origin ?? 'flow',
   })
   if (msgErr) {
     throw new Error(`sent to Meta but DB insert failed: ${msgErr.message}`)
@@ -151,6 +163,7 @@ export async function engineSendText(
 }
 
 interface SendMediaEngineArgs {
+  origin?: MessageOrigin
   accountId: string
   userId: string
   conversationId: string
@@ -176,6 +189,7 @@ export async function engineSendMedia(
   args: SendMediaEngineArgs,
 ): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
+  await assertBudget(db, args.accountId, args.origin ?? 'flow', args.conversationId)
 
   const { data: contact, error: contactErr } = await db
     .from('contacts')
@@ -250,6 +264,7 @@ export async function engineSendMedia(
     content_text: args.caption ?? null,
     message_id: waMessageId,
     status: 'sent',
+    origin: args.origin ?? 'flow',
   })
   if (msgErr) {
     throw new Error(`sent to Meta but DB insert failed: ${msgErr.message}`)
@@ -268,6 +283,7 @@ export async function engineSendMedia(
 }
 
 interface SendInteractiveButtonsEngineArgs {
+  origin?: MessageOrigin
   accountId: string
   userId: string
   conversationId: string
@@ -279,6 +295,7 @@ interface SendInteractiveButtonsEngineArgs {
 }
 
 interface SendInteractiveListEngineArgs {
+  origin?: MessageOrigin
   accountId: string
   userId: string
   conversationId: string
@@ -325,6 +342,7 @@ async function sendInteractiveViaMeta(
   input: SendInput,
 ): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
+  await assertBudget(db, input.accountId, input.origin ?? 'flow', input.conversationId)
 
   // Scope the contact + whatsapp_config lookups by account_id —
   // same defense-in-depth rationale as automations/meta-send.ts.
@@ -443,6 +461,7 @@ async function sendInteractiveViaMeta(
     interactive_payload: interactivePayload,
     message_id: waMessageId,
     status: 'sent',
+    origin: input.origin ?? 'flow',
   })
   if (msgErr) {
     throw new Error(`sent to Meta but DB insert failed: ${msgErr.message}`)
@@ -458,4 +477,31 @@ async function sendInteractiveViaMeta(
     .eq('id', input.conversationId)
 
   return { whatsapp_message_id: waMessageId }
+}
+
+/**
+ * O teto de gasto com mensagens, aplicado no último ponto antes da Meta.
+ *
+ * Aqui, e não em cada motor, porque é aqui que TODO envio de robô passa
+ * — e um teto que depende de cada chamador lembrar de chamá-lo não é um
+ * teto. O atendente humano não passa por esta função (ele usa
+ * `send-message.ts`), que é a garantia de que estourar o orçamento nunca
+ * o cala.
+ */
+async function assertBudget(
+  db: ReturnType<typeof supabaseAdmin>,
+  accountId: string,
+  origin: MessageOrigin,
+  conversationId: string | null,
+): Promise<void> {
+  const verdict = await checkWhatsappBudget({ db, accountId, origin })
+  if (verdict.allowed) return
+  await recordBlockedSend({
+    db,
+    accountId,
+    conversationId,
+    origin,
+    reason: 'whatsapp_budget_exceeded',
+  })
+  throw new WhatsappBudgetError(verdict.spentUsd, verdict.budgetUsd ?? 0)
 }

@@ -80,16 +80,6 @@
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
       "noChange": "No change {suffix}"
     },
-    "aiCost": {
-      "title": "AI cost (this month)",
-      "estimatedBadge": "estimate",
-      "ofBudget": "of {budget}",
-      "usedOfBudget": "{pct}% of the monthly budget used",
-      "nearBudget": "AI balance is running out — {pct}% of the monthly budget used",
-      "overBudget": "Monthly AI budget exceeded",
-      "noBudget": "No monthly budget set — define one in AI Agents → Set up to get a warning before the balance runs out.",
-      "manage": "Manage AI"
-    },
     "quickActions": {
       "newContact": "New Contact",
       "newDeal": "New Deal",
@@ -140,6 +130,26 @@
     },
     "emptyState": {
       "title": "Not enough data yet"
+    },
+    "cost": {
+      "title": "Cost this month",
+      "manage": "Manage",
+      "ai": "AI (tokens)",
+      "whatsapp": "WhatsApp ({count} messages)",
+      "ofBudget": "of {budget}",
+      "forecast": "Under the October rules this month would cost {value}.",
+      "byOrigin": "Most expensive:",
+      "blocked": "{count} message(s) blocked by the budget.",
+      "fallbackPrices": "Prices from the built-in table — no override set.",
+      "origins": {
+        "ai": "AI replies",
+        "inbox": "Inbox",
+        "automation": "Automations",
+        "flow": "Flows",
+        "broadcast": "Broadcasts",
+        "api": "Public API",
+        "unknown": "Unknown"
+      }
     }
   },
   "Inbox": {
@@ -1874,7 +1884,7 @@
       "autoReply": "Auto-reply to inbound messages",
       "autoReplyDesc": "The bot answers new inbound messages automatically (only when no flow handles them and no agent is assigned). Hands off to a human when it can’t help.",
       "maxAutoReplies": "Max auto-replies per conversation",
-      "maxAutoRepliesDesc": "After this many bot replies in one thread, the bot goes quiet.",
+      "maxAutoRepliesDesc": "After this many bot replies in one conversation, the bot goes quiet. From 1 October 2026 every one of these is a billed WhatsApp message, so this number is now the main per-conversation cost control — three replies is roughly US$ 0.02 per conversation in Brazil.",
       "handoffTo": "Hand off to",
       "handoffToDesc": "When the bot can’t help — or hits the reply cap — it pauses and routes the chat here, with a short note on what happened.",
       "handoffQueue": "Unassigned queue (any agent can pick it up)",
@@ -1905,10 +1915,12 @@
       "contextTimestamps": "Timestamps in the conversation context",
       "contextTimestampsDesc": "Marks each message with when it was said, so the agent can tell yesterday from today. Without it, a \"tomorrow\" said yesterday still reads as tomorrow. Costs ~100–160 tokens per reply — turn it off if you do not use scheduling.",
       "handoffNotice": "Tell the customer when transferring",
-      "handoffNoticeDesc": "When a conversation is passed to a person, the bot sends a message before going quiet. Off, it simply stops replying — how it worked until now.",
+      "handoffNoticeDesc": "When the conversation is handed to a person, the bot sends a message before going quiet. Off, it simply stops replying — which is how it worked until now. Note that turning it on costs ONE EXTRA billed message per handoff.",
       "handoffNoticeTextLabel": "Notice message",
       "handoffNoticePlaceholder": "I am passing your request to the responsible team. Someone will get back to you here shortly.",
-      "handoffNoticeTextHint": "Empty uses the text above. Avoid saying \"I will get a human\": the customer does not need to learn who they were talking to, and promising someone \"now\" sets an expectation the queue cannot keep."
+      "handoffNoticeTextHint": "Empty uses the text above. Avoid saying \"I will get a human\": the customer does not need to learn who they were talking to, and promising someone \"now\" sets an expectation the queue cannot keep.",
+      "whatsappBudget": "WhatsApp budget",
+      "whatsappBudgetDesc": "Monthly cap on Meta message spend, in USD. Separate from the AI budget — from October a conversation costs in two currencies. Reaching it silences automations, flows, broadcasts and AI replies; it never silences a human agent in the inbox."
     },
     "aiKnowledge": {
       "loadFailed": "Failed to load knowledge base",

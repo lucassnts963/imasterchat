@@ -80,16 +80,6 @@
       "openDeals": "진행 중인 딜 {count}건",
       "noChange": "변동 없음 {suffix}"
     },
-    "aiCost": {
-      "title": "AI 비용 (이번 달)",
-      "estimatedBadge": "추정치",
-      "ofBudget": "/ {budget}",
-      "usedOfBudget": "월 예산의 {pct}% 사용됨",
-      "nearBudget": "AI 잔액이 얼마 남지 않았습니다 — 월 예산의 {pct}% 사용됨",
-      "overBudget": "월 AI 예산을 초과했습니다",
-      "noBudget": "월 예산이 설정되지 않았습니다 — AI 에이전트 → 설정에서 예산을 정하면 잔액이 소진되기 전에 알려드립니다.",
-      "manage": "AI 관리"
-    },
     "quickActions": {
       "newContact": "새 연락처",
       "newDeal": "새 딜",
@@ -140,6 +130,26 @@
     },
     "emptyState": {
       "title": "아직 데이터가 충분하지 않습니다"
+    },
+    "cost": {
+      "title": "이번 달 비용",
+      "manage": "관리",
+      "ai": "AI (토큰)",
+      "whatsapp": "WhatsApp (메시지 {count}건)",
+      "ofBudget": "/ {budget}",
+      "forecast": "10월 규칙이었다면 이번 달은 {value}였습니다.",
+      "byOrigin": "가장 비싼 항목:",
+      "blocked": "예산으로 차단된 메시지 {count}건.",
+      "fallbackPrices": "내장 요금표 사용 중 — 재정의가 설정되지 않았습니다.",
+      "origins": {
+        "ai": "AI 응답",
+        "inbox": "인박스",
+        "automation": "자동화",
+        "flow": "플로우",
+        "broadcast": "브로드캐스트",
+        "api": "공개 API",
+        "unknown": "알 수 없음"
+      }
     }
   },
   "Inbox": {
@@ -1874,7 +1884,7 @@
       "autoReply": "수신 메시지 자동 응답",
       "autoReplyDesc": "봇이 새 수신 메시지에 자동으로 응답합니다(플로우가 처리하지 않고 담당 상담원이 없는 경우에만). 도움을 줄 수 없으면 사람에게 인계합니다.",
       "maxAutoReplies": "대화당 최대 자동 응답 횟수",
-      "maxAutoRepliesDesc": "한 대화에서 이 횟수만큼 봇이 응답하면 더 이상 응답하지 않습니다.",
+      "maxAutoRepliesDesc": "한 대화에서 봇이 이만큼 응답하면 조용해집니다. 2026년 10월 1일부터 이 응답 하나하나가 과금되는 WhatsApp 메시지이므로, 이 숫자가 대화당 주요 비용 조절 수단이 됩니다 — 브라질 기준 3회 응답은 대화당 약 US$ 0.02입니다.",
       "handoffTo": "인계 대상",
       "handoffToDesc": "봇이 도움을 줄 수 없거나 응답 한도에 도달하면 일시 중지하고 무슨 일이 있었는지 짧은 메모와 함께 이 대상에게 대화를 넘깁니다.",
       "handoffQueue": "미배정 대기열 (모든 상담원이 처리 가능)",
@@ -1905,10 +1915,12 @@
       "contextTimestamps": "대화 컨텍스트에 시각 표시",
       "contextTimestampsDesc": "각 메시지에 발화 시각을 표시해 상담원이 어제와 오늘을 구분할 수 있게 합니다. 없으면 어제 말한 \"내일\"을 여전히 내일로 읽습니다. 응답당 약 100~160토큰이 듭니다 — 예약 기능을 쓰지 않으면 끄세요.",
       "handoffNotice": "전환 시 고객에게 안내",
-      "handoffNoticeDesc": "대화가 담당자에게 넘어갈 때 봇이 조용해지기 전에 메시지를 보냅니다. 끄면 지금까지처럼 그냥 응답을 멈춥니다.",
+      "handoffNoticeDesc": "대화가 사람에게 넘어갈 때 봇이 조용해지기 전에 메시지를 보냅니다. 끄면 그냥 응답을 멈춥니다 — 지금까지의 동작입니다. 켜면 핸드오프마다 과금 메시지가 한 건 더 발생합니다.",
       "handoffNoticeTextLabel": "안내 메시지",
       "handoffNoticePlaceholder": "담당 부서로 전달하겠습니다. 곧 이곳으로 연락드리겠습니다.",
-      "handoffNoticeTextHint": "비워두면 위 문구를 사용합니다. \"사람을 연결해 드릴게요\"라는 표현은 피하세요 — 고객이 상대를 알 필요는 없고, 즉시 연결을 약속하면 대기열이 감당하지 못합니다."
+      "handoffNoticeTextHint": "비워두면 위 문구를 사용합니다. \"사람을 연결해 드릴게요\"라는 표현은 피하세요 — 고객이 상대를 알 필요는 없고, 즉시 연결을 약속하면 대기열이 감당하지 못합니다.",
+      "whatsappBudget": "WhatsApp 예산",
+      "whatsappBudgetDesc": "Meta 메시지 지출의 월 상한(USD). AI 예산과 별개입니다 — 10월부터 대화는 두 가지 통화로 비용이 발생합니다. 도달하면 자동화, 플로우, 브로드캐스트, AI 응답이 멈추지만 인박스의 상담원은 절대 막지 않습니다."
     },
     "aiKnowledge": {
       "loadFailed": "지식베이스를 불러오지 못했습니다",

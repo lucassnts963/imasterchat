@@ -43,7 +43,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, api_key, embeddings_api_key, embeddings_base_url, embeddings_model, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, audio_notice_text, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
+        'provider, model, base_url, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, monthly_budget_usd, whatsapp_monthly_budget_usd, api_key, embeddings_api_key, embeddings_base_url, embeddings_model, context_timestamps, handoff_notice_enabled, handoff_notice_text, new_session_hours, context_message_limit, audio_policy, audio_notice_text, audio_transcription_provider, elevenlabs_api_key, transcription_vocabulary',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -148,6 +148,18 @@ export async function POST(request: Request) {
     // Monthly AI budget in USD (migration 040): a positive number sets
     // it, an explicit null clears it, absent leaves it unchanged — the
     // same partial-save contract as handoff_agent_id.
+    // O teto de MENSAGEM, independente do de LLM. Mesma validação: um
+    // número positivo, ou nulo para "sem teto".
+    const waBudgetProvided = 'whatsapp_monthly_budget_usd' in body
+    let waBudgetUsd: number | null = null
+    if (waBudgetProvided && body.whatsapp_monthly_budget_usd !== null) {
+      const raw = Number(body.whatsapp_monthly_budget_usd)
+      if (!Number.isFinite(raw) || raw <= 0) {
+        return bad('whatsapp_monthly_budget_usd must be a positive number or null')
+      }
+      waBudgetUsd = Math.min(99_999_999, Math.round(raw * 100) / 100)
+    }
+
     const budgetProvided = 'monthly_budget_usd' in body
     let monthlyBudgetUsd: number | null = null
     if (budgetProvided && body.monthly_budget_usd !== null) {
@@ -290,6 +302,7 @@ export async function POST(request: Request) {
     // so a partial save (e.g. flipping a toggle) doesn't wipe it.
     if (handoffProvided) shared.handoff_agent_id = handoffAgentId
     if (budgetProvided) shared.monthly_budget_usd = monthlyBudgetUsd
+    if (waBudgetProvided) shared.whatsapp_monthly_budget_usd = waBudgetUsd
     if (rawEmbeddingsKey) {
       shared.embeddings_api_key = encrypt(rawEmbeddingsKey)
       shared.embeddings_base_url = embeddingsBaseUrl
