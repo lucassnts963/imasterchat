@@ -43,6 +43,7 @@ dois adaptadores sobre o que já existe.
 | **4. Módulo de cobrança** | régua, janela legal, agrupamento por titular, métricas por degrau | precisa da fase 1 pronta e do contador da fase 3 para ser precificável | [`04-fase-4-cobranca.md`](./04-fase-4-cobranca.md) |
 | **5. Integrações** | catálogo, planilha + webhook genérico, Asaas, depois Clube de Associados | o genérico atende todo cliente sem API — tira o roteiro da dependência de terceiros | [`05-fase-5-integracoes.md`](./05-fase-5-integracoes.md) |
 | **6. Múltiplas agendas** | várias agendas do Google | independente das outras; entra quando o cliente pedir | [`06-fase-6-multiplas-agendas.md`](./06-fase-6-multiplas-agendas.md) |
+| **7. Monitoramento de grupos** | assistir grupos de obra e classificar, sem nunca responder | frente à parte, com um bloqueio técnico próprio: a API oficial de grupos **não** serve para grupos que já existem | [`07-monitoramento-de-grupos.md`](./07-monitoramento-de-grupos.md) |
 
 ### Por que a fase 3 não vem primeiro, se tem prazo
 
