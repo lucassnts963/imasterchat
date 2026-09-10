@@ -495,7 +495,9 @@ export type AutomationStepType =
    *  não, fechado na fase 1 (R-7, R-8). */
   | 'send_media'
   | 'route_to_queue'
-  | 'handoff';
+  | 'handoff'
+  /** Devolve ao roteiro uma conversa que um fluxo pausou num handoff. */
+  | 'resume_flow';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
 

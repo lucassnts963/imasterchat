@@ -95,12 +95,74 @@ function isSchedulingNode(nodeType: string): boolean {
   return nodeType in SCHEDULING_SLOTS;
 }
 
+/**
+ * Nós que esperam o cliente e podem ter prazo próprio. A saída de prazo
+ * é um extra por cima do que cada um já tem — um botão não deixa de ser
+ * um botão porque o menu expira.
+ */
+const TIMEOUT_NODES = new Set([
+  "send_buttons",
+  "send_list",
+  "collect_input",
+  "offer_slots",
+]);
+
+const TIMEOUT_SLOT: NamedSlot = {
+  key: "on_timeout_next",
+  handle: "timeout",
+  label: "no reply in time",
+};
+
+/** A continuação de um handoff PAUSADO. Não existe no modo `end`. */
+const PAUSED_HANDOFF_SLOT: NamedSlot = {
+  key: "next_node_key",
+  handle: "next",
+  label: "handed back",
+};
+
+function isPausedHandoff(node: BuilderNode): boolean {
+  return (
+    node.node_type === "handoff" &&
+    (node.config as { mode?: string }).mode === "pause"
+  );
+}
+
+/**
+ * As saídas EXTRA de um nó, por cima das do próprio tipo.
+ *
+ * A de prazo só aparece quando o nó TEM prazo. Mostrar um conector de
+ * "ninguém respondeu" em todo menu encheria a tela de pontas soltas que
+ * nunca disparam, e o operador aprenderia a ignorá-las.
+ */
+function extraSlots(node: BuilderNode): NamedSlot[] {
+  if (TIMEOUT_NODES.has(node.node_type)) {
+    const cfg = node.config as {
+      timeout_minutes?: number;
+      on_timeout_next?: string;
+    };
+    return cfg.timeout_minutes || cfg.on_timeout_next ? [TIMEOUT_SLOT] : [];
+  }
+  if (isPausedHandoff(node)) return [PAUSED_HANDOFF_SLOT];
+  return [];
+}
+
 export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
   const knownKeys = new Set(nodes.map((n) => n.node_key));
   const edges: CanvasEdge[] = [];
 
   for (const node of nodes) {
     const cfg = node.config;
+    for (const slot of extraSlots(node)) {
+      const target = (cfg as Record<string, unknown>)[slot.key];
+      if (typeof target !== "string" || !knownKeys.has(target)) continue;
+      edges.push({
+        id: `${node.node_key}--${slot.handle}--${target}`,
+        source: node.node_key,
+        target,
+        sourceHandle: slot.handle,
+        label: slot.label,
+      });
+    }
     if (isSchedulingNode(node.node_type)) {
       for (const slot of SCHEDULING_SLOTS[node.node_type]) {
         const target = (cfg as Record<string, unknown>)[slot.key];
@@ -253,12 +315,20 @@ export interface OutgoingSlot {
 
 export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
   const cfg = node.config;
+  const extras = extraSlots(node).map((slot) => ({
+    id: slot.handle,
+    label: slot.label,
+  }));
   if (isSchedulingNode(node.node_type)) {
-    return SCHEDULING_SLOTS[node.node_type].map((slot) => ({
-      id: slot.handle,
-      label: slot.label,
-    }));
+    return [
+      ...SCHEDULING_SLOTS[node.node_type].map((slot) => ({
+        id: slot.handle,
+        label: slot.label,
+      })),
+      ...extras,
+    ];
   }
+
   switch (node.node_type) {
     case "start":
     case "send_message":
@@ -283,16 +353,19 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
       const buttons = Array.isArray((cfg as { buttons?: unknown }).buttons)
         ? ((cfg as { buttons: Array<Record<string, unknown>> }).buttons)
         : [];
-      return buttons
-        .filter((b) => typeof b.reply_id === "string" && b.reply_id)
-        .map((b) => {
-          const replyId = b.reply_id as string;
-          const title = typeof b.title === "string" ? b.title : null;
-          return {
-            id: `button:${replyId}`,
-            label: title ?? replyId,
-          };
-        });
+      return [
+        ...buttons
+          .filter((b) => typeof b.reply_id === "string" && b.reply_id)
+          .map((b) => {
+            const replyId = b.reply_id as string;
+            const title = typeof b.title === "string" ? b.title : null;
+            return {
+              id: `button:${replyId}`,
+              label: title ?? replyId,
+            };
+          }),
+        ...extras,
+      ];
     }
 
     case "send_list": {
@@ -315,7 +388,7 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
           });
         }
       }
-      return slots;
+      return [...slots, ...extras];
     }
 
     case "offer_slots":
@@ -326,9 +399,12 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
       // compilador continuar cobrando exaustividade dos outros.
       return [];
 
+    case "handoff":
+      // Só o modo `pause` tem saída: um handoff que encerra é terminal.
+      return extras;
+
     case "send_webhook":
     case "route_to_queue":
-    case "handoff":
     case "end":
       return [];
   }
@@ -349,6 +425,8 @@ export function applyEdgeConnection(
   sourceHandle: string,
   targetKey: string,
 ): Record<string, unknown> | null {
+  const extra = extraSlots(node).find((s) => s.handle === sourceHandle);
+  if (extra) return { [extra.key]: targetKey };
   if (isSchedulingNode(node.node_type)) {
     const slot = SCHEDULING_SLOTS[node.node_type].find(
       (candidate) => candidate.handle === sourceHandle,
@@ -463,6 +541,11 @@ function patchedConfigWithoutKey(
   deletedKey: string,
 ): Record<string, unknown> | null {
   const cfg = node.config;
+  for (const slot of extraSlots(node)) {
+    if ((cfg as Record<string, unknown>)[slot.key] === deletedKey) {
+      return { ...cfg, [slot.key]: "" };
+    }
+  }
   if (isSchedulingNode(node.node_type)) {
     const cleared: Record<string, unknown> = {};
     for (const slot of SCHEDULING_SLOTS[node.node_type]) {

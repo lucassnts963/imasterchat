@@ -473,3 +473,76 @@ início → Oferecer horários ─── escolheu ──→ Agendar ─── ag
   **Fazer:** adicionar o nó e tentar ativar sem ligar a saída de falha.
   **Esperar:** o painel de validação acusa. Um webhook que falha sem destino
   deixa o run morto no meio.
+
+---
+
+## Fase 2 — fluxos para GA (R-10 a R-13)
+
+**Preparação adicional**
+
+- [ ] `bash deploy/apply-migrations.sh` — a **079** precisa ter aplicado
+      (`flow_runs.resume_kind`).
+- [ ] O cron do fluxo rodando (o prazo por nó depende dele, como a espera).
+
+### F2.1 · Prazo por nó (R-10)
+
+- [ ] **⚡ 🔴 Um menu que ninguém responde desvia sozinho**
+  **Fazer:** menu com **Desistir depois de** 2 minutos e a saída **Sem resposta
+  no prazo** ligada a uma mensagem. Disparar e **não** responder.
+  **Esperar:** depois de ~2 min + o intervalo do cron, a mensagem da saída de
+  prazo chega.
+
+- [ ] **⚡ Responder cancela o prazo**
+  **Fazer:** o mesmo menu, mas tocar num botão dentro do prazo.
+  **Esperar:** o fluxo segue normalmente e **nada** da saída de prazo chega
+  depois.
+  **Por que importa:** sem isso o cron acorda um run que já andou e o manda pela
+  aresta de "ninguém respondeu" — depois de alguém ter respondido.
+
+- [ ] **Sem saída de prazo, o run encerra**
+  **Fazer:** pôr o prazo e deixar a saída vazia.
+  **Esperar:** o run vira `timed_out` na hora do prazo, e o contato fica livre.
+
+- [ ] **O conector só aparece quando existe prazo**
+  **Fazer:** abrir um menu sem prazo no canvas.
+  **Esperar:** **nenhum** conector de "sem resposta". Ele aparece assim que você
+  preenche os minutos.
+
+- [ ] **❓ O menor dos dois prazos vence**
+  **Fazer:** fluxo com `on_timeout_hours` de 1 hora e um nó com prazo de 5 min.
+  **Esperar:** o nó vence primeiro.
+  **E o contrário:** um nó com prazo de 48h num fluxo de 24h — a varredura de
+  abandono leva o run em 24h. Prazo de nó mede cliente calado, e é isso que a
+  varredura também mede.
+
+### F2.2 · Handoff que pausa (R-12)
+
+- [ ] **⚡ 🔴 A conversa vai para uma pessoa e o run continua vivo**
+  **Fazer:** nó **Passar para humano** com **Pausar — alguém pode devolver**, a
+  continuação ligada, e prazo de 4 horas. Disparar até chegar nele.
+  **Esperar:** a conversa aparece transferida na inbox; em `/flows/[id]/runs` o
+  run continua **ativo**, parado no nó.
+
+- [ ] **⚡ Devolver retoma o roteiro**
+  **Fazer:** `POST /api/flows/runs/resume` com `{"contactId":"…"}`, ou uma
+  automação com o passo **Retomar fluxo pausado**.
+  **Esperar:** a mensagem do nó seguinte chega, e a resposta automática da IA
+  **volta a funcionar** naquela conversa.
+  **Não pode:** o fluxo retomar falando enquanto a inbox ainda marca a conversa
+  como transferida.
+
+- [ ] **Ninguém devolve → o run encerra sozinho**
+  **Fazer:** deixar o prazo vencer.
+  **Esperar:** `timed_out` com `handoff_pause_expired`, e o contato liberado.
+  **Por que importa:** um run pausado para sempre bloqueia todo gatilho futuro
+  daquele contato.
+
+- [ ] **Devolver quem não está pausado responde 404**
+  **Fazer:** chamar a rota para um contato sem fluxo pausado.
+  **Esperar:** 404 com `no_paused_run` — e não 500.
+
+### F2.3 · GA (R-13)
+
+- [ ] **⚡ Nenhuma tela diz "beta"**
+  **Fazer:** olhar a barra lateral e o cabeçalho de `/flows`.
+  **Esperar:** sem chip. As rotas já estavam abertas desde o PR #134.

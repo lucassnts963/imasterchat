@@ -163,6 +163,9 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
       // Nada obrigatório: nota e atendente são opcionais, e sem os dois
       // a conversa cai na fila compartilhada — que é um destino válido.
       break
+    case 'resume_flow':
+      // Nada a configurar: age sobre o único run pausado do contato.
+      break
     case 'book_appointment':
     case 'reschedule_appointment':
       if (!nonEmpty(c.starts_at)) {

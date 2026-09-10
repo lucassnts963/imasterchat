@@ -34,7 +34,24 @@ export interface SendMessageNodeConfig {
   next_node_key: string;
 }
 
-export interface SendButtonsNodeConfig {
+/**
+ * Prazo do NÓ, distinto do prazo do run.
+ *
+ * `on_timeout_hours` do fluxo mede a conversa inteira; isto mede uma
+ * pergunta. "Este menu expira em 10 minutos, mas a coleta do CPF pode
+ * levar uma hora" só é dizível com os dois.
+ *
+ * Sem `on_timeout_next`, estourar o prazo encerra o run como
+ * `timed_out` — o mesmo desfecho da varredura, só que na hora certa.
+ */
+export interface NodeTimeoutConfig {
+  /** Minutos de silêncio até desistir. Ausente = sem prazo próprio. */
+  timeout_minutes?: number;
+  /** Para onde ir quando estourar. Ausente = encerra o run. */
+  on_timeout_next?: string;
+}
+
+export interface SendButtonsNodeConfig extends NodeTimeoutConfig {
   text: string;
   /** Optional header / footer lines around the buttons. */
   header_text?: string;
@@ -50,7 +67,7 @@ export interface SendButtonsNodeConfig {
   }>;
 }
 
-export interface SendListNodeConfig {
+export interface SendListNodeConfig extends NodeTimeoutConfig {
   text: string;
   /** Label of the tap-to-expand button on the message bubble. */
   button_label: string;
@@ -98,6 +115,21 @@ export interface SendMediaNodeConfig {
 }
 
 export interface HandoffNodeConfig {
+  /**
+   * O que acontece com o run.
+   *
+   * `end` (padrão, e o comportamento de sempre) encerra: a conversa é da
+   * pessoa e o roteiro acabou. `pause` deixa o run SUSPENSO, e alguém o
+   * devolve ao roteiro quando terminar — que é o que falta para cobrança:
+   * o cliente diz "quero negociar", um humano resolve, e nada devolve a
+   * pessoa ao fluxo.
+   */
+  mode?: "end" | "pause";
+  /** Só em `pause`: por onde o roteiro continua ao ser devolvido. */
+  next_node_key?: string;
+  /** Só em `pause`: horas até desistir e encerrar. Um run pausado para
+   *  sempre segura o índice de um run ativo por contato. */
+  pause_timeout_hours?: number;
   /** Optional internal note written to flow_run_events.payload.note. */
   note?: string;
   /**
@@ -116,7 +148,7 @@ export interface HandoffNodeConfig {
  * builder still surfaces the field so users can author flows that
  * v2 will start enforcing.
  */
-export interface CollectInputNodeConfig {
+export interface CollectInputNodeConfig extends NodeTimeoutConfig {
   /** Prompt text sent to the customer before they reply. */
   prompt_text: string;
   /**
@@ -187,7 +219,7 @@ export interface ConditionNodeConfig {
  * calculadas na hora e guardadas em `flow_runs.vars._offered_slots`, na
  * mesma ordem dos `reply_id`. O runner casa a resposta por índice.
  */
-export interface OfferSlotsNodeConfig {
+export interface OfferSlotsNodeConfig extends NodeTimeoutConfig {
   /** Texto acima da lista. */
   text: string;
   /** Rótulo do botão que abre a lista. */
@@ -455,9 +487,12 @@ export interface FlowRunRow {
   last_prompt_message_id: string | null;
   vars: Record<string, unknown>;
   reprompt_count: number;
-  /** Quando o cron deve retomar um run parado num nó `wait`. Null para
-   *  todo o resto — inclusive para quem espera o cliente. */
+  /** Quando o cron deve voltar para buscar este run. Null quando ele não
+   *  tem hora marcada. */
   resume_at?: string | null;
+  /** Por que ele tem hora marcada. Ver migração 079 — a varredura de
+   *  abandono trata cada motivo de um jeito. */
+  resume_kind?: "wait" | "node_timeout" | "handoff_pause" | null;
   started_at: string;
   last_advanced_at: string;
   ended_at: string | null;

@@ -103,6 +103,28 @@ menu expira em 10 minutos, mas a coleta do CPF pode levar uma hora".
   vence.
 - **A4** A varredura de abandono passa a considerar o prazo do nó, não só o do run.
 
+**Como ficou.** O prazo do nó reusa o relógio que o R-9 construiu — `resume_at`
+mais o cron — em vez de inventar um segundo. O que precisou nascer foi
+`resume_kind` (migração 079), porque **três motivos diferentes** levam um run a
+ter hora marcada e a varredura de abandono trata cada um de um jeito:
+
+| `resume_kind` | O que é | A varredura de abandono |
+|---|---|---|
+| `wait` | o fluxo decidiu dormir | **não pode matá-lo** — um "espera 3 dias" seria varrido em 24h |
+| `node_timeout` | o **cliente** está calado num menu | continua valendo: é exatamente o que ela mede, e o menor prazo vence |
+| `handoff_pause` | uma pessoa assumiu a conversa | continua valendo, para não segurar o contato para sempre |
+
+Sem essa coluna, a varredura teria de escolher entre matar quem dorme ou nunca
+cobrar quem se calou.
+
+Duas sutilezas que o teste cobre:
+
+- **Responder limpa o prazo.** Sem isso o cron acordaria um run que já andou e o
+  mandaria pela aresta de "ninguém respondeu" — depois de alguém ter respondido.
+- **O conector de prazo só aparece quando o nó tem prazo.** Mostrar "ninguém
+  respondeu" em todo menu encheria a tela de pontas soltas que nunca disparam, e
+  o operador aprenderia a ignorá-las.
+
 ### R-11 · Teste de ponta a ponta do motor — `M`
 
 Existe teste de validação, de arestas, de fallback e de layout. **Não existe um
@@ -117,7 +139,18 @@ prova.
 - **B3** Um teste do caminho de abandono: run que estoura o prazo e é encerrado
   pela varredura, liberando o índice de "um run ativo por contato".
 - **B4** Um teste da ponte da fase 1: automação inicia fluxo, fluxo termina,
-  automação de `tag_added` dispara.
+  automação de `tag_added` dispara. *(Coberto por `start-run.test.ts` e
+  `engine.test.ts` das automações; o teste de ponta a ponta cobre o motor.)*
+
+**Como ficou.** `end-to-end.test.ts` monta um banco duplo **com estado de
+verdade** — `flow_runs` e `flow_run_events` guardam o que foi escrito e as
+consultas leem de volta. É o que permite afirmar "o run avançou para X" em vez
+de "a função foi chamada", e foi o que permitiu cobrir a idempotência contra
+reentrega da Meta, que um mock de chamadas não alcança.
+
+Um dos testes verifica que o texto cru do cliente **não** entra no histórico: um
+`collect_input` que pergunta o cartão deixaria o número em `flow_run_events`
+para sempre.
 
 ### R-12 · Retomada depois do handoff — `P`
 
@@ -133,6 +166,19 @@ devolve a pessoa ao roteiro.
   um run pendurado para sempre segurando o contato.
 - **C4** O modo atual (encerrar no handoff) continua sendo o padrão.
 
+**Como ficou.** `handoff` ganhou `mode: 'end' | 'pause'`. Em `pause` o run fica
+**ativo**, parado no nó, com prazo próprio — e três caminhos o devolvem ao
+roteiro: `POST /api/flows/runs/resume`, o passo **Retomar fluxo pausado** da
+automação, e o vencimento do prazo (que encerra em vez de retomar).
+
+A devolução é endereçada pelo **contato**, não pelo id do run: quem clica é uma
+atendente olhando uma conversa, e ela não sabe o que é um run. O índice parcial
+de um run ativo por contato garante que existe no máximo um para devolver.
+
+Ao retomar, a conversa **volta a ser do robô** — `ai_autoreply_disabled` volta a
+falso. Sem isso o fluxo retomaria falando enquanto a inbox continua marcando a
+conversa como transferida.
+
 ### R-13 · Tirar o rótulo — `P`
 
 - **D1** Remover o chip `beta` da sidebar e do cabeçalho da lista.
@@ -140,6 +186,10 @@ devolve a pessoa ao roteiro.
   idiomas por causa de um chip é ruído de diff.
 - **D3** Só depois de R-10 a R-12 e da fase 1 estarem verdes. **O rótulo é a
   última coisa, não a primeira.**
+
+Feito nessa ordem: os chips saíram depois de o motor ter prazo por nó, retomada
+depois do handoff, e um teste que atravessa o motor inteiro — do gatilho por
+palavra-chave ao `end`, passando por menu, coleta, condição e etiqueta.
 
 ---
 

@@ -874,7 +874,8 @@
         "cancel_appointment": "Cancel Appointment",
         "send_media": "Send Media",
         "route_to_queue": "Route to Queue",
-        "handoff": "Hand off to a Human"
+        "handoff": "Hand off to a Human",
+        "resume_flow": "Resume Paused Flow"
       },
       "triggers": {
         "new_message_received": {
@@ -1036,7 +1037,8 @@
         "queuePlaceholder": "Queue ID",
         "routeReasonLabel": "Note for whoever picks it up",
         "handoffNoteLabel": "Internal note",
-        "handoffHint": "Pauses the bot on this conversation and leaves it for a person. Leaving the agent empty drops it into the shared queue."
+        "handoffHint": "Pauses the bot on this conversation and leaves it for a person. Leaving the agent empty drops it into the shared queue.",
+        "resumeFlowHint": "Hands a conversation back to the flow that paused it at a handoff. Does nothing if the contact has no paused flow."
       },
       "delete": "Delete"
     }
@@ -1226,7 +1228,17 @@
         "webhookUrl": "URL",
         "webhookBody": "Body (empty sends the run variables as JSON)",
         "onWebhookOk": "Call succeeded →",
-        "onWebhookFailed": "Call failed →"
+        "onWebhookFailed": "Call failed →",
+        "nodeTimeoutMinutes": "Give up after (minutes)",
+        "nodeTimeoutPlaceholder": "no timeout",
+        "onNoReply": "No reply in time →",
+        "nodeTimeoutHint": "This is the deadline for THIS question. The flow-wide timeout still applies as a ceiling — whichever is shorter wins.",
+        "handoffModeLabel": "What happens to the flow",
+        "handoffModeEnd": "End the flow here",
+        "handoffModePause": "Pause — someone can hand it back",
+        "onHandedBack": "When handed back →",
+        "pauseTimeoutHours": "Give up after (hours)",
+        "handoffPauseHint": "The run stays alive, waiting for someone to hand the conversation back. If nobody does within the deadline it ends, so the contact is not held forever."
       },
       "categories": {
         "messaging": "Messaging",

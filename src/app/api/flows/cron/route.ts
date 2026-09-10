@@ -59,8 +59,11 @@ export async function GET(request: Request) {
   // um run que acabou de voltar tem `last_advanced_at` atualizado e não
   // é candidato a abandono na mesma rodada.
   let resumed = 0
+  let expired = 0
   for (const due of await loadDueRuns()) {
-    if ((await resumeWaitingRun(due.id)) === 'resumed') resumed += 1
+    const outcome = await resumeWaitingRun(due.id)
+    if (outcome === 'resumed') resumed += 1
+    else if (outcome === 'timed_out') expired += 1
   }
 
   // Pull all currently-active runs along with their parent flow's
@@ -69,7 +72,7 @@ export async function GET(request: Request) {
   const { data: runs, error } = await admin
     .from('flow_runs')
     .select(
-      'id, flow_id, user_id, contact_id, last_advanced_at, resume_at, flows ( fallback_policy )',
+      'id, flow_id, user_id, contact_id, last_advanced_at, resume_at, resume_kind, flows ( fallback_policy )',
     )
     .eq('status', 'active')
 
@@ -77,7 +80,7 @@ export async function GET(request: Request) {
     console.error('[flows-cron] active-run scan failed:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  if (!runs?.length) return NextResponse.json({ swept: 0, resumed })
+  if (!runs?.length) return NextResponse.json({ swept: 0, resumed, expired })
 
   type Row = {
     id: string
@@ -86,6 +89,7 @@ export async function GET(request: Request) {
     contact_id: string | null
     last_advanced_at: string
     resume_at: string | null
+    resume_kind: string | null
     flows: { fallback_policy: unknown } | { fallback_policy: unknown }[] | null
   }
 
@@ -94,7 +98,16 @@ export async function GET(request: Request) {
     // Quem está dormindo num `wait` não está abandonado. Sem esta
     // guarda, um degrau de "espera 3 dias" seria varrido em 24 horas —
     // e a régua de cobrança pararia sozinha no segundo degrau.
-    if (r.resume_at && new Date(r.resume_at) > now) continue
+    //
+    // Só o `wait` ganha essa isenção, e a distinção é a razão de
+    // `resume_kind` existir (migração 079). Um prazo de NÓ mede o
+    // cliente calado, que é exatamente o que a política de abandono
+    // mede — ali o menor dos dois prazos tem de vencer, e a varredura
+    // continua valendo. Idem para uma conversa pausada num handoff que
+    // ninguém devolveu.
+    if (r.resume_kind === 'wait' && r.resume_at && new Date(r.resume_at) > now) {
+      continue
+    }
 
     const flowsField = Array.isArray(r.flows) ? r.flows[0] : r.flows
     const policy = resolveFallbackPolicy(flowsField?.fallback_policy ?? null)
@@ -129,5 +142,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ swept, resumed })
+  return NextResponse.json({ swept, resumed, expired })
 }

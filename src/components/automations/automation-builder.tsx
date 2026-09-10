@@ -40,6 +40,7 @@ import {
   Image as ImageIcon,
   Users,
   UserPlus,
+  PlayCircle,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -125,6 +126,7 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   send_media: { label: "send_media", icon: ImageIcon, border: "border-l-primary" },
   route_to_queue: { label: "route_to_queue", icon: Users, border: "border-l-amber-500" },
   handoff: { label: "handoff", icon: UserPlus, border: "border-l-amber-500" },
+  resume_flow: { label: "resume_flow", icon: PlayCircle, border: "border-l-sky-500" },
 }
 
 const ADDABLE_STEPS: AutomationStepType[] = [
@@ -148,6 +150,7 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "send_media",
   "route_to_queue",
   "handoff",
+  "resume_flow",
 ]
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType }[] = [
@@ -1681,6 +1684,12 @@ function StepEditor({
             {t("config.cancelAppointmentHint")}
           </p>
         </>
+      )
+    case "resume_flow":
+      return (
+        <p className="text-xs text-muted-foreground">
+          {t("config.resumeFlowHint")}
+        </p>
       )
     case "start_flow":
       return (

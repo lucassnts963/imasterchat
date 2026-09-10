@@ -86,6 +86,8 @@ import {
   type SendMediaNodeConfig,
   type SendMessageNodeConfig,
   type SetTagNodeConfig,
+  type HandoffNodeConfig,
+  type NodeTimeoutConfig,
   type SendTemplateNodeConfig,
   type UpdateContactFieldNodeConfig,
   type CreateDealNodeConfig,
@@ -503,8 +505,8 @@ async function executeHandoff(
   db: AdminClient,
   run: FlowRunRow,
   node: FlowNodeRow,
-): Promise<void> {
-  const cfg = node.config as { assign_to?: string; note?: string };
+): Promise<"ended" | "paused"> {
+  const cfg = node.config as unknown as HandoffNodeConfig;
   const convUpdate: Record<string, unknown> = {
     status: "pending",
     // Desliga a resposta automática, como o handoff do agente de IA já
@@ -531,11 +533,40 @@ async function executeHandoff(
       .update(convUpdate)
       .eq("id", run.conversation_id);
   }
+
+  // `pause` mantém o run VIVO, parado neste nó, à espera de alguém o
+  // devolver ao roteiro (`resumeHandoffPause`). O prazo não é opcional:
+  // um run pausado para sempre segura o índice de um run ativo por
+  // contato e bloqueia todo gatilho futuro daquela pessoa.
+  if (cfg.mode === "pause") {
+    const hours = Math.max(1, cfg.pause_timeout_hours ?? 24);
+    const resumeAt = new Date(Date.now() + hours * 3_600_000);
+    await db
+      .from("flow_runs")
+      .update({
+        current_node_key: node.node_key,
+        resume_at: resumeAt.toISOString(),
+        resume_kind: "handoff_pause",
+        last_advanced_at: new Date().toISOString(),
+      })
+      .eq("id", run.id)
+      .eq("status", "active");
+    await logEvent(db, run.id, "handoff", node.node_key, {
+      note: cfg.note ?? null,
+      assigned_to: cfg.assign_to ?? null,
+      mode: "pause",
+      give_up_at: resumeAt.toISOString(),
+    });
+    return "paused";
+  }
+
   await logEvent(db, run.id, "handoff", node.node_key, {
     note: cfg.note ?? null,
     assigned_to: cfg.assign_to ?? null,
+    mode: "end",
   });
   await endRun(db, run.id, "handed_off", "handoff_node");
+  return "ended";
 }
 
 /**
@@ -619,6 +650,48 @@ async function endRun(
       end_reason: reason,
     })
     .eq("id", runId);
+}
+
+/**
+ * Marca o prazo do nó que acabou de suspender, quando ele tem um.
+ *
+ * Reusa o mesmo relógio do `wait` — `resume_at` mais o cron — porque é
+ * o mesmo problema: alguém precisa voltar aqui sem que ninguém fale. O
+ * que muda é o `resume_kind`, e a diferença importa: um `wait` é o fluxo
+ * dormindo por vontade própria, e a varredura de abandono não pode
+ * matá-lo; um prazo de nó é o CLIENTE calado, que é exatamente o que a
+ * varredura mede.
+ */
+async function markNodeTimeout(
+  db: AdminClient,
+  run: FlowRunRow,
+  node: FlowNodeRow,
+): Promise<void> {
+  const cfg = node.config as unknown as NodeTimeoutConfig;
+  const minutes = cfg.timeout_minutes;
+  if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) {
+    // Sem prazo próprio: limpar o que porventura sobrou de um nó
+    // anterior, senão o run herda a hora marcada de outra pergunta.
+    if (run.resume_at) {
+      await db
+        .from("flow_runs")
+        .update({ resume_at: null, resume_kind: null })
+        .eq("id", run.id);
+      run.resume_at = null;
+      run.resume_kind = null;
+    }
+    return;
+  }
+  const resumeAt = new Date(Date.now() + minutes * 60_000);
+  await db
+    .from("flow_runs")
+    .update({
+      resume_at: resumeAt.toISOString(),
+      resume_kind: "node_timeout",
+    })
+    .eq("id", run.id);
+  run.resume_at = resumeAt.toISOString();
+  run.resume_kind = "node_timeout";
 }
 
 /** Quanto tempo um nó `wait` dorme, com piso de um segundo. */
@@ -998,6 +1071,8 @@ async function advanceFromNodeKey(
           reason: "lost_race_during_advance",
         });
       }
+      run.current_node_key = node.node_key;
+      await markNodeTimeout(db, run, node);
       return { outcome: "advanced" };
     }
     if (node.node_type === "condition") {
@@ -1200,6 +1275,7 @@ async function advanceFromNodeKey(
         .update({
           current_node_key: node.node_key,
           resume_at: resumeAt.toISOString(),
+          resume_kind: "wait",
           last_advanced_at: new Date().toISOString(),
         })
         .eq("id", run.id)
@@ -1243,6 +1319,7 @@ async function advanceFromNodeKey(
       );
       if (!advanced) return { outcome: "advanced" };
       run.current_node_key = node.node_key;
+      await markNodeTimeout(db, run, node);
       return { outcome: "advanced" };
     }
     if (node.node_type === "book_appointment") {
@@ -1354,6 +1431,8 @@ async function advanceFromNodeKey(
           reason: "lost_race_during_advance",
         });
       }
+      run.current_node_key = node.node_key;
+      await markNodeTimeout(db, run, node);
       return { outcome: "advanced" };
     }
     if (node.node_type === "send_list") {
@@ -1369,10 +1448,16 @@ async function advanceFromNodeKey(
           reason: "lost_race_during_advance",
         });
       }
+      run.current_node_key = node.node_key;
+      await markNodeTimeout(db, run, node);
       return { outcome: "advanced" };
     }
     if (node.node_type === "handoff") {
       await executeHandoff(db, run, node);
+      // Pausado ou encerrado, o laço para do mesmo jeito: a conversa é
+      // de uma pessoa agora, e continuar avançando seria falar por cima
+      // dela. A diferença entre os dois modos aparece depois — um run
+      // pausado ainda existe para ser devolvido.
       return { outcome: "handed_off" };
     }
     if (node.node_type === "end") {
@@ -1619,6 +1704,17 @@ async function handleReplyForActiveRun(
         .update({ reprompt_count: 0 })
         .eq("id", run.id);
       if (!error) run.reprompt_count = 0;
+    }
+    // O cliente respondeu: o prazo daquela pergunta não vale mais. Sem
+    // isto o cron acordaria um run que já andou e o mandaria pela aresta
+    // de "ninguém respondeu" — depois de alguém ter respondido.
+    if (run.resume_kind === "node_timeout") {
+      await db
+        .from("flow_runs")
+        .update({ resume_at: null, resume_kind: null })
+        .eq("id", run.id);
+      run.resume_at = null;
+      run.resume_kind = null;
     }
     const outcome = await advanceFromNodeKey(db, run, matched, nodes);
     return {
@@ -2084,24 +2180,33 @@ export async function loadDueRuns(limit = 200): Promise<DueRun[]> {
 
 export type ResumeOutcome =
   | "resumed"
+  | "timed_out"
   | "already_taken"
   | "not_waiting"
   | "error";
 
 /**
- * Retoma um run parado num `wait`.
+ * Volta para um run que tinha hora marcada.
  *
- * A limpeza de `resume_at` é a TRAVA: é feita com a precondição de que
- * ela ainda esteja preenchida, então duas execuções simultâneas do cron
- * não avançam o mesmo run duas vezes. Quem perder a corrida recebe zero
- * linhas e sai — que é o mesmo protocolo do `advanceCurrentNodeKey`.
+ * Três motivos levam um run a ter hora, e cada um termina diferente:
+ *
+ *   wait           avança para o nó seguinte — o fluxo só estava dormindo
+ *   node_timeout   o cliente não respondeu: segue pela aresta de prazo,
+ *                  ou encerra como `timed_out` quando não há aresta
+ *   handoff_pause  ninguém devolveu a conversa: encerra como `timed_out`,
+ *                  para não segurar o contato para sempre
+ *
+ * A limpeza de `resume_at` é a TRAVA: feita com a precondição de que ela
+ * ainda esteja preenchida, duas execuções simultâneas do cron não
+ * avançam o mesmo run duas vezes. Quem perde a corrida recebe zero
+ * linhas e sai — o mesmo protocolo do `advanceCurrentNodeKey`.
  */
 export async function resumeWaitingRun(runId: string): Promise<ResumeOutcome> {
   const db = supabaseAdmin();
   try {
     const { data: claimed, error: claimErr } = await db
       .from("flow_runs")
-      .update({ resume_at: null, last_advanced_at: new Date().toISOString() })
+      .update({ resume_at: null, resume_kind: null, last_advanced_at: new Date().toISOString() })
       .eq("id", runId)
       .eq("status", "active")
       .not("resume_at", "is", null)
@@ -2113,24 +2218,130 @@ export async function resumeWaitingRun(runId: string): Promise<ResumeOutcome> {
     const rows = (claimed as FlowRunRow[] | null) ?? [];
     if (rows.length === 0) return "already_taken";
     const run = rows[0];
-
+    // O UPDATE devolve a linha DEPOIS da escrita, então `resume_kind` já
+    // veio nulo. O motivo tem de sair do nó em que o run parou.
     const nodes = await loadAllNodes(db, run.flow_id);
     const node = run.current_node_key ? nodes.get(run.current_node_key) : null;
-    if (!node || node.node_type !== "wait") {
-      // O run mudou de nó entre a leitura e agora, ou o fluxo foi
-      // reescrito e o nó sumiu. Não é erro: o `resume_at` já foi
-      // limpo, e o run segue a vida por onde estiver.
+    if (!node) {
+      // O fluxo foi reescrito e o nó sumiu. Não dá para adivinhar por
+      // onde continuar; encerrar é mais honesto que deixar ativo.
+      await endRun(db, run.id, "timed_out", "resume_node_missing");
+      return "timed_out";
+    }
+
+    if (node.node_type === "wait") {
+      const cfg = node.config as unknown as WaitNodeConfig;
+      await advanceFromNodeKey(db, run, cfg.next_node_key, nodes);
+      return "resumed";
+    }
+
+    if (node.node_type === "handoff") {
+      await logEvent(db, run.id, "timeout", node.node_key, {
+        reason: "handoff_pause_expired",
+      });
+      await endRun(db, run.id, "timed_out", "handoff_pause_expired");
+      return "timed_out";
+    }
+
+    if (!isSuspending(node.node_type)) {
+      // Nem dormindo, nem transferido, nem esperando resposta: o fluxo
+      // foi reescrito debaixo do run e ele parou num nó que não tem
+      // prazo nenhum. Encerrar é mais honesto que deixar ativo — um run
+      // ativo sem quem o acorde segura o contato para sempre.
+      await logEvent(db, run.id, "error", node.node_key, {
+        reason: "resume_node_unexpected",
+        node_type: node.node_type,
+      });
+      await endRun(db, run.id, "timed_out", "resume_node_unexpected");
       return "not_waiting";
     }
 
-    const cfg = node.config as unknown as WaitNodeConfig;
-    await advanceFromNodeKey(db, run, cfg.next_node_key, nodes);
-    return "resumed";
+    // Sobra o prazo de um nó que esperava resposta.
+    const cfg = node.config as unknown as NodeTimeoutConfig;
+    await logEvent(db, run.id, "timeout", node.node_key, {
+      reason: "node_timeout",
+      timeout_minutes: cfg.timeout_minutes ?? null,
+    });
+    if (cfg.on_timeout_next) {
+      await advanceFromNodeKey(db, run, cfg.on_timeout_next, nodes);
+      return "resumed";
+    }
+    await endRun(db, run.id, "timed_out", "node_timeout");
+    return "timed_out";
   } catch (err) {
     console.error(
       "[flows] resumeWaitingRun threw:",
       err instanceof Error ? err.message : err,
     );
     return "error";
+  }
+}
+
+/**
+ * Devolve ao roteiro um run pausado num `handoff` — o que a pessoa que
+ * assumiu a conversa faz quando termina.
+ *
+ * Endereçado pelo CONTATO, e não pelo id do run: quem clica é uma
+ * atendente olhando uma conversa, e ela não sabe o que é um run. O
+ * índice de um run ativo por contato garante que existe no máximo um.
+ */
+export async function resumeHandoffPause(args: {
+  accountId: string;
+  contactId: string;
+}): Promise<
+  | { resumed: true; flowRunId: string }
+  | { resumed: false; reason: "no_paused_run" | "error" }
+> {
+  const db = supabaseAdmin();
+  try {
+    const { data, error } = await db
+      .from("flow_runs")
+      .update({ resume_at: null, resume_kind: null, last_advanced_at: new Date().toISOString() })
+      .eq("account_id", args.accountId)
+      .eq("contact_id", args.contactId)
+      .eq("status", "active")
+      .eq("resume_kind", "handoff_pause")
+      .select("*");
+    if (error) {
+      console.error("[flows] resumeHandoffPause error:", error.message);
+      return { resumed: false, reason: "error" };
+    }
+    const rows = (data as FlowRunRow[] | null) ?? [];
+    if (rows.length === 0) return { resumed: false, reason: "no_paused_run" };
+    const run = rows[0];
+
+    const nodes = await loadAllNodes(db, run.flow_id);
+    const node = run.current_node_key ? nodes.get(run.current_node_key) : null;
+    const next = (node?.config as unknown as HandoffNodeConfig | undefined)
+      ?.next_node_key;
+    if (!node || node.node_type !== "handoff" || !next) {
+      await endRun(db, run.id, "handed_off", "handoff_pause_no_continuation");
+      return { resumed: false, reason: "no_paused_run" };
+    }
+
+    // A conversa volta a ser do robô. Sem isto o fluxo retomaria falando
+    // enquanto a inbox continua marcando a conversa como transferida.
+    if (run.conversation_id) {
+      await db
+        .from("conversations")
+        .update({
+          ai_autoreply_disabled: false,
+          ai_handoff_summary: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", run.conversation_id);
+    }
+
+    await logEvent(db, run.id, "node_entered", node.node_key, {
+      resumed_from: "handoff_pause",
+    });
+    await advanceFromNodeKey(db, run, next, nodes);
+    return { resumed: true, flowRunId: run.id };
+  } catch (err) {
+    console.error(
+      "[flows] resumeHandoffPause threw:",
+      err instanceof Error ? err.message : err,
+    );
+    return { resumed: false, reason: "error" };
   }
 }

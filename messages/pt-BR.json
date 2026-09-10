@@ -984,7 +984,17 @@
         "webhookUrl": "URL",
         "webhookBody": "Corpo (vazio manda as variáveis do run como JSON)",
         "onWebhookOk": "Chamada deu certo →",
-        "onWebhookFailed": "Chamada falhou →"
+        "onWebhookFailed": "Chamada falhou →",
+        "nodeTimeoutMinutes": "Desistir depois de (minutos)",
+        "nodeTimeoutPlaceholder": "sem prazo",
+        "onNoReply": "Sem resposta no prazo →",
+        "nodeTimeoutHint": "Este é o prazo DESTA pergunta. O prazo do fluxo inteiro continua valendo como teto — o menor dos dois vence.",
+        "handoffModeLabel": "O que acontece com o fluxo",
+        "handoffModeEnd": "Encerrar o fluxo aqui",
+        "handoffModePause": "Pausar — alguém pode devolver",
+        "onHandedBack": "Quando devolverem →",
+        "pauseTimeoutHours": "Desistir depois de (horas)",
+        "handoffPauseHint": "O run continua vivo, esperando alguém devolver a conversa. Se ninguém devolver no prazo ele encerra, para não segurar o contato para sempre."
       },
       "categories": {
         "messaging": "Mensagens",
@@ -1205,7 +1215,8 @@
         "cancel_appointment": "Cancelar agendamento",
         "send_media": "Enviar mídia",
         "route_to_queue": "Encaminhar para fila",
-        "handoff": "Passar para humano"
+        "handoff": "Passar para humano",
+        "resume_flow": "Retomar fluxo pausado"
       },
       "triggers": {
         "new_message_received": {
@@ -1367,7 +1378,8 @@
         "queuePlaceholder": "ID da fila",
         "routeReasonLabel": "Nota para quem for atender",
         "handoffNoteLabel": "Nota interna",
-        "handoffHint": "Pausa o robô nesta conversa e deixa para uma pessoa. Sem atendente escolhido, cai na fila compartilhada."
+        "handoffHint": "Pausa o robô nesta conversa e deixa para uma pessoa. Sem atendente escolhido, cai na fila compartilhada.",
+        "resumeFlowHint": "Devolve a conversa ao fluxo que a pausou num handoff. Não faz nada se o contato não tiver fluxo pausado."
       },
       "delete": "Excluir"
     }

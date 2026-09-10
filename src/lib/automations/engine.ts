@@ -43,7 +43,11 @@ import { loadQueue, routeConversationToQueue } from '@/lib/actions/queue-routing
 import { handOffConversation } from '@/lib/conversations/handoff'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
-import { describeStartFlowRefusal, startFlowRun } from '@/lib/flows/engine'
+import {
+  describeStartFlowRefusal,
+  resumeHandoffPause,
+  startFlowRun,
+} from '@/lib/flows/engine'
 import {
   bookForContact,
   cancelForContact,
@@ -662,6 +666,20 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
         createdVia: 'native',
       })
       return result.ok ? 'appointment booked' : `not booked: ${result.message}`
+    }
+
+    case 'resume_flow': {
+      if (!args.contactId) throw new Error('resume_flow needs a contact')
+      const result = await resumeHandoffPause({
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+      })
+      // Contato sem fluxo pausado é o caso normal, não erro: a
+      // automação pode estar ligada a uma tag que também é aplicada
+      // fora de qualquer fluxo.
+      return result.resumed
+        ? `flow resumed (run ${result.flowRunId})`
+        : 'no paused flow to resume'
     }
 
     case 'close_conversation': {

@@ -185,6 +185,15 @@ export function NodeConfigForm({
             onChange={(v) => onUpdateConfig({ next_node_key: v })}
             label={t("advanceAfterCapture")}
           />
+          {showAdvanced && (
+            <NodeTimeoutRows
+              cfg={cfg as { timeout_minutes?: number; on_timeout_next?: string }}
+              allNodes={allNodes}
+              currentKey={node.node_key}
+              onUpdateConfig={onUpdateConfig}
+              t={t}
+            />
+          )}
         </>
       );
 
@@ -456,11 +465,12 @@ export function NodeConfigForm({
 
     case "handoff":
       return (
-        <TextRow
-          label={t("internalNote")}
-          value={(cfg as { note?: string }).note ?? ""}
-          onChange={(v) => onUpdateConfig({ note: v })}
-          rows={2}
+        <HandoffForm
+          cfg={cfg as HandoffCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
         />
       );
 
@@ -481,6 +491,8 @@ interface SendButtonsCfg {
   text?: string;
   footer_text?: string;
   buttons?: Array<{ reply_id: string; title: string; next_node_key: string }>;
+  timeout_minutes?: number;
+  on_timeout_next?: string;
 }
 
 function SendButtonsForm({
@@ -600,6 +612,15 @@ function SendButtonsForm({
           </Button>
         )}
       </div>
+      {showAdvanced && (
+        <NodeTimeoutRows
+          cfg={cfg}
+          allNodes={allNodes}
+          currentKey={currentKey}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      )}
     </>
   );
 }
@@ -612,6 +633,8 @@ interface SendListCfg {
   text?: string;
   button_label?: string;
   footer_text?: string;
+  timeout_minutes?: number;
+  on_timeout_next?: string;
   sections?: Array<{
     title?: string;
     rows: Array<{
@@ -839,6 +862,15 @@ function SendListForm({
           </Button>
         )}
       </div>
+      {showAdvanced && (
+        <NodeTimeoutRows
+          cfg={cfg}
+          allNodes={allNodes}
+          currentKey={currentKey}
+          onUpdateConfig={onUpdateConfig}
+          t={t}
+        />
+      )}
     </>
   );
 }
@@ -1353,6 +1385,8 @@ function SendMediaForm({
 // ============================================================
 
 interface OfferSlotsCfg {
+  timeout_minutes?: number;
+  on_timeout_next?: string;
   text?: string;
   button_label?: string;
   max_options?: number;
@@ -1438,6 +1472,13 @@ function OfferSlotsForm({
           ["no_slots_next", "onNoSlots"],
           ["on_error_next", "onCalendarError"],
         ]}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onUpdateConfig={onUpdateConfig}
+        t={t}
+      />
+      <NodeTimeoutRows
+        cfg={cfg}
         allNodes={allNodes}
         currentKey={currentKey}
         onUpdateConfig={onUpdateConfig}
@@ -1913,6 +1954,151 @@ function RouteToQueueForm({
         rows={2}
       />
       <p className="text-xs text-muted-foreground">{t("routeToQueueHint")}</p>
+    </>
+  );
+}
+
+// ============================================================
+// Prazo do nó e handoff que pausa — fase 2, R-10 e R-12
+// ============================================================
+
+/**
+ * O prazo de UMA pergunta, distinto do prazo da conversa inteira.
+ *
+ * Fica atrás de "opções avançadas" nos nós que esperam resposta porque a
+ * maioria dos fluxos não precisa dele — e um campo a mais em todo menu
+ * é um campo a mais para o operador decidir sem motivo.
+ */
+export function NodeTimeoutRows({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: { timeout_minutes?: number; on_timeout_next?: string };
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <>
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">
+          {t("nodeTimeoutMinutes")}
+        </label>
+        <Input
+          type="number"
+          min={1}
+          value={cfg.timeout_minutes ?? ""}
+          placeholder={t("nodeTimeoutPlaceholder")}
+          onChange={(e) =>
+            onUpdateConfig({
+              timeout_minutes: e.target.value
+                ? Math.max(1, Number(e.target.value))
+                : undefined,
+            })
+          }
+          className="bg-muted text-xs"
+        />
+      </div>
+      {cfg.timeout_minutes ? (
+        <>
+          <NextNodeRow
+            value={cfg.on_timeout_next ?? ""}
+            allNodes={allNodes}
+            currentKey={currentKey}
+            onChange={(v) => onUpdateConfig({ on_timeout_next: v })}
+            label={t("onNoReply")}
+          />
+          <p className="text-xs text-muted-foreground">{t("nodeTimeoutHint")}</p>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+interface HandoffCfg {
+  mode?: "end" | "pause";
+  note?: string;
+  assign_to?: string;
+  next_node_key?: string;
+  pause_timeout_hours?: number;
+}
+
+function HandoffForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+  t,
+}: {
+  cfg: HandoffCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const mode = cfg.mode ?? "end";
+  return (
+    <>
+      <TextRow
+        label={t("internalNote")}
+        value={cfg.note ?? ""}
+        onChange={(v) => onUpdateConfig({ note: v })}
+        rows={2}
+      />
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">
+          {t("handoffModeLabel")}
+        </label>
+        <Select
+          value={mode}
+          onValueChange={(v) => onUpdateConfig({ mode: v ?? "end" })}
+        >
+          <SelectTrigger className="bg-muted">
+            <SelectValue>
+              {labelOf({
+                end: t("handoffModeEnd"),
+                pause: t("handoffModePause"),
+              })(mode)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="end">{t("handoffModeEnd")}</SelectItem>
+            <SelectItem value="pause">{t("handoffModePause")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {mode === "pause" && (
+        <>
+          <NextNodeRow
+            value={cfg.next_node_key ?? ""}
+            allNodes={allNodes}
+            currentKey={currentKey}
+            onChange={(v) => onUpdateConfig({ next_node_key: v })}
+            label={t("onHandedBack")}
+          />
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">
+              {t("pauseTimeoutHours")}
+            </label>
+            <Input
+              type="number"
+              min={1}
+              value={cfg.pause_timeout_hours ?? 24}
+              onChange={(e) =>
+                onUpdateConfig({
+                  pause_timeout_hours: Math.max(1, Number(e.target.value)),
+                })
+              }
+              className="bg-muted text-xs"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">{t("handoffPauseHint")}</p>
+        </>
+      )}
     </>
   );
 }
