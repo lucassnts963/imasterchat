@@ -41,7 +41,8 @@
     "menuProfile": "Profile",
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
-    "agenda": "Agenda"
+    "agenda": "Agenda",
+    "cobrancas": "Collections"
   },
   "Header": {
     "dashboard": "Dashboard",
@@ -148,7 +149,8 @@
         "flow": "Flows",
         "broadcast": "Broadcasts",
         "api": "Public API",
-        "unknown": "Unknown"
+        "unknown": "Unknown",
+        "cobranca": "Collections"
       }
     }
   },
@@ -2702,5 +2704,48 @@
       "never": "Don't show this again",
       "close": "Close"
     }
+  },
+  "Cobrancas": {
+    "title": "Collections",
+    "description": "The ruler that chases overdue invoices, the wallet it works from, and where the data comes in.",
+    "ruler": "The ruler",
+    "rulerHint": "One step per contact moment, as an offset in days from the due date. Negative warns before it falls due — usually the step that recovers most.",
+    "active": "Active",
+    "legalWindow": "Enforced by the worker, not suggested here: Mon–Fri 08:00–20:00, Sat 08:00–14:00, no Sundays or public holidays, max {max} contacts per invoice every {dias} days.",
+    "offsetLabel": "Days from due date",
+    "daysFromDue": "days from due",
+    "templatePlaceholder": "Approved template name",
+    "addStep": "Add step",
+    "noSteps": "No steps yet. A ruler with no steps sends nothing.",
+    "save": "Save",
+    "saved": "Ruler saved.",
+    "wallet": "Wallet ({count})",
+    "searchPlaceholder": "Search…",
+    "orphans": "{count} invoice(s) matched no contact, so nothing is sent for them.",
+    "unmatched": "no contact",
+    "colWho": "Who",
+    "colDescription": "Description",
+    "colValue": "Amount",
+    "colDue": "Due",
+    "colStatus": "Status",
+    "emptyWallet": "Nothing here yet. Import a spreadsheet or push through the webhook.",
+    "status": {
+      "aberta": "Open",
+      "paga": "Paid",
+      "cancelada": "Cancelled",
+      "negociando": "Negotiating"
+    },
+    "import": "Import a spreadsheet",
+    "importHint": "Paste the CSV with a header row. It always checks before writing — half a wallet imported is worse than none.",
+    "checkFirst": "Check first",
+    "importNow": "Import",
+    "imported": "{count} invoice(s) imported.",
+    "previewSummary": "{validas} ready · {rejeitadas} rejected · {duplicadas} repeated in the file",
+    "csvEmpty": "Paste at least a header row and one line.",
+    "integrations": "Integrations",
+    "integrationsHint": "Where the wallet comes from. The generic webhook and the spreadsheet work with any system.",
+    "connected": "Connected",
+    "available": "Available",
+    "soon": "Soon"
   }
 }

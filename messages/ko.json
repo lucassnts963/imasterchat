@@ -41,7 +41,8 @@
     "menuProfile": "프로필",
     "menuSettings": "설정",
     "menuSignOut": "로그아웃",
-    "agenda": "일정"
+    "agenda": "일정",
+    "cobrancas": "수금"
   },
   "Header": {
     "dashboard": "대시보드",
@@ -148,7 +149,8 @@
         "flow": "플로우",
         "broadcast": "브로드캐스트",
         "api": "공개 API",
-        "unknown": "알 수 없음"
+        "unknown": "알 수 없음",
+        "cobranca": "수금"
       }
     }
   },
@@ -2702,5 +2704,48 @@
       "never": "다시 표시하지 않기",
       "close": "닫기"
     }
+  },
+  "Cobrancas": {
+    "title": "수금",
+    "description": "연체 청구를 추적하는 룰러, 대상이 되는 목록, 그리고 데이터가 들어오는 경로.",
+    "ruler": "룰러",
+    "rulerHint": "연락 시점마다 한 단계씩, 만기일 기준 일수로 지정합니다. 음수는 만기 전 안내로, 보통 회수율이 가장 높은 단계입니다.",
+    "active": "활성",
+    "legalWindow": "여기서 제안하는 것이 아니라 워커가 강제합니다: 월–금 08:00–20:00, 토 08:00–14:00, 일요일과 공휴일 제외, {dias}일마다 청구당 최대 {max}회.",
+    "offsetLabel": "만기일 기준 일수",
+    "daysFromDue": "일 (만기 기준)",
+    "templatePlaceholder": "승인된 템플릿 이름",
+    "addStep": "단계 추가",
+    "noSteps": "아직 단계가 없습니다. 단계 없는 룰러는 아무것도 보내지 않습니다.",
+    "save": "저장",
+    "saved": "룰러가 저장되었습니다.",
+    "wallet": "목록 ({count})",
+    "searchPlaceholder": "검색…",
+    "orphans": "{count}건이 연락처와 매칭되지 않아 아무것도 발송되지 않습니다.",
+    "unmatched": "연락처 없음",
+    "colWho": "대상",
+    "colDescription": "설명",
+    "colValue": "금액",
+    "colDue": "만기",
+    "colStatus": "상태",
+    "emptyWallet": "아직 비어 있습니다. 스프레드시트를 가져오거나 웹훅으로 보내세요.",
+    "status": {
+      "aberta": "미납",
+      "paga": "완납",
+      "cancelada": "취소",
+      "negociando": "협의 중"
+    },
+    "import": "스프레드시트 가져오기",
+    "importHint": "헤더가 있는 CSV를 붙여넣으세요. 쓰기 전에 항상 확인합니다 — 절반만 들어간 목록은 없는 것보다 나쁩니다.",
+    "checkFirst": "먼저 확인",
+    "importNow": "가져오기",
+    "imported": "{count}건을 가져왔습니다.",
+    "previewSummary": "{validas}건 준비 · {rejeitadas}건 거부 · 파일 내 중복 {duplicadas}건",
+    "csvEmpty": "헤더 한 줄과 데이터 한 줄 이상을 붙여넣으세요.",
+    "integrations": "연동",
+    "integrationsHint": "목록이 들어오는 경로입니다. 범용 웹훅과 스프레드시트는 어떤 시스템과도 동작합니다.",
+    "connected": "연결됨",
+    "available": "사용 가능",
+    "soon": "준비 중"
   }
 }

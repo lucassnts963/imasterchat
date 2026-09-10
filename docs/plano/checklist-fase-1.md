@@ -635,3 +635,176 @@ início → Oferecer horários ─── escolheu ──→ Agendar ─── ag
   cliente ao transferir**.
   **Esperar:** os dois dizem, com todas as letras, quanto custam. O aviso de
   transferência é **uma mensagem cobrada a mais** por transferência.
+
+---
+
+## Fases 4 e 5 — cobrança e integrações
+
+**Preparação adicional**
+
+- [ ] `bash deploy/apply-migrations.sh` — a **081** precisa ter aplicado.
+- [ ] O contêiner do cron **reiniciado**, para pegar a nova chamada de
+      `/api/cobrancas/cron`. Confira a linha `[cron] every … cobranca every …`.
+- [ ] Um **template APROVADO** de cobrança, com duas variáveis (valor e
+      vencimento).
+- [ ] Um **contato de teste** cujo telefone você conheça, já com conversa
+      aberta.
+
+> 🔴 **Tudo nesta seção manda mensagem de cobrança.** Use o seu próprio número
+> e uma conta de teste. Uma cobrança falsa enviada a um cliente real é o pior
+> erro que este módulo pode cometer.
+
+### F4.1 · A régua
+
+- [ ] **⚡ A tela existe e diz o que já está imposto**
+  **Fazer:** abrir **Cobrança** no menu.
+  **Esperar:** a faixa cinza dizendo "Imposto pelo worker, não sugerido aqui:
+  seg–sex 08h–20h, sáb 08h–14h, sem domingo e sem feriado, no máximo 4 contatos
+  por título a cada 30 dias".
+  **Por que importa:** a janela legal precisa ser visível como **estado**, não
+  como campo escondido.
+
+- [ ] **Um degrau sem template é recusado**
+  **Fazer:** adicionar degrau, deixar o template vazio, salvar.
+  **Esperar:** erro. Um degrau sem template é uma linha na tela que nunca manda
+  nada.
+
+- [ ] **🔴 O degrau do dia sai**
+  **Fazer:** régua ativa com um degrau `offset 0`. Importar uma cobrança com
+  vencimento **hoje** para o seu número. Chamar `/api/cobrancas/cron`.
+  **Esperar:** a mensagem chega; `regua_disparos` tem uma linha `enviado` com o
+  `message_id` preenchido.
+
+- [ ] **⚡ Rodar duas vezes não manda duas vezes** — *o teste que mais importa*
+  **Fazer:** chamar o cron de novo, imediatamente.
+  **Esperar:** **nenhuma** mensagem nova. A resposta traz o motivo em
+  `por_motivo`.
+  **Por que importa:** cobrar duas vezes um associado é o erro que custa o
+  cliente.
+
+- [ ] **⚡ Quem pagou no meio do caminho não é cobrado**
+  **Fazer:** marcar a cobrança como paga (pela API de baixa) e rodar o cron.
+  **Esperar:** nada sai. O worker reavalia o estado **no momento do disparo**.
+
+### F4.2 · A janela legal
+
+- [ ] **⚡ Nada sai de madrugada**
+  **Fazer:** rodar o cron fora da janela (ou ajustar a janela para uma faixa que
+  já passou).
+  **Esperar:** `por_motivo.fora_da_janela`, e **nenhuma** linha em
+  `regua_disparos`.
+  **Por que a ausência de linha importa:** o degrau é do dia, e ele tem de sair
+  quando a janela abrir. Gravar transformaria a proteção legal numa cobrança
+  perdida.
+
+- [ ] **E sai quando a janela abre**
+  **Fazer:** voltar a janela ao normal e rodar de novo, no mesmo dia.
+  **Esperar:** a mensagem sai.
+
+- [ ] **Domingo e feriado ficam de fora**
+  **Fazer:** inserir a data de hoje em `feriados` (com `account_id` da conta) e
+  rodar.
+  **Esperar:** suprimido por janela.
+
+### F4.3 · Anti-assédio e agrupamento
+
+- [ ] **⚡ 🔴 Três títulos, uma mensagem**
+  **Fazer:** importar três cobranças do **mesmo titular** vencendo hoje.
+  **Esperar:** **uma** mensagem, com os três títulos e o total somado; duas
+  linhas `suprimido / agrupado` apontando para a que saiu.
+  **Não pode:** três mensagens. Sem agrupamento a régua vira assédio por
+  construção.
+
+- [ ] **O intervalo mínimo segura o degrau seguinte**
+  **Fazer:** com um disparo de ontem, rodar o degrau de hoje.
+  **Esperar:** `intervalo_minimo`.
+
+- [ ] **O teto do período segura**
+  **Fazer:** quatro disparos no mês.
+  **Esperar:** `teto_atingido`.
+
+### F4.4 · Parar na resposta
+
+- [ ] **⚡ 🔴 O cliente responde e a régua pausa**
+  **Fazer:** responder a mensagem de cobrança pelo celular e rodar o cron no dia
+  do degrau seguinte.
+  **Esperar:** `pausada`. A conversa virou atendimento humano.
+
+- [ ] **A pausa expira**
+  **Fazer:** esperar mais que `pausa_apos_resposta_dias`.
+  **Esperar:** volta a cobrar.
+
+- [ ] **❓ Uma promessa reagenda**
+  **Fazer:** inserir uma linha em `cobranca_promessas` com data futura.
+  **Esperar:** `promessa` enquanto ela valer.
+
+### F4.5 · Quando dá errado
+
+- [ ] **Template inválido vira supressão, não "enviado"**
+  **Fazer:** apontar o degrau para um template que não existe.
+  **Esperar:** a linha fica `suprimido / erro`, com a mensagem do erro no texto.
+  **Não pode:** ficar como `enviado`. A trilha de auditoria é a defesa do
+  cliente se ele for questionado.
+
+- [ ] **O fluxo do degrau assume a conversa**
+  **Fazer:** apontar o degrau para um fluxo com menu ("já paguei / quero
+  negociar / segunda via") e responder.
+  **Esperar:** o menu chega.
+
+### F5.1 · Importação
+
+- [ ] **⚡ Confere antes de gravar**
+  **Fazer:** colar o CSV e clicar em **Conferir antes**.
+  **Esperar:** "N prontas · N recusadas · N repetidas no arquivo", e **nada**
+  gravado.
+
+- [ ] **⚡ Reimportar o mesmo arquivo não duplica**
+  **Fazer:** importar, e importar de novo.
+  **Esperar:** a carteira continua do mesmo tamanho.
+  **Por que importa:** carteira duplicada é duas mensagens de cobrança para a
+  mesma pessoa.
+
+- [ ] **O valor brasileiro é lido certo**
+  **Fazer:** uma linha com `1.234,56`.
+  **Esperar:** R$ 1.234,56 na tela — não R$ 1,23.
+
+- [ ] **A data não escorrega um dia**
+  **Fazer:** uma linha com `01/01/2027`.
+  **Esperar:** 01/01/2027, não 31/12/2026.
+
+- [ ] **Cobrança sem contato aparece, e não some**
+  **Fazer:** importar uma linha com telefone que não existe na base.
+  **Esperar:** o aviso amarelo "N cobrança(s) não casaram com nenhum contato", e
+  a linha na tabela marcada como **sem contato**.
+
+### F5.2 · Webhook genérico
+
+- [ ] **⚡ Empurrar funciona**
+  **Fazer:** criar uma chave de API com o escopo `cobrancas:write` e
+  `POST /api/v1/cobrancas` com uma cobrança.
+  **Esperar:** 201, com `gravadas: 1`.
+
+- [ ] **⚡ Reentrega não duplica**
+  **Fazer:** repetir o mesmo POST.
+  **Esperar:** a carteira não cresce.
+
+- [ ] **A baixa para a régua**
+  **Fazer:** `POST /api/v1/cobrancas/{id_externo}/pagamento`.
+  **Esperar:** 200; a cobrança vira `paga`; o degrau seguinte não sai.
+
+- [ ] **Id que não existe responde 404**
+  **Esperar:** 404 com `not_found` — e não 500. "Não existe aqui" é uma
+  resposta legítima.
+
+- [ ] **As linhas recusadas voltam com o motivo**
+  **Fazer:** mandar uma cobrança sem valor.
+  **Esperar:** `rejeitadas: 1` e `por_erro`. "Mandei e não chegou" precisa ser
+  respondível pelo lado de quem mandou.
+
+### F5.3 · Catálogo
+
+- [ ] **O catálogo mostra o que ainda não existe**
+  **Esperar:** Asaas, Iugu, Superlógica e Clube de Associados aparecem marcados
+  como **Em breve**.
+  **Por que assim:** o catálogo é argumento comercial antes de ser recurso
+  técnico. Esconder o roteiro transforma-o num segredo interno.

@@ -41,7 +41,8 @@
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
     "menuSignOut": "Sair",
-    "agenda": "Agenda"
+    "agenda": "Agenda",
+    "cobrancas": "Cobrança"
   },
   "Header": {
     "dashboard": "Painel",
@@ -148,7 +149,8 @@
         "flow": "Fluxos",
         "broadcast": "Broadcasts",
         "api": "API pública",
-        "unknown": "Desconhecida"
+        "unknown": "Desconhecida",
+        "cobranca": "Cobrança"
       }
     }
   },
@@ -2702,5 +2704,48 @@
       "never": "Não exibir novamente",
       "close": "Fechar"
     }
+  },
+  "Cobrancas": {
+    "title": "Cobrança",
+    "description": "A régua que persegue o que venceu, a carteira em que ela trabalha, e por onde os dados entram.",
+    "ruler": "A régua",
+    "rulerHint": "Um degrau por momento de contato, em dias a partir do vencimento. Negativo avisa ANTES de vencer — costuma ser o degrau que mais recupera.",
+    "active": "Ativa",
+    "legalWindow": "Imposto pelo worker, não sugerido aqui: seg–sex 08h–20h, sáb 08h–14h, sem domingo e sem feriado, no máximo {max} contatos por título a cada {dias} dias.",
+    "offsetLabel": "Dias do vencimento",
+    "daysFromDue": "dias do vencimento",
+    "templatePlaceholder": "Nome do template aprovado",
+    "addStep": "Adicionar degrau",
+    "noSteps": "Nenhum degrau ainda. Uma régua sem degrau não manda nada.",
+    "save": "Salvar",
+    "saved": "Régua salva.",
+    "wallet": "Carteira ({count})",
+    "searchPlaceholder": "Buscar…",
+    "orphans": "{count} cobrança(s) não casaram com nenhum contato, então nada é enviado para elas.",
+    "unmatched": "sem contato",
+    "colWho": "Quem",
+    "colDescription": "Descrição",
+    "colValue": "Valor",
+    "colDue": "Vencimento",
+    "colStatus": "Situação",
+    "emptyWallet": "Nada aqui ainda. Importe uma planilha ou empurre pelo webhook.",
+    "status": {
+      "aberta": "Em aberto",
+      "paga": "Paga",
+      "cancelada": "Cancelada",
+      "negociando": "Negociando"
+    },
+    "import": "Importar planilha",
+    "importHint": "Cole o CSV com a linha de cabeçalho. Sempre confere antes de gravar — meia carteira importada é pior que nenhuma.",
+    "checkFirst": "Conferir antes",
+    "importNow": "Importar",
+    "imported": "{count} cobrança(s) importada(s).",
+    "previewSummary": "{validas} prontas · {rejeitadas} recusadas · {duplicadas} repetidas no arquivo",
+    "csvEmpty": "Cole ao menos o cabeçalho e uma linha.",
+    "integrations": "Integrações",
+    "integrationsHint": "De onde a carteira vem. O webhook genérico e a planilha funcionam com qualquer sistema.",
+    "connected": "Conectada",
+    "available": "Disponível",
+    "soon": "Em breve"
   }
 }

@@ -40,7 +40,7 @@ não observa nada enquanto espera, e o D+5 sai para quem já quitou.
 
 ## 3. Modelo de dados
 
-### R-18 · Espelho das cobranças — `M`
+### R-18 · Espelho das cobranças — `M` — **feito**
 
 Uma tabela `cobrancas` por conta. É o espelho local do que vem de fora; sem ela
 não há como saber a quem, quando, nem parar de cobrar quem pagou.
@@ -63,7 +63,7 @@ não há como saber a quem, quando, nem parar de cobrar quem pagou.
 - **A3** Cobrança sem contato casado não dispara nada e aparece numa fila de
   "não identificados" com o telefone bruto, para o operador resolver.
 
-### R-19 · A régua — `M`
+### R-19 · A régua — `M` — **feito**
 
 Não uma automação: uma lista de degraus por conta.
 
@@ -83,7 +83,7 @@ Não uma automação: uma lista de degraus por conta.
 - **B3** Ordem por `offset_dias`, e **intervalo mínimo entre degraus** validado
   ao salvar — ver R-21.
 
-### R-20 · Registro de disparo com idempotência — `P`
+### R-20 · Registro de disparo com idempotência — `P` — **feito**
 
 Uma linha por `(cobranca_id, degrau_id)`, **única**.
 
@@ -104,7 +104,7 @@ Uma linha por `(cobranca_id, degrau_id)`, **única**.
 Este é o §2.1 de [`../posicionamento-cobranca.md`](../posicionamento-cobranca.md)
 virando requisito. **Nada disto é sugestão de tela: é o worker que recusa.**
 
-### R-21 · Janela legal e teto anti-assédio — `M`
+### R-21 · Janela legal e teto anti-assédio — `M` — **feito**
 
 | Regra | Origem | Requisito |
 |---|---|---|
@@ -123,7 +123,7 @@ virando requisito. **Nada disto é sugestão de tela: é o worker que recusa.**
 > cliente. E "a régua respeita CDC e horário legal" é argumento comercial direto
 > contra quem manda mensagem por script de planilha.
 
-### R-22 · Agrupamento por titular — `M`
+### R-22 · Agrupamento por titular — `M` — **feito**
 
 Quem tem três títulos vencidos recebe **uma** mensagem, não três. Sem isso a
 régua vira assédio por construção.
@@ -134,7 +134,7 @@ régua vira assédio por construção.
 - **E3** Suprimidos por agrupamento ficam registrados apontando para o disparo
   que os cobriu (R-20 C4).
 
-### R-23 · Parar na resposta — `P`
+### R-23 · Parar na resposta — `P` — **feito**
 
 Cliente respondeu — negociando, contestando ou avisando que pagou — a régua
 **pausa** e vira atendimento humano. Continuar disparando por cima é o caminho
@@ -145,7 +145,7 @@ mais rápido para virar reclamação.
 - **F2** A pausa tem prazo configurável; vencido, a régua retoma de onde parou.
 - **F3** Pausa e retomada aparecem na conversa, não só no log.
 
-### R-24 · Promessa de pagamento — `P`
+### R-24 · Promessa de pagamento — `P` — **parcial**
 
 "Pago sexta" precisa reagendar o próximo degrau, não repetir a mesma cobrança
 quinta.
@@ -156,7 +156,7 @@ quinta.
 - **G4** Registrável pelo atendente na inbox **e** por nó de fluxo — o cliente que
   responde "3" no menu de "quando você consegue pagar?" registra sozinho.
 
-### R-25 · Baixa e parada automática — `P`
+### R-25 · Baixa e parada automática — `P` — **feito**
 
 - **H1** Cobrança que vira `paga` sai da régua imediatamente.
 - **H2** O worker **reavalia o estado no momento do disparo**, não no momento do
@@ -199,7 +199,7 @@ worker diário
 
 ## 6. Tela e números
 
-### R-26 · Configuração da régua — `M`
+### R-26 · Configuração da régua — `M` — **parcial**
 
 - **J1** Editor de degraus com pré-visualização do texto renderizado com dados
   reais de uma cobrança de exemplo.
@@ -209,7 +209,7 @@ worker diário
   próximos 30 dias, custando ~US$ X" — usando a tabela de preços da fase 3.
 - **J4** Lista de cobranças com filtro por status, vencimento e degrau atual.
 
-### R-27 · Métrica por degrau — `M`
+### R-27 · Métrica por degrau — `M` — **feito (API)**
 
 É o relatório que justifica a mensalidade, e o que permite ao cliente cortar o
 degrau que só gasta.
@@ -221,7 +221,7 @@ degrau que só gasta.
 - **K4** Ressalva honesta na tela: atribuição por janela temporal não é prova de
   causalidade. Quem pagaria de qualquer jeito também entra na conta.
 
-### R-28 · Trilha de auditoria — `P`
+### R-28 · Trilha de auditoria — `P` — **feito (dados)**
 
 - **L1** Exportação de tudo que foi enviado a um titular: quando, qual texto,
   por qual degrau, com qual resultado.
@@ -283,3 +283,57 @@ ficar refém de um fornecedor terceiro.
 
 **Total ~5 semanas**, com o bloco de dados + worker mínimo já disparando de
 verdade na segunda.
+
+---
+
+## 11. Como ficou
+
+### O que a implementação confirmou do desenho
+
+A separação em três camadas — **planejador puro**, **store**, **worker** —
+pagou-se no primeiro teste. "O associado que tem três títulos vencidos e
+prometeu pagar sexta, num sábado à tarde de véspera de feriado" é um caso que
+não dá para montar num banco de verdade sem uma tarde de trabalho, e leva uma
+linha em `regua.test.ts`.
+
+### Cinco decisões que só apareceram ao escrever
+
+**1. A unicidade é PARCIAL.** A ideia original era uma linha por
+`(cobrança, degrau)`. Escrevendo o worker, ficou claro que isso transformaria a
+proteção legal numa cobrança perdida: um degrau suprimido às 3h por estar fora
+da janela não poderia mais ser enviado às 9h do **mesmo dia**. O índice cobre só
+`resultado = 'enviado'`. Supressão é linha de auditoria e pode repetir; envio,
+não.
+
+**2. `fora_da_janela` não vira linha.** Consequência da anterior, e a única
+supressão que não é registrada — pelo mesmo motivo.
+
+**3. A marca é gravada ANTES do envio.** Na ordem inversa, dois workers
+simultâneos mandariam duas vezes e só o segundo `insert` falharia — depois de o
+cliente já ter recebido duas cobranças. Gravar antes troca "cobrou duas vezes"
+por "pode não ter cobrado uma vez", e a segunda é recuperável.
+
+**4. O degrau é do dia EXATO, não "a partir de".** Uma régua que dispara tudo o
+que passou quando o worker fica um dia fora do ar manda quatro mensagens de uma
+vez para a mesma pessoa — que é a definição de assédio por construção.
+
+**5. O cron roda de HORA em hora, não uma vez por dia.** Consequência direta da
+janela legal: uma rodada diária às 3h não mandaria nada, nunca. Rodar várias
+vezes é seguro por construção, pela unicidade parcial.
+
+### O que ficou parcial, e por quê
+
+| Requisito | O que existe | O que falta |
+|---|---|---|
+| **R-24 promessa** | tabela, leitura no planejador, e o degrau é suprimido enquanto ela vale | a tela para registrar. Hoje entra por SQL ou pela API — o nó de fluxo que registra a promessa é trabalho de tela, não de motor |
+| **R-26 tela** | degraus, ativação, carteira, importação, catálogo | a pré-visualização do texto renderizado e a simulação de custo. As duas dependem de ler o template aprovado na Meta, que é uma consulta a mais |
+| **R-27 métrica** | `/api/cobrancas/metricas`, com custo real por degrau vindo da fase 3 | a tela. A API já devolve a **ressalva** sobre atribuição junto do número |
+| **R-28 auditoria** | `regua_disparos` guarda o texto como foi enviado, o motivo de cada supressão e o `message_id` | a exportação por titular |
+
+### Riscos que continuam de pé
+
+- **Nenhum cliente real ainda.** A §8 continua valendo: ticket e volume mudam o
+  desenho do agrupamento e do horário, e isso só se descobre com carteira de
+  verdade.
+- **A tarifa de serviço da Meta** (D-4) entra na simulação de custo da régua
+  quando existir.

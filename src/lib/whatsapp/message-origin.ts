@@ -21,6 +21,10 @@ export const MESSAGE_ORIGINS = [
   'broadcast',
   /** API pública (`/api/v1/messages`). */
   'api',
+  /** Régua de cobrança. Separada de `automation` porque é a superfície
+   *  que mais multiplica mensagem sem ninguém ver, e o operador precisa
+   *  enxergá-la sozinha na conta do mês. */
+  'cobranca',
 ] as const
 
 export type MessageOrigin = (typeof MESSAGE_ORIGINS)[number]
@@ -39,6 +43,7 @@ export const BLOCKABLE_ORIGINS: readonly MessageOrigin[] = [
   'flow',
   'broadcast',
   'api',
+  'cobranca',
 ]
 
 export function isBlockableOrigin(origin: string | null | undefined): boolean {

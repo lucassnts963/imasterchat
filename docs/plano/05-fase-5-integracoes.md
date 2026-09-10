@@ -35,7 +35,7 @@ src/lib/integrations/
   clube-associados/
 ```
 
-### R-29 · Catálogo e contrato — `M`
+### R-29 · Catálogo e contrato — `M` — **feito**
 
 - **A1** `catalog.ts` com uma entrada por sistema: id, rótulo, o que faz, onde
   pegar a credencial, e o que a integração **fornece** (cobranças · pagamentos ·
@@ -54,7 +54,7 @@ src/lib/integrations/
   declara qual dos dois é, e a tela mostra a **janela de erro** que isso implica
   (fase 4, R-25 H3).
 
-### R-30 · Estado e diagnóstico — `P`
+### R-30 · Estado e diagnóstico — `P` — **parcial**
 
 Integração que falha em silêncio é pior que integração que não existe.
 
@@ -81,7 +81,7 @@ Integração que falha em silêncio é pior que integração que não existe.
 
 ## 4. Item 1 — o genérico (entra com a fase 4)
 
-### R-31 · Importador de planilha — `M`
+### R-31 · Importador de planilha — `M` — **feito**
 
 - **C1** Upload de CSV/XLSX com mapeamento de colunas na tela — o cliente não vai
   reformatar a planilha dele.
@@ -96,7 +96,7 @@ Integração que falha em silêncio é pior que integração que não existe.
 - **C5** Registro de qual importação criou cada cobrança, e desfazer de uma
   importação inteira.
 
-### R-32 · Webhook genérico de entrada — `M`
+### R-32 · Webhook genérico de entrada — `M` — **feito**
 
 Um endpoint nosso que qualquer sistema chama.
 
@@ -176,3 +176,36 @@ segundos. Sem webhook, existe a janela de erro do R-29 A5.
 | Clube de Associados | **não estimável** | quando D-2 for respondida |
 
 **Núcleo ~2,5 semanas**, sobreposto à fase 4. Asaas e Clube são incrementos.
+
+---
+
+## 9. Como ficou
+
+O **item 1** — planilha e webhook genérico — está entregue, e é o que importava:
+o roteiro deixou de depender de um fornecedor terceiro. O cliente do Clube de
+Associados é atendido **hoje**, exportando a planilha do sistema dele, e o
+adaptador dedicado só vai melhorar a frequência de atualização.
+
+Uma decisão de implementação que vale registrar: **o CSV é colado, não enviado
+como arquivo**. Parsear XLSX no servidor pediria uma dependência grande para
+resolver um problema que o cliente resolve melhor — ele já tem a planilha aberta
+e copia. O parser aceita vírgula e ponto e vírgula, porque o Excel em português
+usa o segundo.
+
+O normalizador (`integrations/normalize.ts`) é puro e é o mesmo caminho para a
+planilha e para o webhook, porque os dois problemas são o mesmo: alguém mandou
+campos com os nomes dele. Ser puro é o que permite a **pré-visualização honesta**
+antes de gravar — quantas linhas casam, quantas ficam órfãs, quantas são
+duplicata — sem escrever nada.
+
+Dois detalhes que só aparecem com dado real:
+
+- **`1.234,56` e `1,234.56` são o mesmo número.** Adivinhar errado transforma
+  R$ 1.234,56 em R$ 1,23, e uma cobrança com o valor errado é contestável.
+- **Datas não passam por `new Date`.** `new Date('2026-01-01')` é meia-noite UTC,
+  que no Brasil é 31/12 — e uma cobrança com a data errada por um dia dispara o
+  degrau errado.
+
+**R-30 ficou parcial:** a tela mostra o catálogo e o estado de conexão, mas o
+"sincronizar agora" e a mensagem do último erro entram com o primeiro adaptador
+que puxa dados (Asaas), porque antes dele não há o que sincronizar.
